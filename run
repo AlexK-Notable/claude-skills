@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# cron-claude/run NAME — invoke prompts/NAME, log to logs/NAME-<timestamp>.log
+#
+# Cron-friendly: exports a sane PATH so `claude` resolves even with cron's
+# barebones environment. Errors out loudly if the prompt isn't executable
+# (silent failures in cron are the worst kind).
+
+set -euo pipefail
+
+NAME="${1:?usage: $(basename "$0") <prompt-name>}"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PROMPT="$HERE/prompts/$NAME"
+
+if [ ! -f "$PROMPT" ]; then
+  echo "error: no such prompt: $PROMPT" >&2
+  exit 2
+fi
+if [ ! -x "$PROMPT" ]; then
+  echo "error: prompt not executable (chmod +x): $PROMPT" >&2
+  exit 2
+fi
+
+# Cron has no PATH by default. Make sure claude (in ~/.local/bin) is reachable.
+export PATH="$HOME/.local/bin:$HOME/bin:/usr/local/bin:/usr/bin:/bin"
+
+mkdir -p "$HERE/logs"
+LOG="$HERE/logs/$NAME-$(date +%Y%m%d-%H%M%S).log"
+
+# `tee` so manual runs see output live; cron will just consume the stdout.
+{
+  echo "=== $NAME @ $(date -Iseconds) ==="
+  "$PROMPT"
+  echo "=== exit: $? ==="
+} 2>&1 | tee "$LOG"

@@ -1,0 +1,17 @@
+# Captured runs — keep the directory, drop the contents.
+/logs/*
+!/logs/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# uv-managed virtualenv (uv.lock IS tracked)
+.venv/

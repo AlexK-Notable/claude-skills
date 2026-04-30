@@ -1,0 +1,45 @@
+[project]
+name = "cron-claude"
+version = "0.0.1"
+description = "Schedule and manage local claude -p invocations via systemd user timers."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Alex K", email = "alexkechichian1@gmail.com" },
+]
+keywords = ["claude", "claude-code", "scheduler", "systemd", "cron", "automation"]
+dependencies = [
+    "typer>=0.12",
+    "rich>=13.7",
+]
+
+[project.optional-dependencies]
+tui = ["textual>=0.80"]
+
+[project.scripts]
+cron-claude = "cron_claude.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cron_claude"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
