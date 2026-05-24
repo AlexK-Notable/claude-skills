@@ -287,7 +287,10 @@ VERIFICATION TASKS:
      - Delete $DRAFT_FILE.
      - Run: cd $SKILL_DIR && git add skills/home-network/references/DEVICES.md
        skills/home-network/references/DEVICES.draft.${TASK_ID}.md &&
-       git commit -m "home-net-learn: add ${RESOLVED_NAME:-${RESOLVED_IP}}"
+       git commit -m "home-net-learn: add ${RESOLVED_NAME:-${RESOLVED_IP}}" &&
+       git push origin main
+     - If git push fails (network, auth, conflict), DO NOT panic — leave
+       the commit local and include "push failed" in your verdict reasoning.
 
    REVIEW-NEEDED (probe mismatched OR collision OR role ambiguous):
      - Write $REVIEW_FILE with: what was checked, what failed, suggested fixes.

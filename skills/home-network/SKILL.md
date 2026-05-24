@@ -1,6 +1,6 @@
 ---
 name: home-network
-description: Use when working with the home LAN — discovering devices, troubleshooting connectivity, configuring ufw firewall rules, opening/closing ports, looking up IPs/hostnames/MAC addresses, scanning subnets, probing services with mDNS/avahi/arping/nmap/dig, working with router DHCP leases, debugging "can't reach" or "host unreachable" symptoms, managing wake-on-LAN, or referencing specific known devices (indiedroid nova running bredOS, raspberry pi, 3D printer / klipper / bigtreetech CB2, AT&T residential gateway, MacBook/iPad/iPhone, Matter/Thread IoT, Amazon Echo, Sunshine streaming host). Includes a self-healing learn loop (home-net-learn) that grows the device inventory via background agent verification.
+description: Use when working with the home LAN — discovering devices, troubleshooting connectivity, configuring ufw firewall rules, opening/closing ports, looking up IPs/hostnames/MAC addresses, scanning subnets, probing services with mDNS/avahi/arping/nmap/dig, working with router DHCP leases, debugging "can't reach" or "host unreachable" symptoms, managing wake-on-LAN, or referencing specific known devices (indiedroid nova running bredOS, raspberry pi, 3D printer / klipper / bigtreetech CB2, AT&T residential gateway, MacBook/iPad/iPhone, Matter/Thread IoT, Amazon Echo, Sunshine streaming host). The skill is SELF-UPDATING: it includes home-net-learn for device-specific discovery and home-net-capture for general findings — both spawn background `claude -p` agents that verify and merge new knowledge into the skill's reference docs without blocking your shell. At the end of any meaningful /home-network task, follow the Knowledge Capture Protocol section to keep the skill growing with use.
 ---
 
 # home-network
@@ -144,10 +144,102 @@ wol AA:BB:CC:DD:EE:FF       # raw MAC
 (Requires the target NIC to have WoL enabled in BIOS + OS. See
 [TROUBLESHOOTING.md §5](references/TROUBLESHOOTING.md#5-wake-on-lan-doesnt-work).)
 
-## The Self-Healing Loop
+## Knowledge Capture Protocol (read this every session)
 
-`home-net-learn` is the experimental piece. Goal: the skill's device
-inventory grows with use, without blocking your shell.
+**Standard practice for /home-network: at the end of any task that
+produced new knowledge, fire a capture.** The skill grows in proportion
+to its use only if you keep this habit.
+
+### When to capture (decision heuristic)
+
+After helping the user, ask yourself: *did I learn something the docs
+don't already have?* Check against these categories:
+
+| Category | Capture if… | Goes into |
+|----------|-------------|-----------|
+| **New device** | A previously-unknown IP / MAC / hostname appeared and was confirmed | DEVICES.md |
+| **Device drift** | An existing entry's IP, MAC, services, or role changed | DEVICES.md |
+| **Device status** | A documented device is now offline / back online / on Wi-Fi vs Ethernet | DEVICES.md (freshness/notes) |
+| **Diagnostic technique** | You used a working diagnostic step the docs don't describe | TROUBLESHOOTING.md |
+| **Firewall change** | A UFW rule was added/removed/scoped during this session | FIREWALL.md |
+| **Tool quirk** | You hit an undocumented flag, gotcha, distro packaging surprise | TOOLS.md |
+| **Docs were wrong** | A documented fact was contradicted by reality | (the file with the wrong fact) |
+
+If yes to ANY: capture. If no to all: skip — don't manufacture findings.
+
+### How to capture
+
+1. Write a freeform markdown narrative of findings to a temp file:
+
+   ```bash
+   cat > /tmp/capture-$$.md <<'EOF'
+   # Findings: <one-line summary>
+
+   ## Context
+   What was the user asking about? What did I do?
+
+   ## What I learned
+   - <fact 1, with specific values: IPs, MACs, ports, etc.>
+   - <fact 2>
+
+   ## Where this belongs
+   - DEVICES.md: update <entry name> with <field changes>
+   - TROUBLESHOOTING.md: add new section under <heading>
+   - (etc.)
+
+   ## What was already documented (skip)
+   - <fact that's already in docs — list so the agent doesn't re-add>
+   EOF
+   ```
+
+2. Fire the capture (foreground returns in <1s):
+
+   ```bash
+   home-net-capture --findings /tmp/capture-$$.md
+   ```
+
+3. The background `claude -p` agent does the work:
+   - Identifies which file(s) to update
+   - Re-verifies claims against live network where possible
+   - Conservative-merges: additions/freshness auto-apply;
+     contradictions/deletions go to a `.review.md`
+   - Git commits AND pushes to origin/main on success
+   - notify-send fires with verdict
+
+4. Continue with the user's next request. The agent works in parallel
+   to your conversation.
+
+### What's IN scope for auto-update
+
+- `DEVICES.md` — device facts (IP, MAC, role, ports, freshness)
+- `TROUBLESHOOTING.md` — new diagnostic techniques
+- `FIREWALL.md` — new rules + rationale
+- `TOOLS.md` — newly-learned quirks
+
+### What's OUT of scope
+
+- `SKILL.md` — versioned release content (this file)
+- `README.md` — versioned release content
+- `DISCOVERY.md` — core mental model (curated manually)
+- `.claude-plugin/plugin.json` — manifest
+
+### Anti-patterns
+
+- ❌ Capturing trivial confirmations ("I confirmed the router is at .254")
+  when no docs change is warranted
+- ❌ Writing a narrative without specific values (vague narratives produce
+  vague updates — the agent needs concrete facts)
+- ❌ Editing reference files inline during the session, then ALSO
+  capturing — the agent will see your edits as already-applied
+  (acceptable but wasteful; one path is better)
+- ❌ Skipping capture because "the user didn't ask me to" — the user has
+  already authorized this pattern by adopting the skill
+
+## The Original Self-Healing Loop (home-net-learn)
+
+`home-net-learn` is the device-specific entry point — narrower than the
+general capture, optimized for the "I just found a new IP" case. Goal:
+the skill's device inventory grows with use, without blocking your shell.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐

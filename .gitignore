@@ -6,6 +6,7 @@ scripts/*.local
 .home-net-queue/
 .home-net-verify-*.log
 .home-net-verify-*.json
+.captures/
 
 # Editor / OS cruft
 .DS_Store

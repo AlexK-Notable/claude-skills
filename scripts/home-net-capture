@@ -1,0 +1,269 @@
+#!/usr/bin/env bash
+# home-net-capture — generic findings-to-update dispatcher.
+#
+# Invoked by Claude (or directly) when an interactive /home-network session
+# produces new knowledge worth saving. Reads a freeform markdown findings
+# narrative, spawns a background `claude -p` agent that:
+#   - identifies which reference file(s) to update
+#   - conservative-merges: auto-applies additions/freshness; flags
+#     contradictions/deletions to a .review.md
+#   - git commits AND pushes if changes made
+#   - notify-send fires with verdict
+#
+# Designed to NOT block the user's shell — foreground returns in <1s.
+
+set -euo pipefail
+
+have() { command -v "$1" >/dev/null 2>&1; }
+warn() { echo "home-net-capture: $*" >&2; }
+
+if [[ -t 1 ]] && command -v tput >/dev/null 2>&1; then
+  C_OK=$(tput setaf 2); C_DIM=$(tput dim); C_BOLD=$(tput bold); C_RESET=$(tput sgr0)
+else
+  C_OK=""; C_DIM=""; C_BOLD=""; C_RESET=""
+fi
+
+usage() {
+  cat <<'EOF'
+home-net-capture — dispatch a background agent to update the skill
+                   from interactive-session findings
+
+USAGE:
+  home-net-capture --stdin                     # read narrative from stdin
+  home-net-capture --findings /tmp/notes.md    # read from file
+  home-net-capture --no-agent --findings X     # foreground stage only (testing)
+
+INPUT FORMAT:
+  Freeform markdown narrative. Example:
+
+    # Findings: Pi moved subnets
+
+    User asked why ssh pi was failing. Discovered:
+    - 192.168.1.165 no longer has the Pi's MAC (88:a2:9e:02:55:a3)
+    - Pi is now at 192.168.1.172 (DHCP gave it a new lease)
+    - Hostname `komi-2.local` still resolves but to the new IP via mDNS
+    - No other changes — same MAC, same services (22, 445)
+
+  Anything the agent should know goes here. It will figure out which
+  file(s) to update and apply conservative-merge policy.
+
+WHAT THE AGENT CAN UPDATE (in-scope files):
+  - DEVICES.md           (device facts: IP/MAC/role/ports/etc.)
+  - TROUBLESHOOTING.md   (new diagnostic techniques discovered)
+  - FIREWALL.md          (new rules + rationale)
+  - TOOLS.md             (tool quirks / undocumented flags)
+
+WHAT IT WILL NOT TOUCH:
+  - SKILL.md             (versioned release content)
+  - README.md            (versioned release content)
+  - DISCOVERY.md         (core mental model — manual updates only)
+
+REQUIRES:
+  - bash
+  - claude (CLI) — without it, narrative stays in .captures/ for manual review
+
+SAFETY:
+  Conservative merge — additions/freshness auto-apply; contradictions and
+  deletions write a .review.md instead. The agent also git-commits AND
+  pushes to origin/main on any successful update.
+EOF
+}
+
+# locate the skill repo (same logic as home-net-learn)
+locate_skill_dir() {
+  local candidates=(
+    "$HOME/repos/home-network-skill"
+    "$HOME/.claude/plugins/home-network-skill"
+    "$HOME/.local/share/claude/plugins/home-network-skill"
+  )
+  for c in "${candidates[@]}"; do
+    [[ -d "$c/skills/home-network/references" ]] && { echo "$c"; return 0; }
+  done
+  return 1
+}
+
+# --- args ---
+SOURCE=""
+FINDINGS_FILE=""
+NO_AGENT=0
+SKILL_DIR=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --stdin) SOURCE=stdin; shift ;;
+    --findings) SOURCE=file; FINDINGS_FILE="$2"; shift 2 ;;
+    --no-agent) NO_AGENT=1; shift ;;
+    --skill-dir) SKILL_DIR="$2"; shift 2 ;;
+    *) warn "unknown arg: $1"; usage >&2; exit 2 ;;
+  esac
+done
+
+if [[ -z "$SOURCE" ]]; then
+  warn "must specify --stdin or --findings FILE"
+  usage >&2
+  exit 2
+fi
+
+if [[ -z "$SKILL_DIR" ]]; then
+  SKILL_DIR=$(locate_skill_dir || true)
+fi
+if [[ -z "$SKILL_DIR" ]]; then
+  warn "couldn't locate the home-network-skill repo"
+  exit 2
+fi
+
+TASK_ID="$(date +%s)-$$"
+CAPTURES_DIR="${SKILL_DIR}/.captures"
+NARRATIVE_FILE="${CAPTURES_DIR}/${TASK_ID}.md"
+LOG_FILE="${SKILL_DIR}/.home-net-verify-capture-${TASK_ID}.log"
+
+mkdir -p "$CAPTURES_DIR"
+
+# --- ingest narrative ---
+if [[ "$SOURCE" == "stdin" ]]; then
+  cat > "$NARRATIVE_FILE"
+elif [[ "$SOURCE" == "file" ]]; then
+  if [[ ! -r "$FINDINGS_FILE" ]]; then
+    warn "cannot read findings file: $FINDINGS_FILE"
+    exit 1
+  fi
+  cp "$FINDINGS_FILE" "$NARRATIVE_FILE"
+fi
+
+# basic sanity: narrative must be non-empty
+if [[ ! -s "$NARRATIVE_FILE" ]]; then
+  warn "narrative is empty — nothing to capture"
+  rm -f "$NARRATIVE_FILE"
+  exit 1
+fi
+
+NARRATIVE_BYTES=$(wc -c < "$NARRATIVE_FILE")
+echo "${C_BOLD}home-net-capture${C_RESET} task=${TASK_ID}"
+echo "  narrative: $(basename "$NARRATIVE_FILE") (${NARRATIVE_BYTES} bytes)"
+echo "  skill repo: $SKILL_DIR"
+
+# --- decide whether to dispatch the agent ---
+if (( NO_AGENT )); then
+  echo "  --no-agent: leaving narrative for manual review"
+  exit 0
+fi
+
+if ! have claude; then
+  echo "  claude CLI not installed — leaving narrative for manual review"
+  echo "  see: $NARRATIVE_FILE"
+  exit 0
+fi
+
+# --- build the agent prompt (interpolated) ---
+PROMPT=$(cat <<EOF
+You are the home-network-skill's knowledge-capture agent.
+
+REPO ROOT: $SKILL_DIR
+TASK ID: $TASK_ID
+NARRATIVE FILE (read this first): $NARRATIVE_FILE
+
+YOUR JOB: read the narrative, decide what (if anything) should be
+updated in the skill, and apply the updates conservatively.
+
+IN-SCOPE FILES (you MAY edit):
+  - $SKILL_DIR/skills/home-network/references/DEVICES.md
+  - $SKILL_DIR/skills/home-network/references/TROUBLESHOOTING.md
+  - $SKILL_DIR/skills/home-network/references/FIREWALL.md
+  - $SKILL_DIR/skills/home-network/references/TOOLS.md
+
+OUT-OF-SCOPE (do NOT edit — these are versioned release content):
+  - SKILL.md
+  - README.md
+  - DISCOVERY.md (core mental model; only the human curator updates this)
+  - .claude-plugin/plugin.json
+
+CONSERVATIVE-MERGE POLICY:
+
+  AUTO-APPLY (silent merge):
+    - Adding a new device entry, troubleshooting technique, firewall
+      rule, or tool quirk that has NO counterpart in current docs
+    - Refreshing a timestamp / "last verified" line on an existing entry
+    - Marking a known device as offline / online (status updates)
+    - Adding non-conflicting supplementary info to an existing entry
+
+  REVIEW-NEEDED (write to .review.md, do NOT modify the in-scope files):
+    - Deleting any existing entry
+    - Contradicting a documented fact (e.g., narrative says Pi is at .172
+      but DEVICES.md says .165 with a recent verified timestamp — verify
+      live before deciding which is right)
+    - Replacing a documented role/identity (e.g., "this is actually a
+      different device")
+    - Anything you're unsure about
+
+  SKIP (no action, just log):
+    - Findings that are already documented (no-op)
+    - Findings that don't map to in-scope files
+
+VERIFICATION:
+  Where possible, re-probe the live network to confirm narrative claims
+  before applying. You have: Bash (ip neigh, arping, /dev/tcp), Read,
+  Write, Edit, Grep, Glob, WebFetch (OUI lookups), WebSearch.
+
+GIT WORKFLOW (after any successful update):
+  cd $SKILL_DIR
+  git add skills/home-network/references/
+  git commit -m "capture: <one-line summary of changes>"
+  git push origin main   # user has explicitly authorized auto-push
+
+  If git push fails (network, auth, conflict), DO NOT panic — leave the
+  commit local and include the failure in your verdict.
+
+CLEANUP (always, at end of run):
+  - Delete $NARRATIVE_FILE — capture is single-use
+
+OUTPUT: end your response with exactly ONE of:
+  VERDICT: applied            (made changes + committed + pushed)
+  VERDICT: applied-no-push    (committed locally; push failed)
+  VERDICT: review-needed      (wrote .review.md, no in-scope edits)
+  VERDICT: no-op              (nothing in narrative warranted update)
+  VERDICT: fail               (couldn't process — see log)
+EOF
+)
+
+# --- spawn background agent ---
+(
+  set +e
+  cd "$SKILL_DIR" || exit 1
+  claude -p "$PROMPT" \
+    --allowed-tools "Bash,Read,Write,Edit,Grep,Glob,WebFetch,WebSearch" \
+    > "$LOG_FILE" 2>&1
+  rc=$?
+
+  verdict=$(grep -oE "VERDICT: (applied|applied-no-push|review-needed|no-op|fail)" "$LOG_FILE" 2>/dev/null | tail -1 | awk '{print $2}')
+  verdict="${verdict:-unknown}"
+
+  if have notify-send; then
+    case "$verdict" in
+      applied)
+        notify-send -u low "home-net-capture" "✓ updates applied + pushed (task ${TASK_ID})"
+        ;;
+      applied-no-push)
+        notify-send -u normal "home-net-capture" "⚠ updates committed locally; push failed (task ${TASK_ID})"
+        ;;
+      review-needed)
+        notify-send -u normal "home-net-capture" "⚠ needs review — see .review.md for task ${TASK_ID}"
+        ;;
+      no-op)
+        notify-send -u low "home-net-capture" "○ no updates needed (findings already documented)"
+        ;;
+      fail)
+        notify-send -u critical "home-net-capture" "✗ capture failed (task ${TASK_ID}) — see ${LOG_FILE}"
+        ;;
+      *)
+        notify-send -u critical "home-net-capture" "agent error (rc=${rc}, verdict=${verdict}) — see ${LOG_FILE}"
+        ;;
+    esac
+  fi
+
+  exit 0
+) &
+AGENT_PID=$!
+disown "$AGENT_PID" 2>/dev/null || true
+
+echo "  ${C_OK}✓${C_RESET} dispatched capture agent (pid $AGENT_PID, log: $(basename "$LOG_FILE"))"
+echo "${C_DIM}returning to your shell — notify-send will fire with the verdict${C_RESET}"
