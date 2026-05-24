@@ -86,6 +86,23 @@ for corrections.
 | Notes | DHCP — IP may change. MAC is stable on this SSID but differs on other Wi-Fi networks (iOS MAC privacy). |
 | Verified | 2026-05-24 via home-net-learn (agent verdict review-needed due to permission issue; manually promoted with agent's analysis) |
 
+### Moug (Intel-NIC client device)
+
+| Field | Value |
+|-------|-------|
+| IPv4 | 192.168.1.101 *(DHCP)* |
+| IPv6 (global) | 2600:1700:4811:4e70::2a |
+| MAC | 28:6b:35:14:ac:9e |
+| OUI | 28:6B:35 — **Intel Corporate** (registered 2022; consistent with an Intel Wi-Fi/Ethernet NIC in a PC/laptop) |
+| Hostname (DNS) | `Moug.attlocal.net` *(AT&T gateway appends `.attlocal.net` to DHCP hostname `Moug`)* |
+| Hostname (mDNS) | not observed at probe time |
+| Role | Personal computer / client device — no listening services exposed |
+| ICMP | **filtered** — use ARP for aliveness (`ip neigh show 192.168.1.101`) |
+| Open ports | none observed on common service ports (22, 80, 443, 445, 631, 7000, 7100, 8008, 8009, 8060, 8123, 8443, 9100, 32400, 5540, 7125) |
+| mDNS services | none observed |
+| Notes | DHCP — IP may change. Default firewall posture (block-all-inbound) consistent with a Windows or Linux desktop/laptop. The hostname "Moug" is the DHCP-supplied name; rename if the actual identity becomes clear. |
+| Verified | 2026-05-24 via home-net-learn |
+
 ### AT&T residential gateway (router)
 
 | Field | Value |
@@ -129,7 +146,6 @@ when you want a verified entry.**
 
 | IP | MAC | Probable identity |
 |----|-----|-------------------|
-| 192.168.1.101 | 28:6b:35:14:ac:9e | Unknown |
 | 192.168.1.141 | d4:ad:fc:42:89:d0 | **LIFX bulb** (OUI D4:AD:FC = Shenzhen Intellirocks / LIFX) |
 | 192.168.1.142 | d4:ad:fc:18:fb:38 | LIFX bulb |
 | 192.168.1.143 | d4:ad:fc:43:15:92 | LIFX bulb |
