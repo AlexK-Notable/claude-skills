@@ -313,7 +313,14 @@ EOF
 (
   set +e
   cd "$SKILL_DIR" || exit 1
-  claude -p "$PROMPT" > "$LOG_FILE" 2>&1
+  # --allowed-tools: claude -p (headless) defaults to prompting on every tool
+  # use, which blocks forever with no UI. Explicit allowlist scopes the
+  # agent to the tools it actually needs for the verification + merge task.
+  # If the model needs a tool not in this list, the verdict comes back
+  # review-needed rather than silently hanging.
+  claude -p "$PROMPT" \
+    --allowed-tools "Bash,Read,Write,Edit,Grep,Glob,WebFetch,WebSearch" \
+    > "$LOG_FILE" 2>&1
   rc=$?
 
   verdict=$(grep -oE "VERDICT: (pass|review-needed|fail)" "$LOG_FILE" 2>/dev/null | tail -1 | awk '{print $2}')

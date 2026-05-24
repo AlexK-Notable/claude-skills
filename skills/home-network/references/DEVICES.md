@@ -71,6 +71,21 @@ for corrections.
 | SSH shortcut | `~/bin/ssh-cb2` already exists |
 | Notes | The "3D printer" referenced in skill triggers. `port-check 192.168.1.188 --klipper` covers the relevant ports. |
 
+### iPhone (Wi-Fi)
+
+| Field | Value |
+|-------|-------|
+| IPv4 | 192.168.1.97 *(DHCP)* |
+| MAC (Wi-Fi) | a6:f3:f0:0d:4e:ed *(locally-administered — iOS Private Wi-Fi Address, per-SSID stable)* |
+| OUI | none — locally-administered MAC, no IEEE assignment expected |
+| Hostname (DNS) | `iPhone.attlocal.net` *(AT&T gateway appends `.attlocal.net` to DHCP hostname `iPhone`)* |
+| Hostname (mDNS) | not observed at probe time; iOS may advertise `iPhone.local` while in active use |
+| Role | Personal mobile device (iPhone) |
+| Open ports | none observed *(iOS exposes no services by default)* |
+| mDNS services | none observed; possible `_companion-link._tcp`, `_apple-mobdev2._tcp`, `_airplay._tcp` when in use |
+| Notes | DHCP — IP may change. MAC is stable on this SSID but differs on other Wi-Fi networks (iOS MAC privacy). |
+| Verified | 2026-05-24 via home-net-learn (agent verdict review-needed due to permission issue; manually promoted with agent's analysis) |
+
 ### AT&T residential gateway (router)
 
 | Field | Value |
@@ -114,7 +129,6 @@ when you want a verified entry.**
 
 | IP | MAC | Probable identity |
 |----|-----|-------------------|
-| 192.168.1.97 | a6:f3:f0:0d:4e:ed | Unknown (locally-administered MAC) |
 | 192.168.1.101 | 28:6b:35:14:ac:9e | Unknown |
 | 192.168.1.141 | d4:ad:fc:42:89:d0 | **LIFX bulb** (OUI D4:AD:FC = Shenzhen Intellirocks / LIFX) |
 | 192.168.1.142 | d4:ad:fc:18:fb:38 | LIFX bulb |
