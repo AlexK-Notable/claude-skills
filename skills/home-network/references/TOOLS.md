@@ -286,3 +286,59 @@ a bash redirection special. Won't work in `sh` if `sh` is dash.
 
 **Alternative for OUI**: the `home-net-learn` script uses the
 IEEE OUI registry over HTTPS — no `whois` required.
+
+---
+
+## MCP servers (LAN access via Claude)
+
+### @fangjunjie/ssh-mcp-server
+
+**Purpose**: Expose SSH access to one or more LAN hosts as MCP tools so
+Claude can run remote commands on `cb2`, `pi`, `nova`, etc. through the
+SSH MCP server rather than via local `ssh` calls.
+
+**Install**: `npx -y @fangjunjie/ssh-mcp-server` (run on demand by the
+MCP host — no global install needed). No public README on npm and no
+public GitHub at time of writing; flags below come from the binary's
+`--help` output.
+
+**Single-host mode** (legacy / one-off):
+```
+--host HOST --port 22 --username USER --password PW
+--host HOST --port 22 --username USER --privateKey /path/to/key
+--host HOST --port 22 --username USER --agent       # use ssh-agent
+```
+
+**Multi-host mode** (preferred):
+```
+--config-file /home/komi/.config/ssh-mcp/servers.json
+```
+where the file is either an object or an array. Object form (used here):
+```json
+{
+  "cb2":  {"host": "192.168.1.188", "port": 22, "username": "biqu",   "privateKey": "/home/komi/.ssh/id_ed25519"},
+  "pi":   {"host": "192.168.1.165", "port": 22, "username": "komi",   "privateKey": "/home/komi/.ssh/id_ed25519"},
+  "nova": {"host": "192.168.1.221", "port": 22, "username": "bredos", "privateKey": "/home/komi/.ssh/id_ed25519"}
+}
+```
+
+**Other useful flags**:
+- `--ssh-config-file ~/.ssh/config` — let the server resolve
+  `HostName`, `User`, `IdentityFile` from your normal ssh config
+  instead of duplicating them.
+- `--whitelist 'regex1,regex2'` — only allow commands matching these
+  regexes.
+- `--blacklist 'regex1,regex2'` — refuse commands matching these
+  regexes. **Global**, not per-server (one allow/deny list spans all
+  hosts).
+
+**Where it's wired up on this machine**: `~/.claude.json` under
+`mcpServers.ssh`. Multi-host config lives at
+`~/.config/ssh-mcp/servers.json`. Migration from single-host: old
+inline config gets backed up as `~/.claude.json.bak-<timestamp>` before
+the rewrite.
+
+**Gotcha**: per-server keys are honored, but a single bad entry in the
+JSON config doesn't fail loudly — it just silently fails to expose
+that host as a tool. After editing `servers.json`, restart the MCP host
+(or your Claude session) and confirm each `ssh_<name>` tool is listed.

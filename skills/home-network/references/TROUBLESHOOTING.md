@@ -49,6 +49,33 @@ ssh user@host
 | `Permission denied (publickey)` | sshd is fine, your key isn't authorized | `ssh-copy-id user@host`, or check `~/.ssh/authorized_keys` on host |
 | `Host key verification failed` | Host's SSH key changed (reinstall? attack?) | `ssh-keygen -R host` then retry; verify fingerprint out-of-band |
 
+### `Permission denied (publickey)` even though you have a working key
+
+If `~/.ssh/config` pins an `IdentityFile` for the host and that file
+isn't the right key for the target user, SSH **will not** fall back to
+other keys in `~/.ssh/`. Without `IdentityFile`, ssh tries every key it
+has and the right one wins; with `IdentityFile` set, it's the only key
+offered (unless you also set `IdentitiesOnly no`).
+
+Symptoms:
+- `ssh user@host` from the command line **works** (no config pin, all
+  keys tried).
+- `ssh alias` using a `Host alias` block **fails** with `Permission
+  denied (publickey,password)` even when the same user/host worked
+  bare.
+
+Fixes (any one):
+- Point `IdentityFile` at the key that's actually in `authorized_keys`
+  on the remote.
+- Remove the `IdentityFile` line (lets ssh try all keys).
+- Set `IdentitiesOnly no` for the host (offers keys beyond the
+  configured identity).
+- Run `ssh-copy-id -i ~/.ssh/configured_key.pub user@host` so the
+  configured key is the right one.
+
+This trips you up specifically when migrating from `id_rsa` to
+`id_ed25519` — the old key still works bare, the new alias doesn't.
+
 ### When the host is on Wi-Fi but unstable
 
 ARM SBCs on Wi-Fi sometimes drop and reassociate. Symptom: SSH works for

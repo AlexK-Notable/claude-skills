@@ -30,7 +30,7 @@ for corrections.
 
 | Field | Value |
 |-------|-------|
-| IPv4 | 192.168.1.221 *(DHCP — may change; was offline during 2026-05-24 audit, see freshness note below)* |
+| IPv4 | 192.168.1.221 *(DHCP — may change)* |
 | IPv6 (global) | 2600:1700:4811:4e70:b6c8:c1a0:de27:97ee *(SLAAC, may rotate)* |
 | MAC (Wi-Fi) | 60:fb:00:37:57:56 |
 | OUI | 60:FB:00 — Shenzhen Bilian Electronic (consistent with indiedroid Wi-Fi NIC) |
@@ -39,9 +39,12 @@ for corrections.
 | Role | SBC, exploratory / dev |
 | OS | bredOS |
 | SSH | enabled, port 22 (only open port observed) |
+| SSH user | `bredos` (bredOS distro default) |
+| SSH key auth | **not yet set up** — needs `ssh-copy-id bredos@192.168.1.221` (interactive password required) |
+| SSH alias | `~/.ssh/config` defines `nova` and `bredos` aliases → `bredos@192.168.1.221` w/ `~/.ssh/id_ed25519` |
 | ICMP | **filtered** — use mDNS/ARP for aliveness |
-| Notes | Connects via Wi-Fi, frequently off-network. Default user typically `bredos`. If `getent hosts bredos` returns IPv6 addresses but ping fails, the lease may be stale — re-verify with `find-host bredos`. |
-| Freshness | last verified online 2026-05-24 morning; offline during afternoon audit |
+| Notes | Connects via Wi-Fi, frequently off-network. If `getent hosts bredos` returns IPv6 addresses but ping fails, the lease may be stale — re-verify with `find-host bredos`. |
+| Freshness | offline during 2026-05-24 afternoon audit; back online same day (transient — probably a power/Wi-Fi blip). Port 22 reachable but SSH banner exchange may time out until key is provisioned. |
 
 ### Raspberry Pi (komi-2 — Samba host)
 
@@ -51,11 +54,17 @@ for corrections.
 | MAC | 88:a2:9e:02:55:a3 |
 | OUI | 88:A2:9E — **Raspberry Pi Trading Ltd** |
 | Hostname (mDNS) | `komi-2.local` |
+| Hostname (on device) | `komi` (system hostname — `komi-2.local` is just the mDNS advertisement) |
+| Hardware | Raspberry Pi 5 (kernel `6.12.62+rpt-rpi-2712`, aarch64) |
+| OS | Raspberry Pi OS (Debian Bookworm derivative) |
 | Role | Samba/SMB server (advertises `model=MacSamba` device-info) |
 | SSH | enabled, port 22 |
+| SSH user | `komi` |
+| SSH key auth | passwordless via `~/.ssh/id_ed25519` (added 2026-05-24; previously only id_rsa was authorized) |
+| SSH alias | `~/.ssh/config` defines `pi` and `komi` aliases → `komi@192.168.1.165` w/ `~/.ssh/id_ed25519` |
 | Open ports | 22 (SSH), 445 (SMB) |
 | mDNS services | `_smb._tcp` + `_ssh._tcp` + `_device-info._tcp` |
-| Notes | This was previously (incorrectly) listed as "KOMI second adapter" — it's actually the Raspberry Pi. Adopt a real hostname when you decide what it should be called. |
+| Notes | Device's actual system hostname is `komi` (not `komi-2`); mDNS responder publishes `komi-2.local`. This was previously (incorrectly) listed as "KOMI second adapter" — it's actually the Raspberry Pi. |
 
 ### BIGTREETECH CB2 (3D printer host — Klipper / Moonraker)
 
@@ -64,11 +73,17 @@ for corrections.
 | IPv4 | 192.168.1.188 |
 | MAC | 02:00:cb:21:cb:21 *(locally-administered — typical for Wi-Fi)* |
 | Hostname (mDNS) | `bigtreetech-cb2.local` |
+| Hostname (on device) | `bigtreetech-cb2` |
+| Hardware | RK35xx-based BIGTREETECH CB2 (kernel `6.1.115-btt-rk35xx`, aarch64) |
 | Role | 3D printer controller (Klipper firmware; Moonraker web API) |
 | OS | Armbian-derivative for BIGTREETECH CB2 |
 | SSH | enabled, port 22 |
+| SSH user | `biqu` |
+| SSH key auth | passwordless via `~/.ssh/id_ed25519` |
+| SSH alias | `~/.ssh/config` defines `cb2` and `printer` aliases → `biqu@192.168.1.188` w/ `~/.ssh/id_ed25519` |
+| SSH shortcut | `~/bin/ssh-cb2` also exists |
 | Open ports | 22 (SSH), 80 (Mainsail/Fluidd web UI), 7125 (Moonraker API) |
-| SSH shortcut | `~/bin/ssh-cb2` already exists |
+| **Security note** | Factory default credentials are `biqu` / `biqu` — anyone on the LAN with default creds can SSH in. Change the password if WAN-exposed, or restrict via firewall. |
 | Notes | The "3D printer" referenced in skill triggers. `port-check 192.168.1.188 --klipper` covers the relevant ports. |
 
 ### iPhone (Wi-Fi)
