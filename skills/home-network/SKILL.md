@@ -1,0 +1,218 @@
+---
+name: home-network
+description: Use when working with the home LAN — discovering devices, troubleshooting connectivity, configuring ufw firewall rules, opening/closing ports, looking up IPs/hostnames/MAC addresses, scanning subnets, probing services with mDNS/avahi/arping/nmap/dig, working with router DHCP leases, debugging "can't reach" or "host unreachable" symptoms, managing wake-on-LAN, or referencing specific known devices (indiedroid nova running bredOS, raspberry pi, 3D printer / klipper / bigtreetech CB2, AT&T residential gateway, MacBook/iPad/iPhone, Matter/Thread IoT, Amazon Echo, Sunshine streaming host). Includes a self-healing learn loop (home-net-learn) that grows the device inventory via background agent verification.
+---
+
+# home-network
+
+Operator's manual for the home LAN. This skill teaches *strategy* — when to
+reach for which tool, how to interpret the results, what to do when nothing
+responds. Device-specific facts live in [DEVICES.md](references/DEVICES.md).
+
+## The Mental Model
+
+Three rules, in order of importance:
+
+### 1. ICMP is not authoritative
+
+`ping` is the wrong default for "is this host alive?" Modern devices —
+especially anything running a default firewall — drop ICMP echo silently.
+A failed `ping` does NOT mean the host is down.
+
+**Better signals, ordered by reliability:**
+
+| Signal | What it proves | Tool |
+|--------|----------------|------|
+| ARP REACHABLE entry | L2 presence — kernel got a MAC for this IP | `ip neigh` |
+| mDNS response | Host actively answers multicast on UDP/5353 | `avahi-resolve`, `avahi-browse` |
+| TCP SYN-ACK | Specific service is listening | `nc -z`, `/dev/tcp/HOST/PORT` |
+| `arping` reply | L2 ARP request answered | `arping -c1 IP` |
+| ICMP echo reply | Host is up AND not firewalled | `ping` |
+
+ICMP being unreachable + ARP REACHABLE + open TCP port = host is fine,
+you're just being firewalled.
+
+### 2. DNS is not mDNS is not ARP
+
+When a name resolves, ask *which resolver answered*. Different layers store
+different state with different freshness:
+
+- **System DNS** (`getent hosts foo`) → asks `/etc/resolv.conf` chain →
+  usually the router → may return **stale leases** for hours after a device
+  leaves the network. Don't trust a resolved IP without an aliveness check.
+- **mDNS** (`avahi-resolve -n foo.local`) → multicast on UDP/5353 → the
+  host *itself* answers in real-time. If mDNS resolves, the host is on
+  the LAN right now.
+- **ARP cache** (`ip neigh`) → only populated for IPs the kernel has
+  recently tried to talk to. Empty cache ≠ empty network. Use `arping` to
+  force a fresh probe.
+
+### 3. Verify your own connectivity before blaming the target
+
+If IPv6 pings fail with "Address unreachable," check `ip -6 route show
+default` first — your own routing might be the problem. Same for v4: if
+nothing on the LAN responds, check `ip -4 addr show` and `ip -4 route`
+before assuming a network-wide outage.
+
+## Toolchain (with availability detection)
+
+Never assume a tool is present. Use this pattern in scripts:
+
+```bash
+have() { command -v "$1" >/dev/null 2>&1; }
+prefer() {
+  for t in "$@"; do have "$t" && { echo "$t"; return 0; }; done
+  return 1
+}
+
+# Example: pick whichever ARP prober is available
+ARP=$(prefer arping nping) || { echo "no ARP tool — falling back to ping"; ARP=ping; }
+```
+
+Run `home-net-doctor` on a fresh machine to see what's available and what
+to install. Full per-tool reference in [TOOLS.md](references/TOOLS.md).
+
+## Decision Tree
+
+**"What's the IP of <device>?"**
+1. Known device? Check [DEVICES.md](references/DEVICES.md) first.
+2. Has a `.local` mDNS name? → `avahi-resolve -4 -n <name>.local`
+3. Router knows it? → `getent hosts <name>` (warning: may be stale)
+4. None of the above? → `scan-lan` to sweep + match.
+
+**"Is <host> up?"**
+1. Try mDNS resolve. If it answers, yes.
+2. `arping -c1 -w1 <IP>` from a known-good interface.
+3. TCP SYN to a likely port (`nc -zv <IP> 22 80 443`).
+4. `ping` only as last resort.
+
+**"Can't reach <host> over SSH"**
+See [TROUBLESHOOTING.md](references/TROUBLESHOOTING.md) for the full
+decision tree. First three checks:
+1. Is the host actually up? (see above)
+2. Is port 22 open from your network? (`nc -zv host 22`)
+3. Is *your* firewall blocking outbound? (`ufw status verbose` on this end)
+
+**"I want to open port N for service X"**
+See [FIREWALL.md](references/FIREWALL.md). Default to **LAN-scoped**, not
+WAN-exposed:
+```bash
+sudo ufw allow from 192.168.1.0/24 to any port N proto tcp comment 'X'
+```
+
+**"I just discovered a new device, want to remember it"**
+```bash
+home-net-learn <name-or-IP>
+```
+Returns immediately. Background agent verifies and merges into
+[DEVICES.md](references/DEVICES.md).
+
+## Common Workflows
+
+### Discover everything on the LAN
+
+```bash
+scan-lan                    # default subnet from `ip route`
+scan-lan 10.0.0.0/24        # specific subnet
+scan-lan --quick            # mDNS browse only, no probes
+```
+
+Combines mDNS browse + ARP probe + TCP fanout on the top 5 ports.
+Avoids ICMP because of Rule 1.
+
+### Resolve a name reliably
+
+```bash
+find-host bredos            # tries DNS → mDNS → ARP cache → reverse lookup
+find-host 192.168.1.221     # tries reverse DNS → mDNS PTR → ARP
+```
+
+### Probe service availability
+
+```bash
+port-check 192.168.1.221 22 80 443 8080
+port-check klipper 80 7125 7136    # Klipper / Moonraker / Mobileraker
+```
+
+### Wake a sleeping machine
+
+```bash
+wol nova                    # uses alias from DEVICES.md
+wol AA:BB:CC:DD:EE:FF       # raw MAC
+```
+
+(Requires the target NIC to have WoL enabled in BIOS + OS. See
+[TROUBLESHOOTING.md §5](references/TROUBLESHOOTING.md#5-wake-on-lan-doesnt-work).)
+
+## The Self-Healing Loop
+
+`home-net-learn` is the experimental piece. Goal: the skill's device
+inventory grows with use, without blocking your shell.
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ User runs:  home-net-learn nova                              │
+└──────────────────────────────────────────────────────────────┘
+                            │
+                            ▼  (synchronous, < 5s)
+┌──────────────────────────────────────────────────────────────┐
+│ Probe: mDNS browse, ARP, TCP fanout, OUI lookup              │
+│ Output: DEVICES.draft.md (staging file)                      │
+│ Spawn:  claude -p "<verify prompt>" &                        │
+│ Return immediately — shell is yours again                    │
+└──────────────────────────────────────────────────────────────┘
+                            │
+                            ▼  (background, agentic, 30-90s)
+┌──────────────────────────────────────────────────────────────┐
+│ Agent re-verifies against live network                       │
+│ Checks naming collisions in DEVICES.md                       │
+│ Looks up MAC OUI (vendor identification)                     │
+│ Infers role from open ports + mDNS services                  │
+│ On pass:  merges draft → DEVICES.md, git commits             │
+│ On fail:  writes DEVICES.draft.review.md, leaves for user    │
+│ Always:   notify-send shows outcome                          │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Why agentic background?** The user's stated goal: don't slow main
+workflow. The verification work (cross-checking, OUI lookup, role
+inference) takes ~30-90s — too long to block on, but boring enough that
+an LLM can do it well without supervision.
+
+**Safety**: the foreground probe only writes a *draft*. Nothing touches
+`DEVICES.md` until the agent passes verification. Failed verifications
+leave a review file with the discrepancies highlighted.
+
+## References (Progressive Disclosure)
+
+Load on demand:
+
+- [DISCOVERY.md](references/DISCOVERY.md) — Deep dive on mDNS/ARP/TCP
+  probing patterns, including the lesson from the 2026-05-24 bredOS hunt.
+- [DEVICES.md](references/DEVICES.md) — The personal device inventory:
+  known hostnames, IPs, MACs, roles, SSH users, special notes.
+- [FIREWALL.md](references/FIREWALL.md) — ufw recipes, rule conventions,
+  the LAN-scoped vs WAN-exposed decision.
+- [TROUBLESHOOTING.md](references/TROUBLESHOOTING.md) — "host unreachable"
+  decision tree, WoL gotchas, IPv6 vs IPv4 fallback logic.
+- [TOOLS.md](references/TOOLS.md) — Per-tool reference (nmap, arping,
+  avahi, ufw, etc.) with cross-distro install commands.
+
+## Anti-Patterns (Don't Do This)
+
+- ❌ `ping -c 1 host && echo "up"` — ICMP is unreliable (Rule 1).
+- ❌ `getent hosts foo` as proof of aliveness — DNS lies (Rule 2).
+- ❌ `nmap -sP 192.168.1.0/24` to find a device — `-sP` (now `-sn`) is
+  ICMP+ARP and may miss firewalled hosts. Prefer `nmap -PR -PS22,80,443
+  -sn <subnet>` or `scan-lan`.
+- ❌ Editing `DEVICES.md` directly when adding a new device — use
+  `home-net-learn` so the verification loop runs.
+- ❌ Opening a port WAN-side without thinking — default to LAN-scoped
+  unless you genuinely need off-LAN access. See FIREWALL.md.
+
+## Where this skill came from
+
+Built 2026-05-24 after a session-long hunt for an indiedroid nova that
+turned out to be IPv6-only-then-offline-then-back-on-Wi-Fi. The lessons
+about ICMP unreliability, DNS-vs-mDNS, and self-verifying your IPv6
+state all came from that hunt. See git log for evolution.

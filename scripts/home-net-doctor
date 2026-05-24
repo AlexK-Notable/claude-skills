@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# home-net-doctor — audit available networking tools and report what's
+# missing, with per-distro install commands.
+#
+# Exit codes:
+#   0 = all required + recommended tools present
+#   1 = degraded (required present, some recommended missing)
+#   2 = unusable (something required is missing)
+
+set -euo pipefail
+
+# --- color setup (only if TTY) ---
+if [[ -t 1 ]] && command -v tput >/dev/null 2>&1; then
+  C_OK=$(tput setaf 2); C_WARN=$(tput setaf 3); C_BAD=$(tput setaf 1)
+  C_DIM=$(tput dim); C_BOLD=$(tput bold); C_RESET=$(tput sgr0)
+else
+  C_OK=""; C_WARN=""; C_BAD=""; C_DIM=""; C_BOLD=""; C_RESET=""
+fi
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# --- detect distro and pick package manager ---
+DISTRO=""
+PM_INSTALL=""
+if [[ -r /etc/os-release ]]; then
+  # shellcheck disable=SC1091
+  . /etc/os-release
+  DISTRO="${ID,,}"
+  case "$DISTRO" in
+    arch|cachyos|manjaro|endeavouros) PM_INSTALL="sudo pacman -S --needed" ;;
+    debian|ubuntu|raspbian|pop|linuxmint) PM_INSTALL="sudo apt install -y" ;;
+    fedora|rhel|centos|rocky|alma) PM_INSTALL="sudo dnf install -y" ;;
+    alpine) PM_INSTALL="sudo apk add" ;;
+    opensuse*|sles) PM_INSTALL="sudo zypper install -y" ;;
+    *) PM_INSTALL="(unknown distro: $DISTRO)" ;;
+  esac
+elif [[ "$(uname -s)" == "Darwin" ]]; then
+  DISTRO="macos"
+  PM_INSTALL="brew install"
+fi
+
+# --- tool registry ---
+# format: NAME|SEVERITY|PURPOSE|arch_pkg|debian_pkg|fedora_pkg|alpine_pkg|macos_pkg
+# SEVERITY: required | recommended | optional
+TOOLS=(
+  "avahi-browse|recommended|mDNS service discovery|avahi nss-mdns|avahi-utils libnss-mdns|avahi-tools nss-mdns|avahi-tools|(built-in: dns-sd)"
+  "avahi-resolve|recommended|mDNS name resolution|avahi nss-mdns|avahi-utils libnss-mdns|avahi-tools nss-mdns|avahi-tools|(built-in: dns-sd)"
+  "arping|recommended|ARP probing|iputils|iputils-arping|iputils|arping|arping"
+  "ip|required|interface/route/neigh management|iproute2|iproute2|iproute|iproute2|(built-in)"
+  "ss|required|socket statistics|iproute2|iproute2|iproute|iproute2|(built-in)"
+  "dig|recommended|DNS queries|bind|dnsutils|bind-utils|bind-tools|bind"
+  "getent|required|NSS host lookups (glibc)|(glibc)|(libc-bin)|(glibc-common)|(libc-utils)|(built-in)"
+  "nmap|optional|port scanning / OS fingerprint|nmap|nmap|nmap|nmap|nmap"
+  "ufw|optional|firewall management|ufw|ufw|ufw|ufw|(use pf on macOS)"
+  "nft|optional|nftables direct management|nftables|nftables|nftables|nftables|(use pf on macOS)"
+  "tcpdump|optional|packet capture|tcpdump|tcpdump|tcpdump|tcpdump|(built-in)"
+  "termshark|optional|wireshark-like TUI|termshark|termshark|termshark|termshark|termshark"
+  "wakeonlan|optional|wake-on-LAN sender|wakeonlan (AUR) or etherwake (AUR)|wakeonlan|wol|wol|wakeonlan"
+  "nc|optional|TCP/UDP probe|openbsd-netcat or gnu-netcat|netcat-openbsd|nmap-ncat|netcat-openbsd|(built-in)"
+  "notify-send|optional|desktop notifications (for home-net-learn)|libnotify|libnotify-bin|libnotify|libnotify|(use osascript on macOS)"
+  "claude|optional|Claude Code CLI (for home-net-learn agent)|(install from anthropic.com)|(install from anthropic.com)|(install from anthropic.com)|(install from anthropic.com)|(install from anthropic.com)"
+)
+
+# pick the package column based on distro
+pkg_for() {
+  local entry="$1"
+  IFS='|' read -r _name _sev _purpose arch deb fed alp mac <<< "$entry"
+  case "$DISTRO" in
+    arch|cachyos|manjaro|endeavouros) echo "$arch" ;;
+    debian|ubuntu|raspbian|pop|linuxmint) echo "$deb" ;;
+    fedora|rhel|centos|rocky|alma) echo "$fed" ;;
+    alpine) echo "$alp" ;;
+    macos) echo "$mac" ;;
+    *) echo "(unknown — see TOOLS.md)" ;;
+  esac
+}
+
+usage() {
+  cat <<'EOF'
+home-net-doctor — audit available networking tools
+
+USAGE:
+  home-net-doctor              # human-readable report
+  home-net-doctor --json       # machine-readable
+  home-net-doctor --quiet      # exit code only
+
+OUTPUT:
+  ✓ available
+  ⚠ recommended but missing — install hint shown
+  ✗ required but missing — install hint shown
+
+EXIT CODES:
+  0 = all required + recommended present
+  1 = degraded (some recommended missing)
+  2 = unusable (something required missing)
+EOF
+}
+
+# --- arg parse ---
+MODE=human
+for arg in "$@"; do
+  case "$arg" in
+    -h|--help) usage; exit 0 ;;
+    --json) MODE=json ;;
+    --quiet) MODE=quiet ;;
+    *) echo "unknown arg: $arg" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+# --- run checks ---
+missing_required=0
+missing_recommended=0
+present=0
+json_entries=()
+
+for entry in "${TOOLS[@]}"; do
+  IFS='|' read -r name sev purpose _arch _deb _fed _alp _mac <<< "$entry"
+  pkg=$(pkg_for "$entry")
+  if have "$name"; then
+    status=ok
+    present=$((present+1))
+    [[ $MODE == human ]] && printf "  ${C_OK}✓${C_RESET} %-16s ${C_DIM}%s${C_RESET}\n" "$name" "$purpose"
+  else
+    if [[ $sev == required ]]; then
+      missing_required=$((missing_required+1))
+      status=missing_required
+      [[ $MODE == human ]] && printf "  ${C_BAD}✗${C_RESET} %-16s ${C_BOLD}REQUIRED${C_RESET} — %s\n      install: ${C_BOLD}%s %s${C_RESET}\n" "$name" "$purpose" "$PM_INSTALL" "$pkg"
+    elif [[ $sev == recommended ]]; then
+      missing_recommended=$((missing_recommended+1))
+      status=missing_recommended
+      [[ $MODE == human ]] && printf "  ${C_WARN}⚠${C_RESET} %-16s ${C_BOLD}recommended${C_RESET} — %s\n      install: ${C_DIM}%s %s${C_RESET}\n" "$name" "$purpose" "$PM_INSTALL" "$pkg"
+    else
+      status=missing_optional
+      [[ $MODE == human ]] && printf "  ${C_DIM}○ %-16s optional      — %s${C_RESET}\n      install: ${C_DIM}%s %s${C_RESET}\n" "$name" "$purpose" "$PM_INSTALL" "$pkg"
+    fi
+  fi
+  json_entries+=("{\"name\":\"$name\",\"severity\":\"$sev\",\"status\":\"$status\",\"purpose\":\"$purpose\",\"install\":\"$PM_INSTALL $pkg\"}")
+done
+
+# --- output ---
+if [[ $MODE == json ]]; then
+  printf '{\n  "distro": "%s",\n  "package_manager": "%s",\n  "missing_required": %d,\n  "missing_recommended": %d,\n  "present": %d,\n  "tools": [\n    %s\n  ]\n}\n' \
+    "$DISTRO" "$PM_INSTALL" "$missing_required" "$missing_recommended" "$present" \
+    "$(IFS=$',\n    '; echo "${json_entries[*]}")"
+elif [[ $MODE == human ]]; then
+  echo
+  echo "${C_BOLD}Summary:${C_RESET}"
+  echo "  Distro:          $DISTRO"
+  echo "  Package manager: $PM_INSTALL"
+  echo "  Tools present:        ${C_OK}$present${C_RESET}"
+  echo "  Recommended missing:  ${C_WARN}$missing_recommended${C_RESET}"
+  echo "  Required missing:     ${C_BAD}$missing_required${C_RESET}"
+fi
+
+# --- exit code ---
+if (( missing_required > 0 )); then
+  exit 2
+elif (( missing_recommended > 0 )); then
+  exit 1
+else
+  exit 0
+fi

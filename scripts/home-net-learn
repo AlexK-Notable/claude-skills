@@ -1,0 +1,346 @@
+#!/usr/bin/env bash
+# home-net-learn — agentic device-discovery + inventory grower.
+#
+# Phase A (foreground, fast): probe a device, write a per-task draft entry
+#   (DEVICES.draft.<TASK_ID>.md), fork a background `claude -p` verifier, return.
+# Phase B (background, agentic): the spawned agent re-verifies the draft
+#   against live network, looks up MAC OUI, infers role, then either
+#   merges into DEVICES.md + git commits, or writes DEVICES.draft.<TASK_ID>.review.md.
+# Phase C (notification): notify-send fires when the agent completes.
+
+set -euo pipefail
+
+have() { command -v "$1" >/dev/null 2>&1; }
+warn() { echo "home-net-learn: $*" >&2; }
+
+if [[ -t 1 ]] && command -v tput >/dev/null 2>&1; then
+  C_OK=$(tput setaf 2); C_WARN=$(tput setaf 3); C_DIM=$(tput dim); C_BOLD=$(tput bold); C_RESET=$(tput sgr0)
+else
+  C_OK=""; C_WARN=""; C_DIM=""; C_BOLD=""; C_RESET=""
+fi
+
+usage() {
+  cat <<'EOF'
+home-net-learn — agentic device-discovery + inventory grower
+
+USAGE:
+  home-net-learn nova                  # probe by hostname
+  home-net-learn 192.168.1.221         # probe by IP
+  home-net-learn                       # interactive: scan-lan + pick
+  home-net-learn --no-agent NAME       # foreground probe only, skip claude -p
+  home-net-learn --skill-dir DIR       # override skill repo location
+
+REQUIRES (foreground):
+  - bash
+  - avahi-resolve OR getent (for name lookup)
+  - arping OR a TCP port (for L2 ARP-cache populate)
+
+REQUIRES (background agent, optional):
+  - claude (the Claude Code CLI)
+  - Without claude, the per-task draft stays for manual review.
+
+OUTPUT:
+  - Foreground writes: <skill>/skills/home-network/references/DEVICES.draft.<TASK_ID>.md
+  - Agent (if available): merges into DEVICES.md + git commits OR writes
+    DEVICES.draft.<TASK_ID>.review.md with discrepancies.
+  - notify-send fires on completion.
+
+CONCURRENCY:
+  Per-task draft filenames prevent concurrent invocations from clobbering
+  each other. Safe to run multiple instances in parallel.
+EOF
+}
+
+locate_skill_dir() {
+  local candidates=(
+    "$HOME/repos/home-network-skill"
+    "$HOME/.claude/plugins/home-network-skill"
+    "$HOME/.local/share/claude/plugins/home-network-skill"
+  )
+  for c in "${candidates[@]}"; do
+    [[ -d "$c/skills/home-network/references" ]] && { echo "$c"; return 0; }
+  done
+  return 1
+}
+
+# --- args ---
+TARGET=""
+NO_AGENT=0
+SKILL_DIR=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --no-agent) NO_AGENT=1; shift ;;
+    --skill-dir) SKILL_DIR="$2"; shift 2 ;;
+    *) TARGET="$1"; shift ;;
+  esac
+done
+
+if [[ -z "$SKILL_DIR" ]]; then
+  SKILL_DIR=$(locate_skill_dir || true)
+fi
+if [[ -z "$SKILL_DIR" ]]; then
+  warn "couldn't locate the home-network-skill repo"
+  warn "pass --skill-dir DIR or install via install.sh"
+  exit 2
+fi
+
+# per-task identifier (used for unique draft filenames — prevents races)
+TASK_ID="$(date +%s)-$$"
+
+DEVICES_FILE="$SKILL_DIR/skills/home-network/references/DEVICES.md"
+DRAFT_FILE="$SKILL_DIR/skills/home-network/references/DEVICES.draft.${TASK_ID}.md"
+REVIEW_FILE="$SKILL_DIR/skills/home-network/references/DEVICES.draft.${TASK_ID}.review.md"
+
+# --- interactive mode: scan and pick ---
+if [[ -z "$TARGET" ]]; then
+  if ! have scan-lan; then
+    warn "interactive mode needs scan-lan in PATH"
+    exit 2
+  fi
+  echo "${C_BOLD}interactive mode: running scan-lan…${C_RESET}"
+  mapfile -t scan_lines < <(scan-lan --quick 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' || true)
+  if [[ ${#scan_lines[@]} -eq 0 ]]; then
+    warn "no hosts found"
+    exit 1
+  fi
+  echo
+  for i in "${!scan_lines[@]}"; do
+    printf "  ${C_BOLD}[%2d]${C_RESET} %s\n" "$((i+1))" "${scan_lines[$i]}"
+  done
+  echo
+  read -rp "pick one to learn (number): " choice
+  TARGET=$(echo "${scan_lines[$((choice-1))]:-}" | awk '{print $1}')
+  [[ -z "$TARGET" ]] && { warn "invalid pick"; exit 2; }
+fi
+
+# --- resolve target to canonical IP + name ---
+echo "${C_BOLD}home-net-learn${C_RESET} target=$TARGET  task=$TASK_ID"
+echo "  skill repo: $SKILL_DIR"
+
+RESOLVED_IP=""
+RESOLVED_NAME=""
+if [[ "$TARGET" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+  RESOLVED_IP="$TARGET"
+  if have avahi-resolve; then
+    RESOLVED_NAME=$({ timeout 3 avahi-resolve -a "$TARGET" 2>/dev/null | awk '{print $2}' | head -1; } || true)
+  fi
+  if [[ -z "$RESOLVED_NAME" ]]; then
+    RESOLVED_NAME=$({ getent hosts "$TARGET" 2>/dev/null | awk '{print $2}' | head -1; } || true)
+  fi
+else
+  RESOLVED_NAME="$TARGET"
+  name_local="$TARGET"
+  [[ "$TARGET" != *.local ]] && name_local="${TARGET}.local"
+  if have avahi-resolve; then
+    RESOLVED_IP=$({ timeout 3 avahi-resolve -4 -n "$name_local" 2>/dev/null | awk '{print $2}'; } || true)
+  fi
+  if [[ -z "$RESOLVED_IP" ]]; then
+    RESOLVED_IP=$({ getent hosts "$TARGET" 2>/dev/null | awk '{print $1; exit}'; } || true)
+  fi
+fi
+
+if [[ -z "$RESOLVED_IP" ]]; then
+  warn "could not resolve $TARGET to an IP — aborting"
+  exit 1
+fi
+echo "  resolved: ${RESOLVED_NAME:-<no-name>} → ${RESOLVED_IP}"
+
+# --- gather facts (foreground) ---
+echo "${C_DIM}probing…${C_RESET}"
+
+# trigger ARP populate
+if have arping; then
+  default_iface=$(ip -4 route show default 2>/dev/null | awk '{print $5; exit}')
+  if [[ -n "$default_iface" ]]; then
+    arping -c 1 -w 1 -I "$default_iface" "$RESOLVED_IP" >/dev/null 2>&1 || true
+  fi
+else
+  # fallback: a tiny TCP probe in a subshell forces the kernel to ARP
+  ( timeout 0.5 bash -c "exec 3<>/dev/tcp/$RESOLVED_IP/22" >/dev/null 2>&1 || true ) || true
+fi
+
+MAC=$(ip neigh show "$RESOLVED_IP" 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="lladdr") print $(i+1)}' || true)
+OUI=""
+[[ -n "$MAC" ]] && OUI="${MAC:0:8}"
+
+# mDNS service advertisement
+MDNS_SERVICES=""
+if have avahi-browse; then
+  MDNS_SERVICES=$({ timeout 6 avahi-browse -arpt 2>/dev/null \
+    | awk -F';' -v ip="$RESOLVED_IP" '$1=="=" && $8==ip {print $5":"$9}' \
+    | sort -u | paste -sd, -; } || true)
+fi
+
+# IPv6 (mDNS)
+RESOLVED_IPV6=""
+if have avahi-resolve && [[ -n "$RESOLVED_NAME" ]]; then
+  name_local="$RESOLVED_NAME"
+  [[ "$name_local" != *.local ]] && name_local="${RESOLVED_NAME}.local"
+  RESOLVED_IPV6=$({ timeout 3 avahi-resolve -6 -n "$name_local" 2>/dev/null | awk '{print $2}' | head -1; } || true)
+fi
+
+# TCP fanout (parallel) — top ports
+OPEN_PORTS=""
+for port in 22 80 443 8080 8123 7125 9100 5540; do
+  if timeout 1 bash -c "exec 3<>/dev/tcp/$RESOLVED_IP/$port" 2>/dev/null; then
+    OPEN_PORTS="${OPEN_PORTS}${port},"
+  fi
+done
+OPEN_PORTS="${OPEN_PORTS%,}"
+
+# --- write per-task draft ---
+mkdir -p "$(dirname "$DRAFT_FILE")"
+NOW=$(date -Iseconds)
+
+cat > "$DRAFT_FILE" <<EOF
+# DEVICES.draft.${TASK_ID}.md
+
+Per-task draft entry from home-net-learn invocation $TASK_ID.
+The verification agent will either merge this into DEVICES.md (on pass) or
+write a sibling .review.md file (on fail). Either way, this file gets
+removed by the agent — if it lingers, the agent crashed or wasn't run.
+
+---
+
+## DRAFT: ${RESOLVED_NAME:-unknown} (probed ${NOW})
+
+| Field | Value |
+|-------|-------|
+| Target arg | $TARGET |
+| IPv4 | $RESOLVED_IP |
+| IPv6 | ${RESOLVED_IPV6:-<not found>} |
+| MAC | ${MAC:-<not in ARP cache>} |
+| OUI prefix | ${OUI:-<n/a>} |
+| Hostname | ${RESOLVED_NAME:-<no answer>} |
+| Open ports | ${OPEN_PORTS:-<none probed open>} |
+| mDNS services | ${MDNS_SERVICES:-<none>} |
+| Probed at | $NOW |
+| Probed by | home-net-learn (foreground, task=${TASK_ID}) |
+
+**Status**: pending agent verification
+EOF
+
+echo "  ${C_OK}✓${C_RESET} draft written: $(basename "$DRAFT_FILE")"
+
+# --- decide whether to dispatch the agent ---
+if (( NO_AGENT )); then
+  echo "${C_WARN}--no-agent: skipping background verification${C_RESET}"
+  exit 0
+fi
+
+if ! have claude; then
+  echo "${C_WARN}claude CLI not installed — leaving draft for manual review${C_RESET}"
+  echo "  see: $DRAFT_FILE"
+  exit 0
+fi
+
+# --- spawn background verifier ---
+LOG_FILE="${SKILL_DIR}/.home-net-verify-${TASK_ID}.log"
+mkdir -p "${SKILL_DIR}/.home-net-queue"
+
+# Heredoc is UNQUOTED — variables (paths, IP, name, TASK_ID) interpolate.
+# Backslash-escape literal `$` if we ever need a literal one inside.
+PROMPT=$(cat <<EOF
+You are verifying a draft device entry for the home-network-skill.
+
+REPO ROOT: $SKILL_DIR
+TASK ID: $TASK_ID
+
+CONTEXT FILES (absolute paths — use these exactly):
+- Draft entry:    $DRAFT_FILE
+- Inventory:      $DEVICES_FILE
+- Review output:  $REVIEW_FILE   (only create this on REVIEW-NEEDED)
+- Reference docs: $SKILL_DIR/skills/home-network/references/{DISCOVERY,TOOLS}.md
+
+DRAFT SUMMARY (also in the draft file):
+- Target arg:    $TARGET
+- IPv4:          $RESOLVED_IP
+- Hostname:      ${RESOLVED_NAME:-<unknown>}
+- MAC:           ${MAC:-<unknown>}
+- Open ports:    ${OPEN_PORTS:-<none>}
+
+TOOLS YOU HAVE: bash, ip, arping (if installed), avahi-resolve/avahi-browse
+(if installed), /dev/tcp for TCP probes, WebSearch/WebFetch for OUI lookups.
+
+VERIFICATION TASKS:
+1. RE-PROBE the device at IP $RESOLVED_IP. Confirm MAC, open ports, mDNS
+   services match the draft. Flag any drift.
+2. OUI LOOKUP: identify the vendor of MAC prefix "${OUI:-<n/a>}" via
+   IEEE OUI registry (https://standards-oui.ieee.org/oui/oui.txt) or web search.
+3. COLLISION CHECK: scan $DEVICES_FILE for existing entries with the same
+   IP ($RESOLVED_IP), MAC (${MAC:-<unknown>}), or hostname
+   (${RESOLVED_NAME:-<unknown>}). Do NOT silently overwrite an existing entry.
+4. ROLE INFERENCE from open ports + mDNS services + vendor. Examples:
+   - port 22 only        → SSH-only server
+   - port 7125           → Klipper Moonraker (3D printer)
+   - port 8123           → Home Assistant
+   - port 5540           → Matter commissioning
+   - port 7000           → AirPlay (Apple)
+   - port 9100           → physical printer
+   - port 32400          → Plex
+5. DECIDE:
+
+   PASS  (re-probe matched + no collision + role identified):
+     - Append a clean entry to $DEVICES_FILE under "## Active devices (verified)"
+       using the same H3 + table format as existing entries.
+     - Delete $DRAFT_FILE.
+     - Run: cd $SKILL_DIR && git add skills/home-network/references/DEVICES.md
+       skills/home-network/references/DEVICES.draft.${TASK_ID}.md &&
+       git commit -m "home-net-learn: add ${RESOLVED_NAME:-${RESOLVED_IP}}"
+
+   REVIEW-NEEDED (probe mismatched OR collision OR role ambiguous):
+     - Write $REVIEW_FILE with: what was checked, what failed, suggested fixes.
+     - Leave $DRAFT_FILE in place.
+
+   FAIL (device unreachable on re-probe — left the network between foreground
+   probe and agent run):
+     - Append a "Status: unreachable on re-probe at <timestamp>" line to $DRAFT_FILE.
+     - Leave for the next learn attempt.
+
+OUTPUT: end your response with exactly ONE of:
+  VERDICT: pass
+  VERDICT: review-needed
+  VERDICT: fail
+EOF
+)
+
+# Run the agent in the background. Wrap in `set +e` because:
+# (a) we want to keep running even if claude or grep exit nonzero, so the
+#     notification always fires;
+# (b) without this, set -euo pipefail kills the subshell on any failure
+#     and the user never learns the verdict.
+(
+  set +e
+  cd "$SKILL_DIR" || exit 1
+  claude -p "$PROMPT" > "$LOG_FILE" 2>&1
+  rc=$?
+
+  verdict=$(grep -oE "VERDICT: (pass|review-needed|fail)" "$LOG_FILE" 2>/dev/null | tail -1 | awk '{print $2}')
+  verdict="${verdict:-unknown}"
+
+  device_label="${RESOLVED_NAME:-$RESOLVED_IP}"
+  if have notify-send; then
+    case "$verdict" in
+      pass)
+        notify-send -u low "home-net-learn" "✓ ${device_label} verified and added to DEVICES.md"
+        ;;
+      review-needed)
+        notify-send -u normal "home-net-learn" "⚠ ${device_label} needs review — see DEVICES.draft.${TASK_ID}.review.md"
+        ;;
+      fail)
+        notify-send -u normal "home-net-learn" "✗ ${device_label} unreachable on re-probe (task=${TASK_ID})"
+        ;;
+      *)
+        notify-send -u critical "home-net-learn" "agent error (rc=${rc}) — see ${LOG_FILE}"
+        ;;
+    esac
+  fi
+
+  exit 0
+) &
+AGENT_PID=$!
+disown "$AGENT_PID" 2>/dev/null || true
+
+echo "  ${C_OK}✓${C_RESET} dispatched verification agent (pid $AGENT_PID, log: $(basename "$LOG_FILE"))"
+echo "${C_DIM}you can keep working — notify-send will fire when done${C_RESET}"

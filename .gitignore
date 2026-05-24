@@ -1,0 +1,20 @@
+# Per-machine overrides — never commit
+skills/home-network/references/DEVICES.local.md
+scripts/*.local
+
+# Self-healing queue + agent output
+.home-net-queue/
+.home-net-verify-*.log
+.home-net-verify-*.json
+
+# Editor / OS cruft
+.DS_Store
+._*
+*~
+*.swp
+.idea/
+.vscode/
+
+# Temporary
+*.tmp
+*.bak

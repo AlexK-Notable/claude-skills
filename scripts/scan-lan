@@ -1,0 +1,202 @@
+#!/usr/bin/env bash
+# scan-lan — discover devices on a LAN using mDNS + ARP + TCP (NOT ICMP).
+#
+# Designed around the principle from DISCOVERY.md: ICMP is not authoritative.
+# Devices with firewalls drop ICMP echo; mDNS and ARP are more reliable.
+
+set -euo pipefail
+
+# --- helpers ---
+have() { command -v "$1" >/dev/null 2>&1; }
+warn() { echo "scan-lan: $*" >&2; }
+
+if [[ -t 1 ]] && command -v tput >/dev/null 2>&1; then
+  C_OK=$(tput setaf 2); C_DIM=$(tput dim); C_BOLD=$(tput bold); C_RESET=$(tput sgr0)
+else
+  C_OK=""; C_DIM=""; C_BOLD=""; C_RESET=""
+fi
+
+usage() {
+  cat <<'EOF'
+scan-lan — discover devices on a LAN (mDNS + ARP + TCP, no ICMP)
+
+USAGE:
+  scan-lan                       # auto-detect subnet from default route
+  scan-lan 192.168.1.0/24        # specific subnet
+  scan-lan --quick               # mDNS browse only, skip probes
+  scan-lan --deep                # add nmap if available
+  scan-lan -i eth0               # specify interface
+  scan-lan --ports 22,80,443     # custom port list for TCP fanout
+
+REQUIRES:
+  - bash (for /dev/tcp)
+  - ip (preinstalled on Linux)
+
+OPTIONAL (better results with):
+  - avahi-browse + avahi-resolve (mDNS)
+  - arping (L2 ARP probes)
+  - nmap (--deep)
+
+Run `home-net-doctor` to see what's installed.
+EOF
+}
+
+# --- args ---
+MODE=normal
+SUBNET=""
+IFACE=""
+PORTS="22,80,443,8080,8123"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --quick) MODE=quick; shift ;;
+    --deep) MODE=deep; shift ;;
+    -i|--iface) IFACE="$2"; shift 2 ;;
+    --ports) PORTS="$2"; shift 2 ;;
+    -*) warn "unknown flag: $1"; usage >&2; exit 2 ;;
+    *) SUBNET="$1"; shift ;;
+  esac
+done
+
+# --- detect subnet + interface if not given ---
+if [[ -z "$SUBNET" || -z "$IFACE" ]]; then
+  default_iface=$(ip -4 route show default 2>/dev/null | awk '{print $5; exit}')
+  if [[ -z "${default_iface:-}" ]]; then
+    warn "no default route — please specify subnet and interface"
+    exit 2
+  fi
+  [[ -z "$IFACE" ]] && IFACE="$default_iface"
+  if [[ -z "$SUBNET" ]]; then
+    SUBNET=$(ip -4 -o addr show dev "$IFACE" | awk '{print $4; exit}')
+    if [[ -z "$SUBNET" ]]; then
+      warn "no IPv4 address on $IFACE"
+      exit 2
+    fi
+  fi
+fi
+
+# normalize subnet: ensure /CIDR
+[[ "$SUBNET" != */* ]] && SUBNET="${SUBNET}/24"
+
+# --- expand subnet to IP list (only /24 supported for now) ---
+prefix="${SUBNET%/*}"
+mask="${SUBNET#*/}"
+if [[ "$mask" != "24" ]]; then
+  warn "only /24 subnets supported in v0.1 — got /$mask"
+  warn "to scan a /16 or smaller, split into /24 chunks or use nmap directly"
+  exit 2
+fi
+base="${prefix%.*}"
+
+echo "${C_BOLD}scan-lan${C_RESET}  subnet=${SUBNET}  iface=${IFACE}  mode=${MODE}"
+echo
+
+# --- phase 1: read existing ARP cache ---
+declare -A SEEN
+declare -A MACS
+declare -A NAMES
+declare -A PORTS_OPEN
+declare -A SOURCES
+
+while read -r ip _ _ _ mac _; do
+  [[ "$ip" =~ ^${base//./\\.}\. ]] || continue
+  [[ "$mac" =~ ^[0-9a-f:]{17}$ ]] || continue
+  SEEN["$ip"]=1
+  MACS["$ip"]="$mac"
+  SOURCES["$ip"]="arp-cache"
+done < <(ip neigh show 2>/dev/null)
+
+# --- phase 2: mDNS browse ---
+if have avahi-browse; then
+  while IFS=';' read -r typ _iface proto _name _svc _dom host addr port _txt; do
+    [[ "$typ" == "=" ]] || continue
+    [[ "$proto" == "IPv4" ]] || continue
+    [[ -z "$addr" || "$addr" == "n/a" ]] && continue
+    [[ "$addr" =~ ^${base//./\\.}\. ]] || continue
+    SEEN["$addr"]=1
+    [[ -z "${NAMES[$addr]:-}" ]] && NAMES["$addr"]="$host"
+    [[ -z "${SOURCES[$addr]:-}" ]] && SOURCES["$addr"]="mdns"
+    # accumulate service ports
+    PORTS_OPEN["$addr"]="${PORTS_OPEN[$addr]:-}${port:+$port }"
+  done < <(timeout 6 avahi-browse -arpt 2>/dev/null || true)
+else
+  warn "avahi-browse not installed — skipping mDNS phase"
+fi
+
+if [[ "$MODE" == "quick" ]]; then
+  # quick mode: skip ARP probing and TCP fanout
+  :
+else
+  # --- phase 3: ARP probe each IP (parallel) ---
+  if have arping; then
+    # arping populates the kernel's ARP cache as a side effect.
+    # We don't read its stdout — we re-read the ARP cache after all probes settle.
+    for i in $(seq 1 254); do
+      arping -c 1 -w 1 -I "$IFACE" "${base}.${i}" >/dev/null 2>&1 &
+    done
+    wait
+    while read -r ip _ _ _ mac _; do
+      [[ "$ip" =~ ^${base//./\\.}\. ]] || continue
+      [[ "$mac" =~ ^[0-9a-f:]{17}$ ]] || continue
+      SEEN["$ip"]=1
+      MACS["$ip"]="$mac"
+      [[ -z "${SOURCES[$ip]:-}" ]] && SOURCES["$ip"]="arp-probe"
+    done < <(ip neigh show 2>/dev/null)
+  else
+    warn "arping not installed — using TCP cache-warming instead"
+    # fallback: try /dev/tcp to a likely port to force ARP discovery
+    for i in $(seq 1 254); do
+      ip="${base}.${i}"
+      (timeout 0.5 bash -c "exec 3<>/dev/tcp/$ip/22" 2>/dev/null; exec 3<&-) &
+    done
+    wait
+    # re-read ARP cache
+    while read -r ip _ _ _ mac _; do
+      [[ "$ip" =~ ^${base//./\\.}\. ]] || continue
+      [[ "$mac" =~ ^[0-9a-f:]{17}$ ]] || continue
+      SEEN["$ip"]=1
+      MACS["$ip"]="$mac"
+      [[ -z "${SOURCES[$ip]:-}" ]] && SOURCES["$ip"]="tcp-warm"
+    done < <(ip neigh show 2>/dev/null)
+  fi
+
+  # --- phase 4: TCP fanout on alive hosts ---
+  IFS=',' read -r -a port_array <<< "$PORTS"
+  if (( ${#SEEN[@]} > 0 )); then
+    for ip in "${!SEEN[@]}"; do
+      open_list=""
+      for port in "${port_array[@]}"; do
+        if timeout 1 bash -c "exec 3<>/dev/tcp/$ip/$port" 2>/dev/null; then
+          open_list="$open_list$port,"
+        fi
+      done
+      [[ -n "$open_list" ]] && PORTS_OPEN["$ip"]="${open_list%,}"
+    done
+  fi
+
+  # --- phase 5: deep mode ---
+  if [[ "$MODE" == "deep" ]] && have nmap; then
+    echo "${C_DIM}running deep nmap (this is slower)…${C_RESET}"
+    nmap -PR -PS22,80,443 -sn "$SUBNET" 2>/dev/null | grep -E "Nmap scan|MAC Address" || true
+  elif [[ "$MODE" == "deep" ]]; then
+    warn "nmap not installed — --deep is a no-op"
+  fi
+fi
+
+# --- output ---
+echo
+printf "${C_BOLD}%-16s %-18s %-26s %-24s %s${C_RESET}\n" "IP" "MAC" "HOST/SERVICE" "OPEN PORTS" "SRC"
+printf '%s\n' "------------------------------------------------------------------------------------------------------------"
+if (( ${#SEEN[@]} > 0 )); then
+  # sort IPs numerically by last octet
+  for ip in $(printf '%s\n' "${!SEEN[@]}" | sort -t. -k4 -n); do
+    printf "%-16s %-18s %-26s %-24s ${C_DIM}%s${C_RESET}\n" \
+      "$ip" \
+      "${MACS[$ip]:--}" \
+      "${NAMES[$ip]:--}" \
+      "${PORTS_OPEN[$ip]:--}" \
+      "${SOURCES[$ip]:--}"
+  done
+fi
+echo
+echo "${C_OK}found ${#SEEN[@]} hosts${C_RESET}"

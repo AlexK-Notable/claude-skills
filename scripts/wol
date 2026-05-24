@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+# wol — Wake-on-LAN sender. Accepts a raw MAC or a device alias from DEVICES.md.
+#
+# Requires `wakeonlan` or `etherwake`. Bash's /dev/udp can't set SO_BROADCAST,
+# so a pure-bash fallback can't actually send a magic packet to a broadcast
+# address. We error cleanly instead of silently producing a packet that goes
+# nowhere.
+
+set -euo pipefail
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+if [[ -t 1 ]] && command -v tput >/dev/null 2>&1; then
+  C_OK=$(tput setaf 2); C_BAD=$(tput setaf 1); C_DIM=$(tput dim); C_BOLD=$(tput bold); C_RESET=$(tput sgr0)
+else
+  C_OK=""; C_BAD=""; C_DIM=""; C_BOLD=""; C_RESET=""
+fi
+
+usage() {
+  cat <<'EOF'
+wol — send Wake-on-LAN magic packet
+
+USAGE:
+  wol AA:BB:CC:DD:EE:FF       # by raw MAC
+  wol nova                     # by alias (looked up in DEVICES.md)
+  wol --list                   # list known aliases
+  wol -b 192.168.1.255 MAC    # explicit broadcast address (default: 255.255.255.255)
+
+DEVICES.md lookup:
+  Looks at $HOME_NETWORK_SKILL_DEVICES (env var) or the installed skill's
+  references/DEVICES.md. Aliases come from device section headers (### Name).
+
+WoL gotchas:
+  - Target NIC needs WoL enabled in BIOS AND in the OS (ethtool -s eth0 wol g).
+  - Target must be on the same broadcast domain as you.
+  - See TROUBLESHOOTING.md "Wake-on-LAN doesn't work".
+EOF
+}
+
+# locate DEVICES.md
+locate_devices() {
+  if [[ -n "${HOME_NETWORK_SKILL_DEVICES:-}" ]] && [[ -r "$HOME_NETWORK_SKILL_DEVICES" ]]; then
+    echo "$HOME_NETWORK_SKILL_DEVICES"; return 0
+  fi
+  # try the installed skill location
+  for candidate in \
+    "$HOME/.claude/skills/home-network/references/DEVICES.md" \
+    "$HOME/repos/home-network-skill/skills/home-network/references/DEVICES.md"; do
+    [[ -r "$candidate" ]] && { echo "$candidate"; return 0; }
+  done
+  return 1
+}
+
+list_aliases() {
+  local devfile
+  devfile=$(locate_devices) || { echo "no DEVICES.md found" >&2; exit 2; }
+  echo "${C_BOLD}Aliases from $devfile:${C_RESET}"
+  # Pull H3 section headers (### name) and MAC lines
+  awk '
+    /^### / { current_alias=substr($0,5); next }
+    /MAC.*\| *([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}/ {
+      match($0, /([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}/)
+      mac = substr($0, RSTART, RLENGTH)
+      if (current_alias != "") printf "  %-30s %s\n", current_alias, mac
+    }
+  ' "$devfile"
+}
+
+# alias → MAC via DEVICES.md
+alias_to_mac() {
+  local alias="$1"
+  local devfile
+  devfile=$(locate_devices) || return 1
+  # match case-insensitively in the alias header
+  awk -v want="${alias,,}" '
+    BEGIN { in_section = 0 }
+    /^### / {
+      header = tolower(substr($0, 5))
+      in_section = (header ~ want) ? 1 : 0
+      next
+    }
+    in_section && /MAC.*\| *([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}/ {
+      match($0, /([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}/)
+      print substr($0, RSTART, RLENGTH)
+      exit
+    }
+  ' "$devfile"
+}
+
+# --- args ---
+TARGET=""
+BCAST="255.255.255.255"
+LIST=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --list) LIST=1; shift ;;
+    -b|--broadcast) BCAST="$2"; shift 2 ;;
+    *) TARGET="$1"; shift ;;
+  esac
+done
+
+if (( LIST )); then
+  list_aliases
+  exit 0
+fi
+
+if [[ -z "$TARGET" ]]; then
+  usage >&2
+  exit 2
+fi
+
+# resolve target to MAC
+MAC=""
+if [[ "$TARGET" =~ ^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$ ]]; then
+  MAC="$TARGET"
+else
+  MAC=$(alias_to_mac "$TARGET" || true)
+  if [[ -z "$MAC" ]]; then
+    echo "${C_BAD}wol: alias '$TARGET' not found in DEVICES.md${C_RESET}" >&2
+    echo "      try: wol --list" >&2
+    exit 1
+  fi
+  echo "${C_DIM}resolved alias '$TARGET' → $MAC${C_RESET}"
+fi
+
+# pick a sender and go
+if have wakeonlan; then
+  echo "${C_BOLD}sending magic packet (via wakeonlan) to $MAC → $BCAST${C_RESET}"
+  wakeonlan -i "$BCAST" "$MAC"
+elif have etherwake; then
+  echo "${C_BOLD}sending magic packet (via etherwake) to $MAC${C_RESET}"
+  echo "${C_DIM}note: etherwake needs cap_net_raw or sudo${C_RESET}"
+  sudo etherwake "$MAC"
+else
+  echo "${C_BAD}wol: neither 'wakeonlan' nor 'etherwake' is installed${C_RESET}" >&2
+  echo "      pure-bash WoL can't broadcast (no SO_BROADCAST in /dev/udp)" >&2
+  echo "      install:" >&2
+  echo "        Arch/CachyOS (AUR):  yay -S wakeonlan   # or: yay -S etherwake-git" >&2
+  echo "        Debian/Ubuntu:       sudo apt install wakeonlan" >&2
+  echo "        Fedora:              sudo dnf install wol" >&2
+  echo "        macOS:               brew install wakeonlan" >&2
+  exit 2
+fi
