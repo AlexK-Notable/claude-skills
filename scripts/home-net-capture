@@ -86,6 +86,7 @@ locate_skill_dir() {
 SOURCE=""
 FINDINGS_FILE=""
 NO_AGENT=0
+FOREGROUND=0
 SKILL_DIR=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -93,6 +94,7 @@ while [[ $# -gt 0 ]]; do
     --stdin) SOURCE=stdin; shift ;;
     --findings) SOURCE=file; FINDINGS_FILE="$2"; shift 2 ;;
     --no-agent) NO_AGENT=1; shift ;;
+    --foreground) FOREGROUND=1; shift ;;
     --skill-dir) SKILL_DIR="$2"; shift 2 ;;
     *) warn "unknown arg: $1"; usage >&2; exit 2 ;;
   esac
@@ -225,15 +227,18 @@ OUTPUT: end your response with exactly ONE of:
 EOF
 )
 
-# --- spawn background agent ---
-(
+# --- run the agent (foreground or detached) ---
+# The agent work itself is wrapped in a function so the same code runs
+# either as a backgrounded subshell or as a foreground block.
+run_agent() {
   set +e
-  cd "$SKILL_DIR" || exit 1
+  cd "$SKILL_DIR" || return 1
   claude -p "$PROMPT" \
     --allowed-tools "Bash,Read,Write,Edit,Grep,Glob,WebFetch,WebSearch" \
     > "$LOG_FILE" 2>&1
-  rc=$?
+  local rc=$?
 
+  local verdict
   verdict=$(grep -oE "VERDICT: (applied|applied-no-push|review-needed|no-op|fail)" "$LOG_FILE" 2>/dev/null | tail -1 | awk '{print $2}')
   verdict="${verdict:-unknown}"
 
@@ -260,10 +265,26 @@ EOF
     esac
   fi
 
-  exit 0
-) &
-AGENT_PID=$!
-disown "$AGENT_PID" 2>/dev/null || true
+  # When run in foreground, echo the verdict to stdout so the caller
+  # (typically Claude via the harness's run_in_background completion
+  # notification) can read it from the tool result.
+  if (( FOREGROUND )); then
+    echo "verdict=${verdict} rc=${rc} log=${LOG_FILE}"
+  fi
+}
 
-echo "  ${C_OK}✓${C_RESET} dispatched capture agent (pid $AGENT_PID, log: $(basename "$LOG_FILE"))"
-echo "${C_DIM}returning to your shell — notify-send will fire with the verdict${C_RESET}"
+if (( FOREGROUND )); then
+  # Synchronous mode — caller blocks until agent finishes. Useful when
+  # invoked by Claude via Bash run_in_background=true so the harness can
+  # deliver a real completion notification.
+  echo "  ${C_OK}✓${C_RESET} running capture agent in foreground (log: $(basename "$LOG_FILE"))"
+  run_agent
+else
+  # Detached mode (default) — returns immediately, agent runs in the
+  # background. notify-send is the only completion signal.
+  ( run_agent ) &
+  AGENT_PID=$!
+  disown "$AGENT_PID" 2>/dev/null || true
+  echo "  ${C_OK}✓${C_RESET} dispatched capture agent (pid $AGENT_PID, log: $(basename "$LOG_FILE"))"
+  echo "${C_DIM}returning to your shell — notify-send will fire with the verdict${C_RESET}"
+fi
