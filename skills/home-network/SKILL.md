@@ -164,8 +164,23 @@ don't already have?* Check against these categories:
 | **Firewall change** | A UFW rule was added/removed/scoped during this session | FIREWALL.md |
 | **Tool quirk** | You hit an undocumented flag, gotcha, distro packaging surprise | TOOLS.md |
 | **Docs were wrong** | A documented fact was contradicted by reality | (the file with the wrong fact) |
+| **Secret discovered** | A password / API token / private key / vault credential emerged or was changed | **Bitwarden (NOT docs)** — see [Storing credentials in Bitwarden](#storing-credentials-in-bitwarden) below |
 
 If yes to ANY: capture. If no to all: skip — don't manufacture findings.
+
+### Storing credentials in Bitwarden
+
+Anything secret — host passwords, API tokens, SSH private keys, vault recovery codes — goes into Bitwarden, **never into `DEVICES.md` or any reference file in this repo**. The repo is private but still gets cloned across machines; secrets in a versioned doc are permanent leaks waiting to happen.
+
+The pattern: invoke the [bitwarden-cli skill](../../bitwarden-cli/SKILL.md)'s **Self-destructing handoff script** recipe. The flow:
+
+1. Generate or capture the secret (e.g., `bw generate --length 28 --uppercase --lowercase --number --special`, or read it from somewhere)
+2. Write it to `/tmp/<secret-name>-<pid>` (mode 600)
+3. Write a wrapper script to `/tmp/<wrapper-name>` (chmod +x) that reads the stash, builds the bw JSON, pipes through `bw encode | bw create item`, and shreds both files on success
+4. Tell the user the wrapper path — they fire it one-shot in their unlocked shell
+5. Metadata-only output prints; both files self-destruct
+
+What goes into `DEVICES.md` instead: a *pointer* — "Password stored in Bitwarden as `nova SSH password (bred user)`. Key auth is the primary access method (`~/.ssh/id_ed25519`)." That tells future-you where to retrieve it without leaking the value.
 
 ### How to capture
 
@@ -301,6 +316,11 @@ Load on demand:
   `home-net-learn` so the verification loop runs.
 - ❌ Opening a port WAN-side without thinking — default to LAN-scoped
   unless you genuinely need off-LAN access. See FIREWALL.md.
+- ❌ Putting passwords, API tokens, or private keys in `DEVICES.md` (or
+  any reference file). Repo is private but still gets cloned across
+  machines — versioned secrets are permanent leaks. Route credentials
+  to Bitwarden via the bitwarden-cli skill's self-destructing handoff
+  recipe; put a *pointer* in DEVICES.md, not the value.
 
 ## Where this skill came from
 
