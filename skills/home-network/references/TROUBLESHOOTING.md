@@ -222,6 +222,42 @@ Verify after a `sudo systemctl suspend` + wake cycle:
 Same pattern applies to any SDIO-attached Wi-Fi (Allwinner, Rockchip,
 Amlogic SBCs frequently hit this).
 
+### Alternative: mask sleep targets for always-on devices
+
+If the host is a server-class SBC plugged into wall power 24/7 with no
+battery (Pi, nova, CB2, etc.), the simpler fix is to prevent sleep from
+ever happening:
+
+```bash
+sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
+```
+
+This catches every path that could trigger a suspend: `systemctl
+suspend`, logind idle-timeout, power-button short-press, lid switch,
+and any other service that pulls in a sleep target. After masking, even
+`sudo systemctl suspend` returns `Call to Suspend failed: Access
+denied`. Uptime grows monotonically and the driver never has to
+unload/reload after first boot.
+
+Reverse with:
+```bash
+sudo systemctl unmask sleep.target suspend.target hibernate.target hybrid-sleep.target
+```
+
+Tradeoffs:
+- **Cost**: ~2-3W extra idle power vs sleep mode (~$2-3/year). Negligible at home.
+- **Benefit**: eliminates an entire class of bugs — sleep/resume races,
+  BT-Wi-Fi-SDIO conflicts, alarm/timer-based wake failures.
+
+When to use which:
+- **Always-on server SBC** (no battery, plugged in 24/7): mask sleep
+  targets. Simpler, no moving parts.
+- **Laptop / battery device**: must keep sleep working — use the
+  system-sleep hook above instead.
+- **Hybrid (mostly-on but occasionally suspended)**: install BOTH (mask
+  + hook). If you later unmask sleep, the hook still protects you.
+  Belt-and-suspenders.
+
 ## 8. "Don't unload a Wi-Fi driver over the same Wi-Fi connection"
 
 If you `modprobe -r <wifi_driver>` while SSHed in over that exact Wi-Fi
