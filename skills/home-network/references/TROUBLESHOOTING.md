@@ -10,6 +10,9 @@ Decision trees for common LAN problems.
 4. "IPv4 works, IPv6 doesn't (or vice versa)"
 5. "Wake-on-LAN doesn't work"
 6. "mDNS suddenly stopped working"
+7. "Wi-Fi driver doesn't survive suspend/resume (rtw88_8821cs)"
+8. "Don't unload a Wi-Fi driver over the same Wi-Fi connection"
+9. "SSH to a DHCP'd host that keeps changing IP" (mDNS HostName pattern)
 
 ---
 
@@ -184,3 +187,93 @@ mDNS works on UDP/5353 multicast. Things that break it:
 - **Recent NetworkManager / systemd-resolved upgrade.** Either may
   start owning DNS resolution and bypass `/etc/nsswitch.conf`. Check
   `resolvectl status`.
+
+## 7. "Wi-Fi driver doesn't survive suspend/resume" (rtw88_8821cs)
+
+Realtek RTL8821CS is a Wi-Fi+Bluetooth combo chip attached via SDIO bus,
+sharing SDIO + an internal UART. Boot-time races are common; the kernel
+module (`rtw88_8821cs`) often needs to be loaded **late** rather than
+during the normal hotplug path. Distros like bredOS commonly ship with
+the module either disabled or loaded with a delay.
+
+If you've already handled the boot case (e.g., a systemd unit that
+`modprobe`s after `multi-user.target` with a 1 s settle), suspend/resume
+will still kill Wi-Fi until you also add a system-sleep hook:
+
+```bash
+sudo install -m 0755 /dev/stdin /usr/lib/systemd/system-sleep/rtw8821cs <<'EOF'
+#!/bin/sh
+# systemd-sleep hook: unload before sleep, reload after resume
+case "$1" in
+  pre/*)  modprobe -r rtw88_8821cs ;;
+  post/*) sleep 1 && modprobe rtw88_8821cs ;;
+esac
+EOF
+```
+
+Test from a DIFFERENT transport (ethernet, serial console) — see §8 for
+why you must not test this over the same Wi-Fi.
+
+Verify after a `sudo systemctl suspend` + wake cycle:
+- `ip link show wlan0` — UP
+- `iw dev wlan0 link` — associated
+- mDNS still answers (`avahi-resolve -4 -n <host>.local`)
+
+Same pattern applies to any SDIO-attached Wi-Fi (Allwinner, Rockchip,
+Amlogic SBCs frequently hit this).
+
+## 8. "Don't unload a Wi-Fi driver over the same Wi-Fi connection"
+
+If you `modprobe -r <wifi_driver>` while SSHed in over that exact Wi-Fi
+interface, the kernel tears down `wlanN` immediately. Your TCP socket
+dies; bash gets `SIGHUP` before any reload command can run. The host is
+now unreachable until console intervention or reboot.
+
+Same hazard with: `ip link set wlan0 down`, `systemctl restart
+NetworkManager` (on a Wi-Fi-only host), `iw dev wlan0 disconnect`,
+`rfkill block wifi`.
+
+**Safer patterns**:
+- Install the script that does the unload, then trigger it indirectly:
+  `sudo systemctl suspend` (kernel runs your sleep hook AFTER your SSH
+  session has been cleaned up) — see §7.
+- SSH in over a DIFFERENT transport (ethernet, USB-gadget RNDIS, serial
+  console) and do the destructive work from there.
+- Chain commands so the reload happens even if the connection drops:
+  `nohup sh -c 'modprobe -r rtw88_8821cs; sleep 2; modprobe rtw88_8821cs' &`
+  (still risky — your `nohup` may itself be killed before the second
+  modprobe lands if the shell dies fast enough).
+- Use `at now + 1 minute` to schedule the reload independently of your
+  session, so the unload is decoupled from your TTY.
+
+## 9. "SSH to a DHCP'd host that keeps changing IP" (mDNS HostName)
+
+SBCs and laptops on DHCP can swap IPs (lease rotation, ethernet ↔
+Wi-Fi failover, router reboot). Hard-coding `HostName 192.168.1.X` in
+`~/.ssh/config` breaks the moment that happens.
+
+**Use the mDNS name as `HostName`**:
+
+```sshconfig
+Host nova
+  HostName bredos.local
+  User bred
+  IdentityFile ~/.ssh/id_ed25519
+  StrictHostKeyChecking accept-new
+```
+
+Why `accept-new`: mDNS can resolve to multiple IPs over time (e.g., the
+host's ethernet today, Wi-Fi tomorrow). Each IP is a fresh entry in
+`~/.ssh/known_hosts`. `accept-new` trusts a new IP on first encounter
+but still rejects a key CHANGE for an existing IP — the security
+property you actually want (TOFU per IP, alarm on key change).
+
+Caveats:
+- Requires `nss-mdns` configured locally (`/etc/nsswitch.conf` has
+  `mdns4_minimal` in the `hosts:` line) — see [TOOLS.md §avahi](TOOLS.md#avahi-browse--avahi-resolve).
+- Requires `avahi-daemon` running on the target.
+- mDNS is racy on multi-homed hosts — `avahi-resolve -4 -n foo.local`
+  returns whichever interface answers first. Functionally fine if both
+  IPs reach the same sshd.
+- Same pattern applies to per-host SSH MCP config (e.g.,
+  `~/.config/ssh-mcp/servers.json` — use `bredos.local` not `192.168.1.221`).

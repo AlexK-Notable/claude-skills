@@ -316,11 +316,17 @@ public GitHub at time of writing; flags below come from the binary's
 where the file is either an object or an array. Object form (used here):
 ```json
 {
-  "cb2":  {"host": "192.168.1.188", "port": 22, "username": "biqu",   "privateKey": "/home/komi/.ssh/id_ed25519"},
-  "pi":   {"host": "192.168.1.165", "port": 22, "username": "komi",   "privateKey": "/home/komi/.ssh/id_ed25519"},
-  "nova": {"host": "192.168.1.221", "port": 22, "username": "bredos", "privateKey": "/home/komi/.ssh/id_ed25519"}
+  "cb2":  {"host": "192.168.1.188",  "port": 22, "username": "biqu", "privateKey": "/home/komi/.ssh/id_ed25519"},
+  "pi":   {"host": "192.168.1.165",  "port": 22, "username": "komi", "privateKey": "/home/komi/.ssh/id_ed25519"},
+  "nova": {"host": "bredos.local",   "port": 22, "username": "bred", "privateKey": "/home/komi/.ssh/id_ed25519"}
 }
 ```
+
+**Prefer mDNS names over IPs** for `host:` when the target is DHCP-leased
+(SBCs, laptops). `bredos.local` survives lease rotation and ethernet ↔
+Wi-Fi failover transparently; a hard-coded `192.168.1.221` does not.
+See [TROUBLESHOOTING.md §9](TROUBLESHOOTING.md#9-ssh-to-a-dhcpd-host-that-keeps-changing-ip-mdns-hostname)
+for the SSH-config equivalent of the same pattern.
 
 **Other useful flags**:
 - `--ssh-config-file ~/.ssh/config` — let the server resolve

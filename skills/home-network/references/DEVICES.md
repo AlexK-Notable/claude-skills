@@ -28,23 +28,31 @@ for corrections.
 
 ### indiedroid nova (bredOS)
 
+**Dual-homed: ethernet + Wi-Fi simultaneously active, each with its own DHCP lease.**
+
 | Field | Value |
 |-------|-------|
-| IPv4 | 192.168.1.221 *(DHCP — may change)* |
+| IPv4 (ethernet) | 192.168.1.224 *(DHCP, metric 100 — PREFERRED default route)* |
+| IPv4 (Wi-Fi) | 192.168.1.221 *(DHCP, metric 600 — fallback)* |
 | IPv6 (global) | 2600:1700:4811:4e70:b6c8:c1a0:de27:97ee *(SLAAC, may rotate)* |
-| MAC (Wi-Fi) | 60:fb:00:37:57:56 |
-| OUI | 60:FB:00 — Shenzhen Bilian Electronic (consistent with indiedroid Wi-Fi NIC) |
-| Hostname (mDNS) | `bredos.local` |
-| Hostname (DNS) | `bredos.attlocal.net` (AT&T router DNS — may be stale) |
+| MAC (ethernet `enP4p65s0`) | `c6:65:5c:3a:45:3e` *(locally-administered / randomized — unusual for an SBC)* |
+| MAC (Wi-Fi `wlan0`) | `60:fb:00:37:57:56` |
+| OUI (Wi-Fi) | 60:FB:00 — Shenzhen Bilian Electronic (consistent with indiedroid Wi-Fi NIC) |
+| Hostname (mDNS) | `bredos.local` *(racy — resolves to whichever interface answers first; both reach the same host)* |
+| Hostname (system) | `bredos` (the distro name — `hostname` command is NOT installed on bredOS; use `cat /etc/hostname`) |
+| Hostname (DNS) | `bredos.attlocal.net` (AT&T router DNS may show both IPs under this name) |
+| Hardware | indiedroid nova (RK3588-class SoC) |
+| Kernel | `Linux 6.1.75-rkr3 aarch64` (rkr3 = Rockchip BSP build) |
 | Role | SBC, exploratory / dev |
 | OS | bredOS |
 | SSH | enabled, port 22 (only open port observed) |
-| SSH user | `bredos` (bredOS distro default) |
-| SSH key auth | **not yet set up** — needs `ssh-copy-id bredos@192.168.1.221` (interactive password required) |
-| SSH alias | `~/.ssh/config` defines `nova` and `bredos` aliases → `bredos@192.168.1.221` w/ `~/.ssh/id_ed25519` |
+| SSH user | `bred` (bredOS default — 4-char short name, NOT `bredos`) |
+| SSH default password | `bred` (factory default — matches username, extreme insecurity. Key auth now primary.) |
+| SSH key auth | passwordless via `~/.ssh/id_ed25519` (added 2026-05-24) |
+| SSH alias | `~/.ssh/config` defines `nova` and `bredos` aliases → `bred@bredos.local` w/ `~/.ssh/id_ed25519` and `StrictHostKeyChecking accept-new` |
 | ICMP | **filtered** — use mDNS/ARP for aliveness |
-| Notes | Connects via Wi-Fi, frequently off-network. If `getent hosts bredos` returns IPv6 addresses but ping fails, the lease may be stale — re-verify with `find-host bredos`. |
-| Freshness | offline during 2026-05-24 afternoon audit; back online same day (transient — probably a power/Wi-Fi blip). Port 22 reachable but SSH banner exchange may time out until key is provisioned. |
+| Wi-Fi driver | `rtw88_8821cs` (Realtek RTL8821CS combo Wi-Fi+BT via SDIO). Needs a `modprobe` workaround for both BOOT (boot-time race) and SLEEP (suspend/resume); both hooks are now installed. See [TROUBLESHOOTING.md §7](TROUBLESHOOTING.md#7-wi-fi-driver-doesnt-survive-suspendresume-rtw88_8821cs). |
+| Notes | When `bredos.local` is preferred over a hard-coded IP, lease rotation and ethernet↔Wi-Fi swaps become transparent. Use `bredos.local` in SSH config (with `StrictHostKeyChecking accept-new` since mDNS may map to multiple IPs over time). |
 
 ### Raspberry Pi (komi-2 — Samba host)
 
@@ -141,7 +149,7 @@ These appeared on `avahi-browse` during 2026-05-24 audit.
 |----|-----|----------|
 | 192.168.1.76 | e8:d8:7e:31:ae:e7 | Speaker — SpotifyConnect + Matter (`_matter._tcp` port 5541) |
 | 192.168.1.84 | 90:23:5b:fa:62:dc | Speaker — SpotifyConnect #3 + Matter |
-| 192.168.1.85 | 44:6d:7f:22:59:5b | Amazon Echo — SpotifyConnect #2 + Matter + `_meshcop._udp` (Thread border router) |
+| 192.168.1.85 | 44:6d:7f:22:59:5b | Amazon Echo — SpotifyConnect #2 + Matter + `_meshcop._udp` (Thread border router). **Advertises Thread mesh ULA `fd43:c8e2:678:1::/64` via ICMPv6 RA** — shows up on neighboring hosts as `ip -6 route` entry via `fe80::466d:7fff:fe22:595b` (link-local derived from Echo's MAC). Unusual but correct TBR behavior. |
 | 192.168.1.151 | 0e:7b:9c:c9:3e:97 *(randomized)* | iPad on Wi-Fi (`iPad.local`) |
 | 192.168.1.160 | d6:77:f4:f4:b3:fa *(randomized)* | MacBook Pro — `Alexs-MacBook-Pro.local`, AirPlay port 7000 |
 | 192.168.1.177 | e4:b3:23:74:31:98 | Matter/Thread hub — `_matterc._udp` port 5540 (OUI: Espressif) |
