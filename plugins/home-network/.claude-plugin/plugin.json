@@ -1,0 +1,27 @@
+{
+  "name": "home-network",
+  "version": "0.3.0",
+  "description": "Home LAN discovery, troubleshooting, and device inventory with self-healing knowledge capture. Includes home-net-learn (per-device write-back via background `claude -p` agents) and home-net-capture (general findings write-back) — the skill grows its reference docs through normal use. Companions with the bitwarden-cli plugin in this marketplace for secret routing.",
+  "author": {
+    "name": "Alex Kechichian",
+    "email": "alexkechichian1@gmail.com",
+    "url": "https://github.com/AlexK-Notable"
+  },
+  "homepage": "https://github.com/AlexK-Notable/home-network-skill",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AlexK-Notable/home-network-skill.git"
+  },
+  "license": "MIT",
+  "keywords": [
+    "networking",
+    "lan",
+    "mdns",
+    "discovery",
+    "firewall",
+    "ufw",
+    "home-lab",
+    "self-healing",
+    "agentic"
+  ]
+}

@@ -52,10 +52,14 @@ EOF
 }
 
 locate_skill_dir() {
+  # Walk in priority order: under-Claude env var, dev clone (post-restructure),
+  # installed-via-plugin locations.
   local candidates=(
-    "$HOME/repos/home-network-skill"
-    "$HOME/.claude/plugins/home-network-skill"
-    "$HOME/.local/share/claude/plugins/home-network-skill"
+    "${CLAUDE_PLUGIN_ROOT:-/nonexistent}"
+    "$HOME/repos/home-network-skill/plugins/home-network"
+    "$HOME/.claude/plugins/cache/komi-home-toolkit/plugins/home-network"
+    "$HOME/.claude/plugins/marketplaces/home-network-skill/plugins/home-network"
+    "$HOME/.local/share/claude/plugins/komi-home-toolkit/plugins/home-network"
   )
   for c in "${candidates[@]}"; do
     [[ -d "$c/skills/home-network/references" ]] && { echo "$c"; return 0; }

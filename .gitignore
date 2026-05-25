@@ -2,11 +2,17 @@
 skills/home-network/references/DEVICES.local.md
 scripts/*.local
 
-# Self-healing queue + agent output
+# Self-healing queue + agent output (per-plugin paths after restructure)
 .home-net-queue/
 .home-net-verify-*.log
 .home-net-verify-*.json
 .captures/
+plugins/home-network/.home-net-queue/
+plugins/home-network/.home-net-verify-*.log
+plugins/home-network/.captures/
+
+# Session state from the remember skill
+.remember/
 
 # Editor / OS cruft
 .DS_Store

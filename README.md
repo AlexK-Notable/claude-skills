@@ -1,106 +1,78 @@
-# home-network-skill
+# komi-home-toolkit
 
-A Claude Code skill + script bundle for managing a home LAN — discovery,
-troubleshooting, firewall recipes, and a curated device inventory. Designed
-to be portable across Linux machines with graceful degradation when expected
-tools aren't installed.
+A Claude Code plugin marketplace bundling two cooperating skills for personal home infrastructure:
 
-## What's in here
+| Plugin | What it does |
+|--------|--------------|
+| **[home-network](plugins/home-network/README.md)** | LAN discovery, troubleshooting, firewall recipes, and a self-updating device inventory that grows via background `claude -p` agents |
+| **[bitwarden-cli](plugins/bitwarden-cli/README.md)** | Patterns for using the Bitwarden CLI — secure note creation, secret routing, the self-destructing handoff script pattern |
 
-```
-.claude-plugin/plugin.json       Claude Code plugin manifest
-skills/home-network/
-  SKILL.md                       Strategy + decision tree (auto-loads into Claude)
-  references/
-    DISCOVERY.md                 mDNS / ARP / TCP probe playbook
-    DEVICES.md                   Personal device inventory
-    FIREWALL.md                  ufw recipes and conventions
-    TROUBLESHOOTING.md           "host unreachable" decision tree
-    TOOLS.md                     Per-tool reference + cross-distro install
-scripts/
-  home-net-doctor                Audit available networking tools on this host
-  scan-lan                       Discovery sweep (mDNS + ARP + TCP fallback)
-  find-host                      Resolve a name via DNS → mDNS → ARP fallback chain
-  port-check                     TCP fanout port check
-  wol                            Wake-on-LAN by device alias or MAC
-  home-net-learn                 AGENTIC: probe a new device, draft entry,
-                                 fire background verifier, merge on pass
-install.sh                       Bootstrap on any machine
-```
+They're packaged together because they routinely cooperate: during a network onboarding session, you discover credentials (default passwords, API tokens, vault recovery codes) that should land in Bitwarden rather than in any reference file. The `home-network` skill's Knowledge Capture Protocol explicitly routes secrets to the `bitwarden-cli` skill's self-destructing handoff recipe.
 
 ## Install
 
-### Option A — Claude Code plugin (preferred)
+### As a marketplace (recommended — gives you both plugins to pick from)
 
 ```bash
-# inside Claude Code (or via CLI)
-claude plugin install https://github.com/AlexK-Notable/home-network-skill
+# inside Claude Code:
+/plugin marketplace add https://github.com/AlexK-Notable/home-network-skill
+/plugin install home-network
+/plugin install bitwarden-cli
 ```
 
-Skill auto-activates on networking-related prompts.
+Or just install whichever subset you want. Plugins can be installed independently.
 
-### Option B — manual
+### Direct git clone (for hacking on the plugins)
 
 ```bash
 git clone git@github.com:AlexK-Notable/home-network-skill.git ~/repos/home-network-skill
-~/repos/home-network-skill/install.sh
+
+# For the home-network plugin: symlinks scripts into ~/bin/ + the skill into ~/.claude/skills/
+~/repos/home-network-skill/plugins/home-network/install.sh
 ```
 
-`install.sh` does:
-- Symlinks each script in `scripts/` into `~/bin/` (refuses to clobber)
-- Symlinks `skills/home-network/` into `~/.claude/skills/`
-- Runs `home-net-doctor` to report tool availability for this distro
-- Does NOT install any packages — reports what's missing and how to get it
+The `bitwarden-cli` plugin is documentation-only (no scripts), so no install step is needed beyond cloning — the SKILL.md auto-discovers when the plugin is loaded.
 
-## Tool dependencies
+## Cross-plugin workflow
 
-Detected, never auto-installed. `home-net-doctor` reports what's available
-and shows install commands per distro.
+The canonical example: changing a default factory password on a newly-onboarded device.
 
-| Required for | Tool | Arch/CachyOS | Debian/Ubuntu | macOS |
-|--------------|------|--------------|---------------|-------|
-| mDNS discovery | `avahi-utils` | `pacman -S avahi nss-mdns` | `apt install avahi-utils libnss-mdns` | built-in (`dns-sd`) |
-| ARP probes | `arping` | `pacman -S iputils` | `apt install iputils-arping` | `brew install arping` |
-| Port scans (advanced) | `nmap` | `pacman -S nmap` | `apt install nmap` | `brew install nmap` |
-| Packet capture | `termshark` or `tcpdump` | `pacman -S termshark` | `apt install termshark` | `brew install termshark` |
-| Firewall | `ufw` | `pacman -S ufw` | preinstalled | n/a (use pf) |
-| Wake-on-LAN | `wakeonlan` or `etherwake` | `yay -S wakeonlan` (AUR) | `apt install wakeonlan` | `brew install wakeonlan` |
+1. `/home-network onboard the new SBC at 192.168.1.221` — the skill helps you SSH in, sets up key auth, etc.
+2. During the session, you discover the factory password is `bred/bred` and want to change it.
+3. The skill's anti-pattern rule: **don't put the new password in `DEVICES.md`**.
+4. Instead, follow the **Knowledge Capture Protocol → Secret discovered** row, which points at the `bitwarden-cli` skill's **Self-destructing handoff script** recipe.
+5. Claude generates a strong password with `bw generate`, sets it on the device via `chpasswd`, stashes it in `/tmp/secret-XXX`, and writes a wrapper script that you fire from your unlocked shell.
+6. The wrapper creates a Bitwarden secure note and shreds both files.
+7. `DEVICES.md` gets a *pointer*: "Password stored in Bitwarden as `<item name>`. Key auth via `~/.ssh/id_ed25519`."
 
-Pure-bash fallbacks exist for the most basic operations (TCP probes via
-`/dev/tcp`, ARP cache via `/proc/net/arp`), so the skill is still useful on
-a minimal install.
+This whole flow is described in both skills' SKILL.md files, with the same recipe referenced from both sides.
 
-## Self-healing learn loop
+## Repository layout
 
-The big experiment in this skill: `home-net-learn` doesn't block your shell.
-
-```bash
-home-net-learn nova                  # probes by hostname
-home-net-learn 192.168.1.221         # probes by IP
-home-net-learn                       # interactive: scan + pick from results
+```
+.claude-plugin/
+  marketplace.json              ← lists both plugins for the Claude plugin system
+plugins/
+  home-network/
+    .claude-plugin/plugin.json
+    skills/home-network/{SKILL.md, references/}
+    scripts/{home-net-doctor, scan-lan, find-host, port-check, wol,
+             home-net-learn, home-net-capture}
+    install.sh                  ← optional ~/bin + ~/.claude/skills symlink helper
+    README.md
+  bitwarden-cli/
+    .claude-plugin/plugin.json
+    skills/bitwarden-cli/{SKILL.md, references/}
+    README.md
+README.md                       ← this file
 ```
 
-What happens:
-1. Foreground (fast): probe the device, gather facts, write `DEVICES.draft.md`
-2. Background: spawn `claude -p` agent that
-   - re-verifies findings against live network
-   - looks up MAC OUI
-   - cross-references hostname for collisions
-   - infers device role from open ports + mDNS services
-3. On pass: agent commits to `DEVICES.md` + git commits
-4. On fail: agent writes `DEVICES.draft.review.md` for you to look at
-5. `notify-send` fires either way
+## Why a marketplace and not one plugin
 
-The skill grows over time without slowing your active work.
-
-## Privacy posture
-
-All device-specific data (MACs, hostnames, SSH users) lives in
-`DEVICES.md` as **plaintext** in this **private** repo. If you ever flip
-this repo public, move sensitive entries to `DEVICES.local.md`
-(gitignored) first.
-
-The `.gitignore` already excludes `DEVICES.local.md` for that pattern.
+Each skill has a distinct lifecycle. The `home-network` skill mutates frequently (every `home-net-capture` or `home-net-learn` invocation can produce a commit). The `bitwarden-cli` skill is more stable. Packaging them as separate plugins under one marketplace lets:
+- Either be installed independently if a user wants only one
+- Each evolve at its own pace with independent semver
+- Future skills (3D printer / Klipper, smart-home / Matter, etc.) be added to the marketplace without disrupting either current plugin
 
 ## License
 
