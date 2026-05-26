@@ -13,6 +13,7 @@ Decision trees for common LAN problems.
 7. "Wi-Fi driver doesn't survive suspend/resume (rtw88_8821cs)"
 8. "Don't unload a Wi-Fi driver over the same Wi-Fi connection"
 9. "SSH to a DHCP'd host that keeps changing IP" (mDNS HostName pattern)
+10. "avahi-daemon shows active but mDNS doesn't resolve"
 
 ---
 
@@ -284,6 +285,7 @@ NetworkManager` (on a Wi-Fi-only host), `iw dev wlan0 disconnect`,
 
 ## 9. "SSH to a DHCP'd host that keeps changing IP" (mDNS HostName)
 
+
 SBCs and laptops on DHCP can swap IPs (lease rotation, ethernet ↔
 Wi-Fi failover, router reboot). Hard-coding `HostName 192.168.1.X` in
 `~/.ssh/config` breaks the moment that happens.
@@ -313,3 +315,64 @@ Caveats:
   IPs reach the same sshd.
 - Same pattern applies to per-host SSH MCP config (e.g.,
   `~/.config/ssh-mcp/servers.json` — use `bredos.local` not `192.168.1.221`).
+- If the target host's mDNS is broken (see §10), this pattern fails open
+  — fall back to a pinned IP until you fix avahi on the target.
+
+## 10. "avahi-daemon shows active but mDNS doesn't resolve"
+
+A subtler failure mode than §6: the systemd unit reports healthy, but
+mDNS is silently dead — both on the host itself and from every other
+LAN client trying to resolve it.
+
+**Symptom pattern**:
+
+```bash
+# On the affected host:
+systemctl is-active avahi-daemon         # → active
+avahi-resolve -n $(hostname).local       # → "Failed to create client object: Daemon not running"
+
+# From another LAN client:
+avahi-resolve -4 -n <host>.local         # → "Failed to resolve host name" (timeout)
+```
+
+The contradiction is the diagnostic: systemd thinks it's running, the
+daemon's own resolver client thinks it isn't.
+
+**Root cause**: avahi-daemon talks to clients (including `avahi-resolve`
+and other LAN devices doing mDNS lookups) over D-Bus. The daemon's
+systemd unit can remain `active` while its D-Bus connection breaks —
+process alive, interface dead. Common triggers: D-Bus restart without
+restarting avahi, dbus-daemon socket churn during heavy reconfiguration,
+package upgrades that swap dbus mid-boot.
+
+**Diagnostic principle (general)**: `systemctl is-active` only tells you
+the process exists. For daemons that expose a D-Bus or socket interface,
+**always exercise the interface itself** to confirm functional health.
+Same lesson applies to `pulseaudio`, `bluetoothd`, `NetworkManager`,
+`polkit`, `udisks2`, etc.
+
+**Recovery**:
+
+```bash
+sudo systemctl restart avahi-daemon
+# then re-test:
+avahi-resolve -n $(hostname).local
+```
+
+If a plain restart doesn't fix it, the D-Bus side may be the culprit:
+
+```bash
+systemctl status avahi-daemon                 # look for "Failed to register"
+journalctl -u avahi-daemon -n 50              # D-Bus connection errors here
+sudo systemctl restart dbus && sudo systemctl restart avahi-daemon
+```
+
+Restarting `dbus` is heavy-handed (it can disturb session services), so
+try the avahi-only restart first.
+
+**Don't be fooled into thinking the host is down.** Per DISCOVERY.md
+Rule 1 / Rule 2, a broken mDNS responder doesn't mean the host is
+offline — fall back to ARP (`ip neigh show <IP>`) or the pinned IP via
+SSH while diagnosing.
+
+See also DEVICES.md §"indiedroid nova (bredOS)" for a real case (post-reflash 2026-05-25).

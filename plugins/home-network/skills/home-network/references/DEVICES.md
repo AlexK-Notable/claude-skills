@@ -30,29 +30,32 @@ for corrections.
 
 **Dual-homed: ethernet + Wi-Fi simultaneously active, each with its own DHCP lease.**
 
+**Reflashed 2026-05-25**: hostname `bredos` → `zbred`, default user `bred` → `komi`, SSH host keys regenerated. MAC addresses survived the reflash unchanged. mDNS currently broken on the device (avahi-daemon active but D-Bus interface dead — see [TROUBLESHOOTING.md §10](TROUBLESHOOTING.md#10-avahi-daemon-shows-active-but-mdns-doesnt-resolve)); pin SSH config to the wired IP until that's fixed.
+
 | Field | Value |
 |-------|-------|
-| IPv4 (ethernet) | 192.168.1.224 *(DHCP, metric 100 — PREFERRED default route)* |
-| IPv4 (Wi-Fi) | 192.168.1.221 *(DHCP, metric 600 — fallback)* |
+| IPv4 (ethernet) | 192.168.1.224 *(DHCP, metric 100 — PREFERRED default route; re-verified 2026-05-25)* |
+| IPv4 (Wi-Fi) | 192.168.1.221 *(DHCP, metric 600 — fallback; re-verified 2026-05-25)* |
 | IPv6 (global) | 2600:1700:4811:4e70:b6c8:c1a0:de27:97ee *(SLAAC, may rotate)* |
-| MAC (ethernet `enP4p65s0`) | `c6:65:5c:3a:45:3e` *(locally-administered / randomized — unusual for an SBC)* |
-| MAC (Wi-Fi `wlan0`) | `60:fb:00:37:57:56` |
+| MAC (ethernet `enP4p65s0`) | `c6:65:5c:3a:45:3e` *(locally-administered / randomized — unusual for an SBC; survived 2026-05-25 reflash)* |
+| MAC (Wi-Fi `wlan0`) | `60:fb:00:37:57:56` *(survived 2026-05-25 reflash)* |
 | OUI (Wi-Fi) | 60:FB:00 — Shenzhen Bilian Electronic (consistent with indiedroid Wi-Fi NIC) |
-| Hostname (mDNS) | `bredos.local` *(racy — resolves to whichever interface answers first; both reach the same host)* |
-| Hostname (system) | `bredos` (the distro name — `hostname` command is NOT installed on bredOS; use `cat /etc/hostname`) |
-| Hostname (DNS) | `bredos.attlocal.net` (AT&T router DNS may show both IPs under this name) |
+| Hostname (mDNS) | `zbred.local` *(currently NOT resolving — avahi-daemon's D-Bus interface is broken even though the unit reports active; see TROUBLESHOOTING §10)* |
+| Hostname (system) | `zbred` (set during 2026-05-25 reflash — was `bredos`; `hostname` command still NOT installed on bredOS, use `cat /etc/hostname`) |
+| Hostname (DNS) | `zbred.attlocal.net` *(expected once the AT&T gateway picks up the new DHCP hostname; previously `bredos.attlocal.net`)* |
 | Hardware | indiedroid nova (RK3588-class SoC) |
 | Kernel | `Linux 6.1.75-rkr3 aarch64` (rkr3 = Rockchip BSP build) |
 | Role | SBC, exploratory / dev |
 | OS | bredOS |
 | SSH | enabled, port 22 (only open port observed) |
-| SSH user | `bred` (bredOS default — 4-char short name, NOT `bredos`) |
-| SSH default password | `bred` (factory default — matches username, extreme insecurity. Key auth now primary.) |
-| SSH key auth | passwordless via `~/.ssh/id_ed25519` (added 2026-05-24) |
-| SSH alias | `~/.ssh/config` defines `nova` and `bredos` aliases → `bred@bredos.local` w/ `~/.ssh/id_ed25519` and `StrictHostKeyChecking accept-new` |
+| SSH user | `komi` *(set during 2026-05-25 reflash — was `bred`; the `bred` default user appears to be gone on the rebuilt system)* |
+| SSH host keys | regenerated 2026-05-25 (reflash). If you see `Host key verification failed`, run `ssh-keygen -R 192.168.1.224 && ssh-keygen -R 192.168.1.221 && ssh-keygen -R bredos.local` and accept the new key. |
+| SSH key auth | passwordless via `~/.ssh/id_ed25519` (re-deployed 2026-05-25 post-reflash) |
+| SSH alias | `~/.ssh/config` defines `nova` and `zbred` aliases → `komi@192.168.1.224` w/ `~/.ssh/id_ed25519`. Pinned to the wired IP (not `zbred.local`) because device-side mDNS is currently broken. |
+| Bitwarden | Historical secure note "nova SSH password (bred user)" holds the old `bred/bred` factory default — stale, since the `bred` user is gone post-reflash. Not deleted from Bitwarden by automation. |
 | ICMP | **filtered** — use mDNS/ARP for aliveness |
 | Wi-Fi driver | `rtw88_8821cs` (Realtek RTL8821CS combo Wi-Fi+BT via SDIO). Needs a `modprobe` workaround for both BOOT (boot-time race) and SLEEP (suspend/resume); both hooks are now installed. See [TROUBLESHOOTING.md §7](TROUBLESHOOTING.md#7-wi-fi-driver-doesnt-survive-suspendresume-rtw88_8821cs). |
-| Notes | When `bredos.local` is preferred over a hard-coded IP, lease rotation and ethernet↔Wi-Fi swaps become transparent. Use `bredos.local` in SSH config (with `StrictHostKeyChecking accept-new` since mDNS may map to multiple IPs over time). |
+| Notes | Once device-side mDNS is fixed, prefer `zbred.local` in SSH config so lease rotation and ethernet↔Wi-Fi swaps become transparent (use `StrictHostKeyChecking accept-new` since mDNS may map to multiple IPs over time). Until then, the wired IP is the stable target. The `nova` alias is preserved across reflashes — it's user-facing muscle memory, not tied to the system hostname. |
 
 ### Raspberry Pi (komi-2 — Samba host)
 
