@@ -56,7 +56,12 @@ to work transparently.
 
 **Gotcha**: needs RAW sockets. Either run as root, or
 `sudo setcap cap_net_raw+eip $(which arping)` once to make it
-unprivileged forever.
+unprivileged forever. On this CachyOS box neither is in effect (and sudo
+is barred by policy), so a plain `arping` prints `socket: Operation not
+permitted`. When that happens, use the unprivileged ping-sweep +
+`ip neigh` substitute in
+[TROUBLESHOOTING.md §1](TROUBLESHOOTING.md#1-cant-reach-host) — it proves
+L2 presence by MAC without RAW sockets.
 
 ### nmap
 
@@ -256,7 +261,10 @@ See [TROUBLESHOOTING.md §5](TROUBLESHOOTING.md#5-wake-on-lan-doesnt-work).
 - `nc -u HOST PORT` — UDP instead of TCP
 
 **Gotcha**: flag semantics differ between flavors. If `-z` doesn't work,
-you have a flavor that needs `--probe`.
+you have a flavor that needs `--probe`. **On this CachyOS box `nc` is
+absent entirely** — only `ncat` (shipped with the `nmap` package) is
+installed. Use `ncat -zv HOST PORT`, or the dependency-free `/dev/tcp`
+bash builtin below.
 
 ### `/dev/tcp` (bash builtin)
 

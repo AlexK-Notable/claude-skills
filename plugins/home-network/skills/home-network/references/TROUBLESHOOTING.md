@@ -39,6 +39,41 @@ Step 3: Host is up. Why can't you reach it?
 └── Connection works but timeouts? → MTU or routing issue (see step 4).
 ```
 
+### Unprivileged "is the host present at L2 anywhere?" (when `arping` needs root)
+
+`arping` needs `CAP_NET_RAW`/root; on a locked-down box (e.g. this
+CachyOS workstation, where sudo is barred by policy and the cap isn't
+set) it just prints `socket: Operation not permitted`. Unprivileged
+substitute that works across BOTH IP families and survives DHCP lease
+rotation — because you search by MAC, not IP:
+
+```bash
+# IPv4: fan out pings to force ARP even when ICMP echo is filtered, then read the cache
+for i in $(seq 1 254); do ping -c1 -W1 192.168.1.$i >/dev/null 2>&1 & done; wait
+ip neigh show | grep -i <MAC>
+
+# IPv6: solicit all-nodes multicast, then read the neighbor cache
+ping -6 -c3 -W1 -I <iface> ff02::1
+ip -6 neigh show | grep -i <MAC>
+```
+
+ARP/ND are answered by the kernel *below* any host firewall, so a hit
+means the host is genuinely on-LAN even if every port is filtered.
+Three distinct conclusions:
+
+- **Hit at some IP** → host is up; if you can't connect, it's
+  firewalled/ICMP-filtered, not absent (back to step 3 above).
+- **`INCOMPLETE` at the expected IP but a hit at another** → stale IP /
+  lease moved; use the IP the MAC actually answers at.
+- **Absent by MAC across BOTH families** → genuinely off-LAN (powered
+  off / crashed / on another network). If a multi-homed host goes dark
+  on *all* its interfaces at once, suspect a whole-device event rather
+  than a per-interface driver failure.
+
+Searching by MAC instead of IP is what makes this robust to lease
+rotation. See DEVICES.md §"indiedroid nova (bredOS)" for a real case
+(nova OFFLINE 2026-05-27).
+
 ## 2. "SSH connection refused / timeout"
 
 ```

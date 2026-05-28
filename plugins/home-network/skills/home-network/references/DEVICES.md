@@ -30,6 +30,8 @@ for corrections.
 
 **Dual-homed: ethernet + Wi-Fi simultaneously active, each with its own DHCP lease.**
 
+**Status 2026-05-27: OFFLINE** — absent from LAN on both interfaces (ethernet .224 + Wi-Fi .221 both `INCOMPLETE`, no ARP reply) and on IPv6 (no ND entry for either MAC after an all-nodes solicit). Both transports going dark *simultaneously* points to a whole-device event (powered off / crashed / hung), NOT the lone `rtw88_8821cs` Wi-Fi failure mode. Searched by MAC, so a lease swap wouldn't hide it. Re-verify with the dual-stack L2-presence-by-MAC check ([TROUBLESHOOTING.md §1](TROUBLESHOOTING.md#1-cant-reach-host)) before assuming it's back — and remember device-side mDNS is broken (§10), so a `*.local` timeout is uninformative about aliveness.
+
 **Reflashed 2026-05-25**: hostname `bredos` → `zbred`, default user `bred` → `komi`, SSH host keys regenerated. MAC addresses survived the reflash unchanged. mDNS currently broken on the device (avahi-daemon active but D-Bus interface dead — see [TROUBLESHOOTING.md §10](TROUBLESHOOTING.md#10-avahi-daemon-shows-active-but-mdns-doesnt-resolve)); pin SSH config to the wired IP until that's fixed.
 
 | Field | Value |
@@ -177,10 +179,11 @@ when you want a verified entry.**
 | 192.168.1.143 | d4:ad:fc:43:15:92 | LIFX bulb |
 | 192.168.1.145 | d4:ad:fc:43:15:92 | LIFX bulb |
 | 192.168.1.146 | d4:ad:fc:41:19:68 | LIFX bulb |
-| 192.168.1.144 | 0e:c5:4e:38:25:fc | Unknown (randomized MAC) |
+| 192.168.1.144 | 0e:c5:4e:38:25:fc *(randomized)* | Android device — advertises mDNS `Android_LBTMCTRB.local` (name seen 2026-05-27; MAC unchanged from 2026-05-24 audit) |
 | 192.168.1.148 | 1c:69:20:85:e0:90 | ESP32-based IoT (OUI: Espressif) |
 | 192.168.1.180 | 3c:dc:75:0e:ce:38 | ESP32-based IoT |
 | 192.168.1.192 | 36:be:fe:48:f3:f5 | Unknown (randomized MAC) |
+| 192.168.1.223 | 28:94:01:89:5d:4e | Web IoT device — port 80 open, 22 closed/filtered, no mDNS reverse. OUI 28:94:01 is globally-assigned (NOT nova, despite being adjacent to nova's old .224 lease). Seen 2026-05-27 — run `home-net-learn 192.168.1.223` to identify. |
 | 2600:1700:4811:4e70::48 | (IPv6-only) | Matter endpoint — `none-3.local`, advertises `_matter._tcp` |
 
 ---
