@@ -452,9 +452,15 @@ Confirm the *new* OS is really what booted (not a fluke): match the SSH
 banner / `nmap -sV` against the flashed image (e.g. `OpenSSH ... Debian
 7+deb13u2` ⇒ Debian 13 Trixie). Note the board will come up with a
 **new DHCP lease and a new MAC** — mainline images on SoCs without a
-burned-in MAC (RK3588) generate a stable random locally-administered MAC
-from the SoC, which differs from the previous install's MAC. That's
-expected, not a second device.
+burned-in MAC (RK3588) generate a stable locally-administered MAC, which
+differs from the previous install's MAC. That's expected, not a second
+device. The MAC is **stable across reboots but tied to the OS install**:
+systemd-networkd's `MACAddressPolicy=persistent` (`99-default.link`)
+derives it deterministically from `/etc/machine-id`, so the same rootfs
+regenerates the same MAC every boot — but reflashing to other storage
+(new machine-id) yields a *new* MAC, so any DHCP reservation keyed to it
+must be updated. Verified on nova: ethernet MAC identical across a
+reboot, reservation held.
 
 See DEVICES.md §"indiedroid nova (bredOS)" for a real case (2026-05-28:
 proved nova's board good after a bredOS-eMMC boot failure).
