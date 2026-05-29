@@ -14,6 +14,7 @@ Decision trees for common LAN problems.
 8. "Don't unload a Wi-Fi driver over the same Wi-Fi connection"
 9. "SSH to a DHCP'd host that keeps changing IP" (mDNS HostName pattern)
 10. "avahi-daemon shows active but mDNS doesn't resolve"
+11. "Corrupt OS install vs board failure on an SBC" (SD swap-test)
 
 ---
 
@@ -411,3 +412,49 @@ offline — fall back to ARP (`ip neigh show <IP>`) or the pinned IP via
 SSH while diagnosing.
 
 See also DEVICES.md §"indiedroid nova (bredOS)" for a real case (post-reflash 2026-05-25).
+
+## 11. "Corrupt OS install vs board failure on an SBC" (SD swap-test)
+
+When an SBC won't boot — no display, unresponsive, **absent from the LAN
+on every interface** (confirm with the dual-stack L2-by-MAC sweep in §1)
+— the open question is: is the **board** dead, or just the **installed
+OS**? On RK3588 and similar SoCs the kernel console is on a **serial
+UART, not HDMI**, so an early-boot/initramfs failure looks identical to a
+hardware fault: the display blanks at kernel handoff (normal) and the
+real error is invisible without a serial cable.
+
+**The swap-test isolates the variable.** Boot a *known-good OS from
+different storage* on the *same board, power, cable, and monitor* —
+change only the OS-storage variable:
+
+```
+1. Back up the existing SD card (if any).
+2. Flash a verified mainline image (e.g. Armbian minimal) to SD.
+3. BYPASS the installed eMMC so the board falls through to SD:
+   - physically remove the eMMC module, OR
+   - hold the MASKROM button so the BootROM skips eMMC.
+   (RK3588 tries the eMMC bootloader BEFORE SD, so you MUST remove
+    eMMC or force MASKROM — otherwise it boots the broken install again.)
+4. Power on. Watch for network presence (§1 L2-by-MAC sweep) + SSH.
+```
+
+Interpreting the result:
+
+- **Board reappears on the LAN / serves SSH** → hardware, power, and
+  cabling are all **good**; the fault is isolated to the *installed OS*
+  on the original storage (corrupt rootfs/bootloader — often a write
+  interrupted by a power-supply incident). Recover or reflash that
+  storage.
+- **Still dead from known-good SD** → the fault is below the OS: board,
+  PSU, or storage interface. Now a hardware investigation is warranted.
+
+Confirm the *new* OS is really what booted (not a fluke): match the SSH
+banner / `nmap -sV` against the flashed image (e.g. `OpenSSH ... Debian
+7+deb13u2` ⇒ Debian 13 Trixie). Note the board will come up with a
+**new DHCP lease and a new MAC** — mainline images on SoCs without a
+burned-in MAC (RK3588) generate a stable random locally-administered MAC
+from the SoC, which differs from the previous install's MAC. That's
+expected, not a second device.
+
+See DEVICES.md §"indiedroid nova (bredOS)" for a real case (2026-05-28:
+proved nova's board good after a bredOS-eMMC boot failure).
