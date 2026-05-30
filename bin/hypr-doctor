@@ -59,6 +59,28 @@ hyprctl_alive() {
 # Return the mtime (epoch seconds) of a path, or 0 if missing.
 mtime() { stat -c %Y "$1" 2>/dev/null || echo 0; }
 
+# The name hyprctl reports for plugin $i in `plugin list` (e.g. "Hyprtasking").
+# Manifest .loaded_name is authoritative; fall back to capitalized .name.
+plugin_loaded_name() {
+    local idx="$1" name ln
+    ln=$(manifest ".plugins[$idx].loaded_name // empty")
+    if [[ -z "$ln" ]]; then
+        name=$(manifest ".plugins[$idx].name")
+        ln="${name^}"
+    fi
+    printf '%s' "$ln"
+}
+
+# Is a plugin currently loaded in live Hyprland? Verifies against the live
+# plugin list (ground truth) — NOT against `hyprctl plugin load` output, which
+# exits 0 and prints "loaded" on BOTH success ("loaded successfully") and
+# failure ("could not be loaded"), making its output useless as a signal.
+# plugin list lines look like: "Plugin Hyprtasking by raybbian:"
+plugin_is_loaded() {
+    local loaded_name="$1"
+    hyprctl plugin list 2>/dev/null | grep -qE "^Plugin ${loaded_name}([: ]|\$)"
+}
+
 # ── checks ────────────────────────────────────────────────────────────────────
 
 check_recent_stack_updates() {
@@ -138,8 +160,8 @@ check_hypr_plugin_abi() {
             fail "$name: .so built $(date -d "@$so_mtime" '+%Y-%m-%d') < Hyprland $(date -d "@$hypr_mtime" '+%Y-%m-%d') → ABI mismatch likely"
             DRIFT=$((DRIFT+1))
         elif $hypr_running; then
-            # Confirm it's actually loaded right now
-            if hyprctl plugin list 2>/dev/null | grep -q "Plugin ${name^}\|Plugin $name"; then
+            # Confirm it's actually loaded right now (ground truth: plugin list)
+            if plugin_is_loaded "$(plugin_loaded_name "$i")"; then
                 ok "$name: built $(date -d "@$so_mtime" '+%Y-%m-%d'), loaded"
             else
                 warn "$name: .so newer than Hyprland but not loaded — check the exec-once in hyprland.conf"
@@ -293,15 +315,18 @@ cmd_rebuild() {
         ok "$name: build succeeded"
         rebuilt=$((rebuilt+1))
 
-        # Reload in live Hyprland (unload→load to swap the in-memory .so)
+        # Reload in live Hyprland (unload→load to swap the in-memory .so).
+        # Verify against the live plugin list, never against `load`'s own output
+        # (it lies — see plugin_is_loaded). Capture load output once for errors.
         if hyprctl_alive; then
+            local loaded_name load_out
+            loaded_name=$(plugin_loaded_name "$i")
             hyprctl plugin unload "$so_path" >/dev/null 2>&1
-            if hyprctl plugin load "$so_path" 2>&1 | grep -qiE '^ok|loaded'; then
+            load_out=$(hyprctl plugin load "$so_path" 2>&1)
+            if plugin_is_loaded "$loaded_name"; then
                 ok "$name: reloaded in live Hyprland"
             else
-                # Re-run to surface the error message
-                local err; err=$(hyprctl plugin load "$so_path" 2>&1)
-                fail "$name: live reload failed — $err"
+                fail "$name: live reload failed — ${load_out:-not present in plugin list}"
                 FAILED=$((FAILED+1))
             fi
         else
@@ -376,8 +401,16 @@ cmd_plugin_rebuild() {
             ok "build succeeded"
 
             if hyprctl_alive; then
+                local loaded_name load_out
+                loaded_name=$(plugin_loaded_name "$i")
                 hyprctl plugin unload "$so_path" >/dev/null 2>&1
-                hyprctl plugin load "$so_path"
+                load_out=$(hyprctl plugin load "$so_path" 2>&1)
+                if plugin_is_loaded "$loaded_name"; then
+                    ok "$name: reloaded in live Hyprland"
+                else
+                    fail "$name: live reload failed — ${load_out:-not present in plugin list}"
+                    return 1
+                fi
             else
                 info "Hyprland not running; will load on next session"
             fi

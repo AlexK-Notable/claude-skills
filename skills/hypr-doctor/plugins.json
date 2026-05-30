@@ -4,6 +4,7 @@
     {
       "name": "hyprtasking",
       "enabled": true,
+      "loaded_name": "Hyprtasking",
       "repo_dir": "/home/komi/repos/hypr-things/hyprtasking",
       "branch": "komi/workspace-fixes-v55",
       "remote_push_to": "komi",
@@ -17,6 +18,7 @@
     {
       "name": "dynamic-cursors",
       "enabled": false,
+      "loaded_name": "dynamic-cursors",
       "disabled_reason": "Not yet compatible with Hyprland 0.55.x. Re-enable when upstream raybbian/dynamic-cursors PR #139 (or successor) lands and the hyprpm.toml pin matrix lists a 0.55.x-compatible commit.",
       "repo_dir": "/home/komi/repos/dynamic-cursors",
       "branch": null,
