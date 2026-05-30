@@ -256,6 +256,79 @@ check_aur_rebuild_hints() {
     fi
 }
 
+check_bin_shims() {
+    header "~/bin shim integrity"
+    local bindir="$HOME/bin"
+    [[ -d "$bindir" ]] || { info "no ~/bin directory — skipping"; return; }
+
+    local broken=0 checked=0 f
+    for f in "$bindir"/*; do
+        [[ -e "$f" || -L "$f" ]] || continue
+
+        # Dangling symlink — the exact class that silently kills hypr-doctor's
+        # own SessionStart hook if claude-dirs ever moves.
+        if [[ -L "$f" ]]; then
+            checked=$((checked+1))
+            if [[ ! -e "$f" ]]; then
+                fail "$(basename "$f"): dangling symlink → $(readlink "$f")"
+                broken=$((broken+1)); FAILED=$((FAILED+1))
+            fi
+            continue
+        fi
+
+        # Thin exec-wrapper whose absolute/~ target no longer exists (the ccx
+        # pattern: repo moved, wrapper still points at the old path).
+        if [[ -f "$f" && "$(head -c2 "$f" 2>/dev/null)" == "#!" ]]; then
+            local target
+            target=$(awk '/^[[:space:]]*exec[[:space:]]+[~\/]/ {t=$2; gsub(/["'\''"]/,"",t); print t; exit}' "$f" 2>/dev/null)
+            [[ -z "$target" ]] && continue
+            checked=$((checked+1))
+            local expanded="${target/#\~/$HOME}"
+            if [[ ! -e "$expanded" ]]; then
+                fail "$(basename "$f"): exec target missing → $target"
+                broken=$((broken+1)); FAILED=$((FAILED+1))
+            fi
+        fi
+    done
+
+    [[ "$broken" -eq 0 ]] && ok "all $checked shim(s)/symlink(s) resolve"
+}
+
+check_venvs() {
+    header "Python venv health"
+    local n; n=$(manifest '(.watched_venvs // []) | length')
+    if [[ -z "$n" || "$n" -eq 0 ]]; then
+        info "no watched venvs in manifest — skipping"
+        return
+    fi
+
+    local i
+    for ((i=0; i<n; i++)); do
+        local dir base venv
+        dir=$(manifest ".watched_venvs[$i]")
+        base=$(basename "$dir")
+        venv="$dir/.venv"
+
+        if [[ ! -d "$dir" ]]; then
+            warn "$base: project dir missing ($dir) — stale manifest entry?"
+            continue
+        fi
+        if [[ ! -d "$venv" ]]; then
+            info "$base: no .venv yet — skipping"
+            continue
+        fi
+        # Run the venv's own interpreter. Fails if it's a dangling symlink to a
+        # removed system python, or the whole tree moved out from under it.
+        if "$venv/bin/python" --version >/dev/null 2>&1; then
+            ok "$base: venv healthy ($("$venv/bin/python" --version 2>&1))"
+        else
+            fail "$base: venv broken — interpreter won't run"
+            info "  fix: rm -rf '$venv' && python -m venv '$venv' && '$venv/bin/pip' install -e '$dir'"
+            FAILED=$((FAILED+1))
+        fi
+    done
+}
+
 # ── subcommands ───────────────────────────────────────────────────────────────
 
 cmd_audit() {
@@ -265,6 +338,8 @@ cmd_audit() {
     check_qt_python_skew
     check_systemd_user_failed
     check_xdg_desktop_portal
+    check_bin_shims
+    check_venvs
     check_aur_rebuild_hints
 
     header "Summary"
