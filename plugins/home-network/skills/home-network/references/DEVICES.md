@@ -28,7 +28,19 @@ for corrections.
 
 ### indiedroid nova (bredOS)
 
-**Dual-homed: ethernet + Wi-Fi simultaneously active, each with its own DHCP lease.**
+**⚠ Status 2026-05-31: REFLASHED to Armbian vendor 6.1.115 SD — now Wi-Fi `.229`, hostname `indiedroid-nova`, NPU FUNCTIONAL. Live-verified from KOMI 2026-05-31 (ICMP ~5ms, ARP lladdr matches the Wi-Fi MAC, `.228` dead, SSH banner Debian 13).** Migrated off the mainline-6.18 Armbian-on-SD (the `.228`/eMMC-removed state below) onto a freshly flashed **Armbian vendor 6.1.115** microSD — chosen for the in-tree RKNPU driver. The Armbian first-run wizard **overwrote the entire prebake**: hostname reset to `indiedroid-nova` (was baked `nova`), and the deployed SSH key, NOPASSWD sudo, and ethernet-MAC pin were ALL wiped by first-run (re-applied by hand afterward). This **supersedes the `.228` ethernet identity** documented in the 2026-05-28 block below.
+  - **Current verified network identity (Armbian vendor 6.1.115 SD; live-confirmed from KOMI 2026-05-31):**
+    - Hostname `indiedroid-nova` (set by the Armbian first-run wizard; was `nova`).
+    - IPv4 **`192.168.1.229` via Wi-Fi** (`wlan0`, MAC `60:fb:00:37:57:56` — the real Realtek hardware MAC, OUI 60:FB:00 Shenzhen Bilian, unchanged across every reflash). Plain DHCP, **not** reserved. ICMP responds (~5ms; Wi-Fi slightly flaky — one SSH attempt timed out then retried OK).
+    - **Ethernet did NOT get a DHCP lease** (via the PoE splitter): the baked eth MAC `be:9e:7a:4c:d1:52` did not survive the first-run wipe, so the old `.228` reservation no longer matches and `.228` is **dead** (confirmed `FAILED` / no ARP / 100% ICMP loss from KOMI 2026-05-31).
+    - OS: Armbian, Debian 13 Trixie, kernel **`6.1.115-vendor-rk35xx`** (Rockchip BSP — switched from the 6.18 mainline build specifically to get the in-tree RKNPU driver). SSH banner `OpenSSH 10.0p2 Debian-7+deb13u2`.
+    - SSH user `komi`, port 22, key auth works (KOMI `id_ed25519` re-deployed via `ssh-copy-id`). **NOPASSWD sudo re-enabled** (`/etc/sudoers.d/komi-nopasswd`) — same homelab-convenience tradeoff as before. `komi` is in groups `video,render`.
+    - **NPU FUNCTIONAL:** RKNPU driver **v0.9.8** bound at `fdab0000.npu`, exposed via **`/dev/dri/renderD129`** (NOT `/dev/rknpu` on this vendor build — important gotcha). Userspace stack: librknnrt 2.3.2 + sherpa-onnx 1.13.2 (RKNN). SenseVoice speech-to-text smoke test ran at **RTF 0.091** — on-NPU STT confirmed working.
+  - **Local-side config on KOMI (out of scope to edit here):** the `nova`/`zbred` alias in `~/.ssh/config` still points at the stale `.228`/`.224` → repoint to `.229`. mDNS does not currently resolve `indiedroid-nova.local` from the LAN (no avahi claim made for this fresh vendor flash — verified non-resolving 2026-05-31), so pin SSH config to `.229` for now.
+
+**[The 2026-05-28 block below is SUPERSEDED by the 2026-05-31 reflash above — `.228`/ethernet/kernel-6.18 are no longer current. Kept as history; the baseline table at the bottom remains the pre-flux record.]**
+
+**Dual-homed: ethernet + Wi-Fi simultaneously active, each with its own DHCP lease.** *(bredOS-era baseline — see the 2026-05-31 block above for the current single-homed Wi-Fi state.)*
 
 **Status 2026-05-27: OFFLINE** — absent from LAN on both interfaces (ethernet .224 + Wi-Fi .221 both `INCOMPLETE`, no ARP reply) and on IPv6 (no ND entry for either MAC after an all-nodes solicit). Both transports going dark *simultaneously* points to a whole-device event (powered off / crashed / hung), NOT the lone `rtw88_8821cs` Wi-Fi failure mode. Searched by MAC, so a lease swap wouldn't hide it. Re-verify with the dual-stack L2-presence-by-MAC check ([TROUBLESHOOTING.md §1](TROUBLESHOOTING.md#1-cant-reach-host)) before assuming it's back — and remember device-side mDNS is broken (§10), so a `*.local` timeout is uninformative about aliveness.
 
