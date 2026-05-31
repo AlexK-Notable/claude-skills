@@ -216,15 +216,37 @@ check_systemd_user_failed() {
     failed=$(systemctl --user --failed --no-legend --plain 2>/dev/null)
     if [[ -z "$failed" ]]; then
         ok "no failed user units"
-    else
-        # Count, then list. Each failure is its own line.
-        local count
-        count=$(echo "$failed" | wc -l)
-        fail "$count failed user unit(s):"
-        echo "$failed" | sed 's/^/      /'
-        FAILED=$((FAILED+count))
-        info "recover with: systemctl --user reset-failed <unit>"
+        return
     fi
+
+    local count; count=$(grep -c . <<<"$failed")
+    fail "$count failed user unit(s):"
+    FAILED=$((FAILED+count))
+
+    # Per-unit triage. The exit code is the actual signal — a blanket
+    # "reset-failed" is wrong advice for a path/interpreter failure (it just
+    # clears the state and lets it fail again). ExecMainStatus is the process
+    # exit code; Result is systemd's verdict (exit-code/timeout/signal/oom).
+    local line unit status result hint
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        unit=$(awk '{print $1}' <<<"$line")
+        status=$(systemctl --user show "$unit" -p ExecMainStatus --value 2>/dev/null)
+        result=$(systemctl --user show "$unit" -p Result --value 2>/dev/null)
+        printf "      %s%s%s  (exit=%s result=%s)\n" "$BOLD" "$unit" "$RESET" "${status:-?}" "${result:-?}"
+        case "$status" in
+            127) hint="command not found — ExecStart or a wrapper it calls is missing. Moved repo? Check the ~/bin shim it invokes (see the shim-integrity section)." ;;
+            126) hint="found but not runnable — bad interpreter or permissions. A venv or shebang target likely moved; recreate the venv (see the venv-health section)." ;;
+            203) hint="systemd couldn't exec ExecStart — bad path or not executable. Check the unit's ExecStart= line." ;;
+            0)   if [[ "$result" == "timeout" ]]; then hint="timed out — ran past TimeoutStartSec."
+                 else hint="exited 0 but marked failed ($result) — check Type=/RemainAfterExit= or a killed dependency."; fi ;;
+            "")  hint="no recorded exit (likely signal/oom, result=$result) — journalctl --user -u $unit -e" ;;
+            *)   hint="runtime error exit $status — journalctl --user -u $unit -e" ;;
+        esac
+        printf "        ↳ %s\n" "$hint"
+    done <<<"$failed"
+
+    info "once the cause is fixed: systemctl --user reset-failed <unit> && systemctl --user start <unit>"
 }
 
 check_xdg_desktop_portal() {
