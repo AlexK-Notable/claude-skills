@@ -5,6 +5,7 @@
 #   audit               (default) read-only diagnostic report
 #   rebuild             apply fixes: rebuild drifted plugins + reload via hyprctl
 #   abi-drift           terse output for SessionStart hook (silent if healthy)
+#   ack-skew            acknowledge the current PyQt6↔Qt6 skew (silences the hook)
 #   plugin-rebuild NAME rebuild a single plugin by name
 #   help                show this message
 #
@@ -17,7 +18,7 @@
 # Note: -e intentionally omitted — diagnostics must keep going past partial failures.
 set -uo pipefail
 
-MANIFEST="$HOME/.claude/skills/hypr-doctor/plugins.json"
+MANIFEST="${HYPR_DOCTOR_MANIFEST:-$HOME/.claude/skills/hypr-doctor/plugins.json}"
 PACMAN_LOG="/var/log/pacman.log"
 STATE_DIR="$HOME/.cache/hypr-doctor"
 LAST_RUN="$STATE_DIR/last-run"
@@ -191,6 +192,10 @@ check_qt_python_skew() {
     if [[ -n "$pyqt_ver" ]]; then
         if [[ "$pyqt_ver" == "$qt_ver" ]]; then
             ok "python-pyqt6: $pyqt_ver matches"
+        elif [[ "$pyqt_ver vs $qt_ver" == "$(manifest '.suppressions.pyqt_skew_ack // empty')" ]]; then
+            # Acknowledged & unfixable-locally — visible here, silent in the hook,
+            # not counted. Auto-revives if either package version changes.
+            warn "python-pyqt6: $pyqt_ver ≠ qt6-base $qt_ver (acknowledged — waiting on Arch; suppressed in hook)"
         else
             fail "python-pyqt6: $pyqt_ver ≠ qt6-base $qt_ver → Python+Qt apps will SIGABRT on init"
             FAILED=$((FAILED+1))
@@ -444,8 +449,13 @@ cmd_abi_drift() {
     pyqt_ver=$(pacman -Q python-pyqt6 2>/dev/null | awk '{print $2}' | sed 's/-.*//')
 
     local qt_skew=""
-    [[ -n "$qt_ver" && -n "$pyqt_ver" && "$qt_ver" != "$pyqt_ver" ]] && \
-        qt_skew="python-pyqt6 ($pyqt_ver) lags qt6-base ($qt_ver)"
+    if [[ -n "$qt_ver" && -n "$pyqt_ver" && "$qt_ver" != "$pyqt_ver" ]]; then
+        # Suppress an acknowledged skew so the hook stays silent on drift the
+        # user already knows about and can't fix. Any version change revives it.
+        if [[ "$pyqt_ver vs $qt_ver" != "$(manifest '.suppressions.pyqt_skew_ack // empty')" ]]; then
+            qt_skew="python-pyqt6 ($pyqt_ver) lags qt6-base ($qt_ver)"
+        fi
+    fi
 
     # Output only if there's something to say.
     if [[ "${#hits[@]}" -gt 0 || -n "$qt_skew" ]]; then
@@ -496,6 +506,31 @@ cmd_plugin_rebuild() {
     return 1
 }
 
+cmd_ack_skew() {
+    # Record the current python-pyqt6-vs-qt6-base pair as acknowledged, so the
+    # SessionStart hook stops nagging about a skew you can't fix locally.
+    local qt_ver pyqt_ver
+    qt_ver=$(pacman -Q qt6-base 2>/dev/null | awk '{print $2}' | sed 's/-.*//')
+    pyqt_ver=$(pacman -Q python-pyqt6 2>/dev/null | awk '{print $2}' | sed 's/-.*//')
+    if [[ -z "$qt_ver" || -z "$pyqt_ver" ]]; then
+        fail "can't read qt6-base / python-pyqt6 versions — nothing to acknowledge"
+        return 1
+    fi
+    if [[ "$qt_ver" == "$pyqt_ver" ]]; then
+        ok "python-pyqt6 ($pyqt_ver) already matches qt6-base — no skew to acknowledge"
+        return 0
+    fi
+    local pair="$pyqt_ver vs $qt_ver" tmp
+    tmp=$(mktemp)
+    if jq --arg p "$pair" '.suppressions.pyqt_skew_ack = $p' "$MANIFEST" > "$tmp" && mv "$tmp" "$MANIFEST"; then
+        ok "acknowledged skew: $pair (hook now silent until either version changes)"
+    else
+        rm -f "$tmp"
+        fail "failed to write manifest at $MANIFEST"
+        return 1
+    fi
+}
+
 cmd_help() {
     sed -n '2,/^$/{s/^# \?//;p}' "$0"
 }
@@ -505,6 +540,7 @@ case "${1:-audit}" in
     audit)          cmd_audit ;;
     rebuild)        cmd_rebuild ;;
     abi-drift)      cmd_abi_drift ;;
+    ack-skew)       cmd_ack_skew ;;
     plugin-rebuild) shift; cmd_plugin_rebuild "${1:?usage: hypr-doctor plugin-rebuild NAME}" ;;
     -h|--help|help) cmd_help ;;
     *) echo "Unknown subcommand: $1" >&2; cmd_help; exit 1 ;;
