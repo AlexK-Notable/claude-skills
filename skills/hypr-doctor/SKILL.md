@@ -1,6 +1,6 @@
 ---
 name: hypr-doctor
-description: Use after `pacman -Syu` (or any system update on this Arch/CachyOS Hyprland desktop) to triage and repair recurring post-update breakage. Covers Hyprland plugin ABI mismatch (Hyprtasking, dynamic-cursors — both local-build, rebuilt manually), Qt6 ↔ python-pyqt6/pyside6 binding skew (PyQt6 lag breaks Variety, arch-update-tray, and other Python+Qt apps with "no Qt platform plugin can be initialized" SIGABRTs), failed systemd user units (today's swaync double-launch was an example), xdg-desktop-portal regressions, and rebuild-detector hints for AUR packages. Triggers on terms like "post-update", "what broke", "another update broke my config", "rebuild plugins", "Hyprland plugin failed to load", "hypr doctor", "plugin ABI", "Mismatched headers", "Qt platform plugin", "system update broke", or any session-start drift warning from `~/bin/hypr-doctor abi-drift`. The skill has TWO MODES — audit (read-only, the safe default) and rebuild (applies fixes). Always run audit first and present findings to the user before invoking rebuild. The manifest at `plugins.json` is the source of truth for which plugins to manage; edit it when adding/retiring local-build plugins.
+description: Use after `pacman -Syu` (or any system update on this Arch/CachyOS Hyprland desktop) to triage and repair recurring post-update breakage. Covers Hyprland plugin ABI mismatch (Hyprtasking, dynamic-cursors — both local-build, rebuilt manually), Qt6 ↔ python-pyqt6/pyside6 binding skew (PyQt6 lag breaks Variety, arch-update-tray, and other Python+Qt apps with "no Qt platform plugin can be initialized" SIGABRTs), failed systemd user units (today's swaync double-launch was an example; each is shown with an exit-code triage hint), broken `~/bin` shims / dangling symlinks and orphaned Python venvs (the "a repo moved and a wrapper or venv now points at a dead path" class), xdg-desktop-portal regressions, and rebuild-detector hints for AUR packages. Triggers on terms like "post-update", "what broke", "another update broke my config", "rebuild plugins", "Hyprland plugin failed to load", "hypr doctor", "plugin ABI", "Mismatched headers", "Qt platform plugin", "system update broke", "command not found after update", "broken venv", "dangling symlink", "service keeps failing", or any session-start drift warning from `~/bin/hypr-doctor abi-drift`. The skill has TWO MODES — audit (read-only, the safe default) and rebuild (applies fixes). Always run audit first and present findings to the user before invoking rebuild. The manifest at `plugins.json` is the source of truth for which plugins to manage; edit it when adding/retiring local-build plugins.
 ---
 
 # hypr-doctor
@@ -57,18 +57,24 @@ hypr-doctor          # or: hypr-doctor audit  (same thing)
 ```
 
 This is read-only. It produces a structured report with sections for: recent
-stack updates (filtered from `/var/log/pacman.log`), plugin ABI drift,
-Qt6/PyQt6/PySide6 skew, failed systemd user units, portal health, and
-rebuild-detector hints. Exit code is non-zero if anything is flagged.
+stack updates (filtered from `/var/log/pacman.log`, compared by absolute
+epoch), plugin ABI drift (load verified against the live `hyprctl plugin
+list`), Qt6/PyQt6/PySide6 skew, failed systemd user units (each with an
+exit-code-specific triage hint), `~/bin` shim integrity, Python venv health,
+portal health, and rebuild-detector hints. Exit code is non-zero if anything
+is flagged. (`checkrebuild` rescans every installed ELF, so a full audit takes
+~10s; the `abi-drift` hook skips it and is instant.)
 
 **Step 2 — present findings to the user.** Map flagged items to action:
 
 | Flagged item | Action |
 |---|---|
 | Plugin `.so` older than Hyprland binary | `hypr-doctor rebuild` (or `hypr-doctor plugin-rebuild <name>` for one) |
-| `python-pyqt6` lags `qt6-base` | **Wait** for the Arch repo to catch up (hours-to-days). Not locally fixable. Optionally mask offending services to silence boot coredumps. |
-| Failed user unit | Investigate with `systemctl --user status <unit>` and `journalctl --user -u <unit>` — fix the underlying cause, then `reset-failed`. Do NOT just `reset-failed` blindly. |
-| AUR rebuild hint | Suggest `paru -S --rebuild <pkg>` (don't auto-run without consent — AUR rebuilds can be slow and require user attention) |
+| `python-pyqt6` lags `qt6-base` | **Wait** for the Arch repo to catch up (hours-to-days). Not locally fixable. Once acknowledged, run `hypr-doctor ack-skew` so the session-start hook stops nagging until the versions change. |
+| Failed user unit | The audit prints the exit code + a hint. Follow it: 127 → a command/shim path is missing (check the shim-integrity section), 126 → bad interpreter (recreate the venv), else → `journalctl --user -u <unit> -e`. Fix the cause, *then* `reset-failed`. Never `reset-failed` blindly. |
+| Broken `~/bin` shim / dangling symlink | The repo it points at moved or was removed. Fix the shim's target path (or recreate the symlink). This is also how hypr-doctor's own hook would silently die. |
+| Broken venv | Run the printed `rm -rf … && python -m venv … && pip install -e …` recipe. Usually caused by a python version bump or a moved repo. |
+| AUR rebuild hint | The audit prints a ready `paru -S --rebuild <pkgs>` line. Suggest it; don't auto-run (AUR rebuilds are slow and need user attention). |
 
 **Step 3 — rebuild only when the user agrees, and only what they agree to:**
 
@@ -104,6 +110,7 @@ it via `jq`; you read it via the Read tool. Schema:
     {
       "name": "hyprtasking",                    // short id used in CLI
       "enabled": true,                          // false → skipped entirely
+      "loaded_name": "Hyprtasking",             // name in `hyprctl plugin list`; verifies a load took
       "repo_dir": "/abs/path/to/clone",
       "branch": "komi/workspace-fixes-v55",     // informational
       "remote_push_to": "komi",                 // informational
@@ -115,6 +122,8 @@ it via `jq`; you read it via the Read tool. Schema:
       "notes": "…"                              // free-form
     }
   ],
+  "watched_venvs": ["/abs/project-dir"],        // venvs whose interpreter health is checked
+  "suppressions": { "pyqt_skew_ack": "x vs y" },// acknowledged skew pair; hook silent while it matches (set via ack-skew)
   "qt_python_bindings": { "watch": ["…"] },     // packages whose version skew matters
   "stack_packages": { "compositor": [], … }     // upgrades that warrant a hypr-doctor run
 }
@@ -160,9 +169,16 @@ it via `jq`; you read it via the Read tool. Schema:
   updates" section may be sparse. Not a failure — the other checks still
   run.
 - **`jq` missing** → fatal, but unlikely on this system (jq is in `base`).
-- **Plugin build fails** → script reports `✗ <name>: build failed` and
-  continues to next plugin. User must investigate the build error
-  (usually upstream API drift requiring a cherry-pick).
+- **Plugin build fails** → script reports `✗ <name>: build FAILED` with the
+  last 15 log lines and a pointer to the full log under
+  `~/.cache/hypr-doctor/`; continues to next plugin. User must investigate
+  the build error (usually upstream API drift requiring a cherry-pick).
+- **hypr-doctor's own shim breaks** → `~/bin/hypr-doctor` is a symlink into
+  `~/repos/claude-dirs/hypr-doctor`. If that repo moves, the symlink dangles,
+  the SessionStart hook silently no-ops (it's `|| true; exit 0`), and drift
+  stops being surfaced. The shim-integrity check flags this *while it can still
+  run* — but if it's already dangling, re-point the symlink to the repo's new
+  location. This is the one failure the detector cannot announce about itself.
 
 ## Knowledge capture (optional, future)
 

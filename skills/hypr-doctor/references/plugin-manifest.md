@@ -12,6 +12,7 @@ Claude (via Read) consume it directly.
     {
       "name": "string",              // short id, used in `hypr-doctor plugin-rebuild <name>`
       "enabled": true|false,         // false → fully skipped (audit and rebuild both)
+      "loaded_name": "…",            // name hyprctl reports in `plugin list` (e.g. "Hyprtasking"); used to verify a load actually took. Falls back to capitalized .name if omitted
       "disabled_reason": "…",        // shown by audit when enabled=false (optional)
       "repo_dir": "/abs/path",       // git clone location
       "branch": "…" | null,          // informational; not enforced by the script
@@ -24,12 +25,37 @@ Claude (via Read) consume it directly.
       "notes": "…"                   // free-form context for future Claude / future-you
     }
   ],
+  "watched_venvs": ["/abs/project-dir", …],  // dirs containing a .venv whose interpreter health is checked
+  "suppressions": {
+    "pyqt_skew_ack": "<pyqt> vs <qt>"        // acknowledged skew pair; hook stays silent while it matches. Set via `hypr-doctor ack-skew`
+  },
   "qt_python_bindings": { "watch": ["qt6-base", "python-pyqt6", …] },
   "stack_packages": {
     "compositor": [], "graphics": [], "wayland": [], "qt_python": [], …
   }
 }
 ```
+
+## `watched_venvs`
+
+Project directories (absolute paths) that contain a `.venv`. The venv-health
+check runs `<dir>/.venv/bin/python --version` for each; on failure it prints a
+`rm -rf … && python -m venv … && pip install -e …` recipe. This catches venvs
+orphaned when the system python is bumped (the old interpreter the venv
+symlinks to is removed) or when the project tree moves. Omit or leave empty to
+skip the check.
+
+## `suppressions`
+
+Acknowledged drift that should NOT nag in the SessionStart hook (it still
+appears in full `audit`, marked acknowledged, and is not counted toward the
+issue total). Currently one key:
+
+- **`pyqt_skew_ack`** — a `"<pyqt_ver> vs <qt_ver>"` string. While the live
+  pair matches, the hook is silent about the PyQt6↔Qt6 skew. It is
+  self-expiring: any bump to either package changes the pair, so the ack stops
+  matching and the warning revives (a worse skew is never masked). Set it to
+  the current live pair with `hypr-doctor ack-skew` rather than hand-editing.
 
 ## Adding a new plugin
 
