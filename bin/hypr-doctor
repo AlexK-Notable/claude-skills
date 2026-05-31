@@ -86,7 +86,7 @@ plugin_is_loaded() {
 
 check_recent_stack_updates() {
     header "Recent stack updates"
-    local since
+    local since since_epoch
     if [[ -f "$LAST_RUN" ]]; then
         since=$(cat "$LAST_RUN")
         info "since last run: $since"
@@ -94,21 +94,29 @@ check_recent_stack_updates() {
         since=$(date -d '7 days ago' -Iseconds)
         info "no prior run — showing last 7 days"
     fi
+    since_epoch=$(date -d "$since" +%s 2>/dev/null || echo 0)
 
     local pkgs
     pkgs=$(stack_packages | sort -u | paste -sd'|')
     [[ -z "$pkgs" ]] && { warn "manifest has no stack packages"; return; }
 
-    # pacman log format: [TIMESTAMP] [ALPM] upgraded NAME (OLD -> NEW)
-    local found=0
-    while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
-        found=$((found+1))
-        # Strip [ALPM] prefix for cleaner display
-        printf "    %s\n" "${line//[ALPM] /}"
-    done < <(awk -v since="$since" -v re="$pkgs" '
-        match($0, /^\[([^\]]+)\] \[ALPM\] upgraded ([^ ]+)/, m) {
-            if (m[1] >= since && m[2] ~ "^(" re ")$") print
+    # Compare by EPOCH, not by string. pacman logs local time with a no-colon
+    # offset (-0700) while `date -Iseconds` emits -07:00, and the offset itself
+    # shifts at DST boundaries — so lexicographic comparison is wrong. awk first
+    # narrows to lines upgrading a watched package (≈150 over all history), then
+    # each candidate is converted to absolute epoch and compared.
+    # pacman line format: [TIMESTAMP] [ALPM] upgraded NAME (OLD -> NEW)
+    local found=0 ts line ev_epoch
+    while IFS=$'\t' read -r ts line; do
+        [[ -z "$ts" ]] && continue
+        ev_epoch=$(date -d "$ts" +%s 2>/dev/null) || continue
+        if [[ "$ev_epoch" -ge "$since_epoch" ]]; then
+            found=$((found+1))
+            printf "    %s\n" "${line//\[ALPM\] /}"
+        fi
+    done < <(awk -v re="$pkgs" '
+        match($0, /^\[([^]]+)\] \[ALPM\] upgraded ([^ ]+)/, m) {
+            if (m[2] ~ "^(" re ")$") print m[1] "\t" $0
         }
     ' "$PACMAN_LOG")
 
@@ -280,6 +288,11 @@ check_aur_rebuild_hints() {
     else
         warn "rebuild-detector suggests rebuilding these AUR packages:"
         echo "$hints" | sed 's/^/      /'
+        # checkrebuild prints "<reason>\t<pkgname>"; last field is the name.
+        # Emit a ready-to-paste command (we never run it — AUR builds need the
+        # user's privileges and judgement).
+        local pkgs; pkgs=$(awk '{print $NF}' <<<"$hints" | paste -sd' ')
+        [[ -n "$pkgs" ]] && info "rebuild with: paru -S --rebuild $pkgs"
     fi
 }
 
@@ -409,12 +422,19 @@ cmd_rebuild() {
         header "Rebuilding $name"
         info "repo: $repo"
         info "cmd:  $build_cmd"
-        if ! ( cd "$repo" && eval "$build_cmd" ); then
-            fail "$name: build failed"
+        # Capture build output to a log instead of flooding stdout (a clean
+        # rebuild is ~30KB of deprecation warnings). Show a pointer on success;
+        # show the tail — where the actual error is — on failure.
+        local log="$STATE_DIR/rebuild-${name}.log"
+        info "log:  $log  (tail -f to watch live)"
+        if ! ( cd "$repo" && eval "$build_cmd" ) >"$log" 2>&1; then
+            fail "$name: build FAILED — last 15 lines:"
+            tail -n 15 "$log" | sed 's/^/        /'
+            info "full log: $log"
             FAILED=$((FAILED+1))
             continue
         fi
-        ok "$name: build succeeded"
+        ok "$name: build succeeded ($(grep -c '' "$log") lines → $log)"
         rebuilt=$((rebuilt+1))
 
         # Reload in live Hyprland (unload→load to swap the in-memory .so).
