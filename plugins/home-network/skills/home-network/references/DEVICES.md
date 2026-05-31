@@ -36,6 +36,8 @@ for corrections.
     - OS: Armbian, Debian 13 Trixie, kernel **`6.1.115-vendor-rk35xx`** (Rockchip BSP — switched from the 6.18 mainline build specifically to get the in-tree RKNPU driver). SSH banner `OpenSSH 10.0p2 Debian-7+deb13u2`.
     - SSH user `komi`, port 22, key auth works (KOMI `id_ed25519` re-deployed via `ssh-copy-id`). **NOPASSWD sudo re-enabled** (`/etc/sudoers.d/komi-nopasswd`) — same homelab-convenience tradeoff as before. `komi` is in groups `video,render`.
     - **NPU FUNCTIONAL:** RKNPU driver **v0.9.8** bound at `fdab0000.npu`, exposed via **`/dev/dri/renderD129`** (NOT `/dev/rknpu` on this vendor build — important gotcha). Userspace stack: librknnrt 2.3.2 + sherpa-onnx 1.13.2 (RKNN). SenseVoice speech-to-text smoke test ran at **RTF 0.091** — on-NPU STT confirmed working.
+    - **Services (Home Assistant stack; verified live OPEN from KOMI 2026-05-31):** Home Assistant web UI `:8123` (Docker, host network); Wyoming STT `:10300` — SenseVoice on the NPU (mDNS `_wyoming._tcp` as `sensevoice-rknn`); Wyoming openWakeWord `:10400`. (Piper TTS runs on the Pi 5 `192.168.1.165:10200`, not here.) See the Home Assistant entry below.
+    - **Peripheral:** SONOFF Zigbee 3.0 Dongle Plus MG24 (Silicon Labs EFR32MG24, USB `10c4:ea60`) on `/dev/ttyUSB0` — by-id `usb-SONOFF_SONOFF_Dongle_Plus_MG24_64b8b3a3f2a2ef119fca926661ce3355`; passed into the HA container for ZHA (Zigbee).
   - **Local-side config on KOMI (out of scope to edit here):** the `nova`/`zbred` alias in `~/.ssh/config` still points at the stale `.228`/`.224` → repoint to `.229`. mDNS does not currently resolve `indiedroid-nova.local` from the LAN (no avahi claim made for this fresh vendor flash — verified non-resolving 2026-05-31), so pin SSH config to `.229` for now.
 
 **[The 2026-05-28 block below is SUPERSEDED by the 2026-05-31 reflash above — `.228`/ethernet/kernel-6.18 are no longer current. Kept as history; the baseline table at the bottom remains the pre-flux record.]**
@@ -101,7 +103,8 @@ for corrections.
 | SSH user | `komi` |
 | SSH key auth | passwordless via `~/.ssh/id_ed25519` (added 2026-05-24; previously only id_rsa was authorized) |
 | SSH alias | `~/.ssh/config` defines `pi` and `komi` aliases → `komi@192.168.1.165` w/ `~/.ssh/id_ed25519` |
-| Open ports | 22 (SSH), 445 (SMB) |
+| Open ports | 22 (SSH), 445 (SMB), 10200 (Piper TTS — Wyoming) |
+| Services | **Piper TTS** `:10200` (Wyoming, Docker) — verified live OPEN from KOMI 2026-05-31; serves the Home Assistant voice stack (STT + wakeword run on the Nova). Per session narrative, this Pi also hosts a RustDesk relay (hbbs/hbbr) — not independently re-verified here. |
 | mDNS services | `_smb._tcp` + `_ssh._tcp` + `_device-info._tcp` |
 | Notes | Device's actual system hostname is `komi` (not `komi-2`); mDNS responder publishes `komi-2.local`. This was previously (incorrectly) listed as "KOMI second adapter" — it's actually the Raspberry Pi. |
 
@@ -124,6 +127,7 @@ for corrections.
 | Open ports | 22 (SSH), 80 (Mainsail/Fluidd web UI), 7125 (Moonraker API) |
 | **Security note** | Factory default credentials are `biqu` / `biqu` — anyone on the LAN with default creds can SSH in. Change the password if WAN-exposed, or restrict via firewall. |
 | Notes | The "3D printer" referenced in skill triggers. `port-check 192.168.1.188 --klipper` covers the relevant ports. |
+| Freshness 2026-05-31 | Moonraker `:80` + `:7125` were observed **filtered** earlier on 2026-05-31 (printer likely powered off), but a later same-day live re-probe from KOMI found both **OPEN** again — treat as power-cycle intermittency, not a fault. Port reachability tracks whether the printer is powered on. |
 
 ### iPhone (Wi-Fi)
 
@@ -218,14 +222,18 @@ when you want a verified entry.**
 
 ## Expected / not currently on LAN
 
-### Home Assistant (incoming)
+*(none pending — Home Assistant was deployed and moved to active below on 2026-05-31)*
+
+### Home Assistant — ACTIVE (deployed 2026-05-31)
 
 | Field | Value |
 |-------|-------|
-| IP | *not yet deployed* |
-| Expected port | 8123 (web UI) |
-| Expected mDNS | `homeassistant.local` |
-| Notes | User mentioned this is being added soon. After deployment, run `home-net-learn homeassistant.local` to capture the verified entry. The skill's `port-check HOST 8123` will confirm the web UI is reachable. |
+| Host | Nova `192.168.1.229:8123` (Docker, host network) |
+| Web UI | `:8123` — verified OPEN live from KOMI 2026-05-31 |
+| Voice (Wyoming) | STT on the Nova `:10300` (SenseVoice/NPU, mDNS `_wyoming._tcp` as `sensevoice-rknn`); openWakeWord on the Nova `:10400`; **Piper TTS on the Pi 5 `192.168.1.165:10200`** — all three verified OPEN live 2026-05-31 |
+| Integrations | Zigbee via ZHA (SONOFF MG24 dongle on the Nova — see the nova block); Govee LAN light (`govee_light_local`) |
+| mDNS | expected `homeassistant.local` |
+| Notes | Was the "incoming / not yet deployed" placeholder before 2026-05-31. Run `home-net-learn 192.168.1.229` for a fuller verified entry. |
 
 ---
 
