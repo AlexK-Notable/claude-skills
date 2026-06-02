@@ -16,6 +16,11 @@ This symlinks each skill into `~/.claude/skills`, links CLIs into `~/bin`, merge
 
 `bitwarden-cli` · `home-network` · `cron-claude` · `hypr-doctor` · `chezmoi` · `universal-directory-organizer`
 
+## Working in this repo
+
+- **Small edits / fixes** → edit on `master`; the autosync watcher commits + pushes automatically.
+- **Bigger work** (new plugin, multi-file feature) → isolate in a git worktree, test, then merge to `master`. Autosync would otherwise race a multi-commit build and push broken intermediate states. See **[CLAUDE.md](CLAUDE.md)** → *Development workflow*.
+
 ## Architecture & rationale
 
 See **[CLAUDE.md](CLAUDE.md)** — especially *Deployment model*, which explains why skills deploy via live symlinks rather than `claude plugin install` (the latter caches a frozen snapshot, breaking live editing). Don't "fix" the symlinks into a marketplace-install on this machine.

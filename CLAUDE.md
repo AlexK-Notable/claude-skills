@@ -70,6 +70,26 @@ They must be **registered in `~/.claude/settings.json`** with their event — `i
 
 `install.sh` installs a `systemd --user` service running `bin/claude-skills-watch` — an `inotifywait -r` watcher (excluding `.git`) that debounces bursts and calls `bin/claude-skills-sync`. The sync does `git pull --rebase --autostash` → `add -A` → `commit` → `push`; on a rebase conflict it **stops and `notify-send`s** rather than auto-resolving (multi-machine safe). It's loop-safe: it only commits when there are non-`.git` changes, so its own commit doesn't re-trigger it. (home-network's capture loop also commits/pushes this repo — same remote.)
 
+## Development workflow — worktree vs. autosync
+
+Autosync (above) is a feature for *small* changes and a hazard for *large* ones. Pick by the size of the change:
+
+- **Small edits / fixes / touch-ups** (a doc tweak, a one-file bug fix, a path correction): just edit on `master`. Autosync commits + pushes immediately. This is the default and the whole point of the watcher.
+- **Larger multi-step work** (a new plugin, a feature spanning several files, anything built test-first across a sequence of commits): do it in an **isolated git worktree on a feature branch**, test there, then merge to `master`. Autosync does **not** watch other worktrees, so in-progress commits stay off `master` until the work is reviewed and green.
+
+**Why not just build big features on `master`?** Autosync would race a multi-commit TDD loop — it fires on every file write, so it would commit half-written, test-failing intermediate states and overwrite the clean per-task commit messages. Worktree isolation avoids both.
+
+```bash
+# big project: isolate → test → merge
+git worktree add ../claude-skills-<feature> -b <feature>
+cd ../claude-skills-<feature>
+# … implement + test (autosync ignores this worktree) …
+cd ~/repos/claude-skills && git merge <feature> && git push
+git worktree remove ../claude-skills-<feature> && git branch -d <feature>
+```
+
+Rule of thumb: **worktree → test → merge for projects; autosync for touch-ups.**
+
 ## Adding / editing a skill
 
 1. Create `plugins/<name>/skills/<name>/SKILL.md` (+ `.claude-plugin/plugin.json`; optional `skill-rules.fragment.json` if you want proactive suggestion).
