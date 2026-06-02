@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Smoke test: prove `claude -p` works in a non-interactive context with a
+# narrow tool allowlist. Should print the running Hyprland version and the
+# current ISO timestamp, then "OK".
+#
+# Run via: ../run hello   (from the cron-claude/ directory)
+
+exec claude -p \
+  'Run two shell commands: (1) `hyprctl version | head -1`, (2) `date -Iseconds`. Output exactly three lines: "VERSION: <line 1 of hyprctl version>", "TIME: <iso timestamp>", "OK". Nothing else.' \
+  --allowed-tools 'Bash(hyprctl *) Bash(date *)'
