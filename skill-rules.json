@@ -301,6 +301,203 @@
           "DBus"
         ]
       }
+    },
+    "qmk-zmk-animation-conversion": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "Converting QMK OLED animations to ZMK LVGL widgets",
+      "promptTriggers": {
+        "keywords": [
+          "qmk animation",
+          "zmk animation",
+          "qmk to zmk",
+          "zmk widget",
+          "lvgl widget",
+          "lvgl canvas",
+          "oled animation",
+          "keyboard animation",
+          "column-major",
+          "frame format",
+          "status_screen",
+          "native_sim",
+          "zmk display",
+          "zmk oled",
+          "ssd1306 animation",
+          "convert animation",
+          "port animation"
+        ],
+        "intentPatterns": [
+          "(convert|port|migrate).*?(qmk|animation).*?(zmk|zephyr)",
+          "(create|build|add).*?(zmk|lvgl).*?(widget|animation|display)",
+          "zmk.*?(display|animation|widget|oled|canvas)",
+          "qmk.*?(animation|oled).*?(zmk|convert|port)",
+          "(native.?sim|emulator).*?(display|animation|test)",
+          "lvgl.*?(canvas|widget|animation)"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          "**/zmk*/**/*.c",
+          "**/zmk*/**/*.h",
+          "**/*animation*/**/*.c",
+          "**/status_screen.c",
+          "**/native_sim.conf",
+          "**/native_sim.keymap",
+          "**/zmk*/**/module.yml"
+        ],
+        "contentPatterns": [
+          "zmk_display_status_screen",
+          "lv_canvas_create",
+          "lv_canvas_set_buffer",
+          "CONFIG_ZMK_DISPLAY",
+          "CONFIG_LV_USE_CANVAS",
+          "zmk,kscan-mock",
+          "FRAME_WIDTH",
+          "FRAME_HEIGHT"
+        ]
+      }
+    },
+    "universal-directory-organizer": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "Interactive directory cleanup, organization, and disk space recovery for any directory",
+      "promptTriggers": {
+        "keywords": [
+          "organize home",
+          "organize directory",
+          "organize downloads",
+          "organize folder",
+          "clean up home",
+          "clean up directory",
+          "clean up downloads",
+          "clean up project",
+          "declutter",
+          "directory mess",
+          "home directory mess",
+          "disk space",
+          "reclaim space",
+          "free up space",
+          "stale files",
+          "duplicate files",
+          "cleanup home",
+          "directory cleanup",
+          "folder cleanup",
+          "disk usage",
+          "tidy up",
+          "directory organization",
+          "home directory audit",
+          "directory audit"
+        ],
+        "intentPatterns": [
+          "(organize|clean|tidy|declutter|audit).*?(home|~/|directory|files|folder|downloads|project)",
+          "(home|~/|directory|folder).*?(mess|cluttered|disorganized|chaotic)",
+          "(reclaim|free|recover|save).*?(space|disk|storage)",
+          "(find|remove|delete).*?(stale|old|unused|duplicate).*?(files|directories|dirs|folders)",
+          "(what|where).*?(taking up|using|wasting).*?space",
+          "(merge|consolidate|combine).*?(directories|folders|dirs)",
+          "organize\\s+/",
+          "clean\\s+up\\s+/"
+        ]
+      }
+    },
+    "chezmoi": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "Managing dotfiles and config files with chezmoi",
+      "promptTriggers": {
+        "keywords": [
+          "chezmoi",
+          "dotfiles",
+          "dotfile",
+          "config files",
+          "backup config",
+          "sync config",
+          "manage config",
+          "new machine setup",
+          "machine setup",
+          ".config",
+          "home directory",
+          "config sync",
+          "dotfile manager"
+        ],
+        "intentPatterns": [
+          "(backup|sync|manage|track).*?(config|dotfile|dotfiles|settings)",
+          "(setup|configure|bootstrap).*?(new|fresh).*?(machine|system|computer)",
+          "(add|manage|track).*?(\\.config|~\\/|home)",
+          "chezmoi.*?(init|add|apply|diff|edit|update|managed|unmanaged)",
+          "(encrypt|template).*?(config|secret|dotfile)",
+          "(sync|share|transfer).*?(config|dotfile|settings).*?(machine|computer|system)"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": [
+          "**/.local/share/chezmoi/**/*",
+          "**/chezmoi/**/*",
+          "**/.chezmoi*",
+          "**/chezmoi.toml"
+        ],
+        "contentPatterns": [
+          "\\.chezmoi\\.",
+          "chezmoi\\s+(init|add|apply|diff)",
+          "dot_",
+          "private_dot_",
+          "run_once_",
+          "run_onchange_"
+        ]
+      }
+    },
+    "bitwarden-cli": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "TWO different Bitwarden products — disambiguate first. bw = password-vault CLI (master-password unlock, BW_SESSION, secure notes, personal credentials). bws = Secrets Manager CLI (BWS_ACCESS_TOKEN machine-account auth, projects + secrets, runtime injection via 'bws run', e.g. LLM API keys into Home Assistant).",
+      "promptTriggers": {
+        "keywords": [
+          "bitwarden",
+          "bws",
+          "bws cli",
+          "secrets manager",
+          "bitwarden secrets manager",
+          "BWS_ACCESS_TOKEN",
+          "machine account",
+          "bws run",
+          "bws project",
+          "bws secret",
+          "bw cli",
+          "bw unlock",
+          "bw login",
+          "bw lock",
+          "bw create item",
+          "bw list items",
+          "BW_SESSION",
+          "secure note",
+          "secure notes",
+          "password vault",
+          "store in vault",
+          "store a secret",
+          "store this in bitwarden",
+          "save to bitwarden",
+          "back up to bitwarden",
+          "rotate credential",
+          "invalid_grant",
+          "vault is locked"
+        ],
+        "intentPatterns": [
+          "(store|save|backup|put|stash).*?(in|to|into).*?(bitwarden|vault|secure note|password manager)",
+          "(retrieve|look ?up|fetch|read|get).*?(from|in).*?(bitwarden|vault|secure note)",
+          "(rotate|regenerate|update).*?(credential|api key|secret|token).*?(bitwarden|vault)",
+          "bw\\s+(unlock|lock|login|logout|status|sync|list|get|create|edit|delete|encode|generate)",
+          "(invalid_grant|vault is locked|master password unlock data was not found)",
+          "(create|add|make).*?(secure note|bitwarden item|login item|vault entry)",
+          "bws\\s+(project|secret|run|config|list|get|create|edit|delete)",
+          "(set ?up|configure|use|wire ?up).*?(bitwarden )?secrets manager",
+          "(machine account|access token|BWS_ACCESS_TOKEN).*?(bitwarden|secrets manager|bws|inject|project)",
+          "(inject|provide|pass|load).*?(secret|api key|credential)s?.*?(bws|secrets manager|home ?assistant)"
+        ]
+      }
     }
   },
   "notes": {
@@ -327,7 +524,10 @@
       "mcp-server-discovery": "Task-to-MCP-server routing and recommendations",
       "python-rich-cli": "Custom skill for CLI tools with Rich",
       "obsidian-plugin-dev": "Custom skill for Obsidian plugin development",
-      "gtk-pygobject-dev": "Custom skill for GTK desktop development"
+      "gtk-pygobject-dev": "Custom skill for GTK desktop development",
+      "qmk-zmk-animation-conversion": "Converting QMK OLED animations to ZMK LVGL widgets",
+      "chezmoi": "Managing dotfiles and config files with chezmoi",
+      "universal-directory-organizer": "Interactive directory cleanup and organization for any directory, with enforced safety hooks"
     }
   }
 }

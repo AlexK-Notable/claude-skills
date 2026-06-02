@@ -1,11 +1,29 @@
 ---
 name: bitwarden-cli
-description: Use when interacting with Bitwarden via the `bw` CLI — storing/retrieving credentials, creating secure notes for backups (age keys, API tokens, recovery codes, machine fingerprints), reading existing items, scripting non-interactive operations against the vault, or troubleshooting CLI auth errors. Triggers on mentions of bitwarden, bw, bw cli, secure note, secure notes, password vault, bw unlock, bw login, BW_SESSION, vault is locked, invalid_grant, "store in bitwarden", "back up to bitwarden", "save to vault", "store a secret", "rotate credential", or the user's email alexkechichian1@gmail.com in a vault context.
+description: Covers BOTH Bitwarden CLIs — they are DIFFERENT products, disambiguate first. (1) `bw`, the password-vault CLI — master-password unlock to a BW_SESSION, storing/retrieving credentials, secure notes for backups (age keys, API tokens, recovery codes, fingerprints), scripted vault lookups, auth errors (vault is locked, invalid_grant). (2) `bws`, the Secrets Manager CLI — machine-account access token (BWS_ACCESS_TOKEN, no master password), projects + secrets, creating/reading secrets, and runtime injection via `bws run` (e.g. feeding LLM API keys into Home Assistant). Triggers on bitwarden, bw, bws, secrets manager, secure note, password vault, BW_SESSION, BWS_ACCESS_TOKEN, machine account, bws run/project/secret, "store/back up to bitwarden", rotate credential, or alexkechichian1@gmail.com in a vault context. Route bw vs bws before following any recipe.
 ---
 
 # Bitwarden CLI
 
-The user keeps the `bw` CLI installed (v2026.x via Arch package) and is logged in as `alexkechichian1@gmail.com`. Primary use case stated by the user: **storing information in secure notes** — backups, recovery instructions, key material, fingerprints. Less frequent: reading credentials, scripted lookups.
+## ⚠ First: `bw` and `bws` are different products — route before you act
+
+Bitwarden ships **two separate CLIs**. They share a brand and almost nothing else — different binary, auth model, data model, and use case. Decide which one the task needs *before* following any recipe below.
+
+| If the task involves… | Product | Binary | Auth | Where to read |
+|---|---|---|---|---|
+| Personal credentials, **secure notes**, backups, master password, vault unlock, `BW_SESSION`, `invalid_grant` | Password Manager | `bw` | master password → `BW_SESSION` (needs the user's TTY) | the rest of this file ↓ |
+| **Machine secrets**, `BWS_ACCESS_TOKEN`, projects, `bws run`, injecting API keys into apps / services / CI | Secrets Manager | `bws` | machine-account **access token** (non-interactive) | [Secrets Manager — the `bws` CLI](#secrets-manager--the-bws-cli) + [references/secrets-manager.md](references/secrets-manager.md) |
+
+**Rule of thumb:** `bw` = *your* passwords (human, interactive). `bws` = *machines'* secrets (automation, injected at runtime). A `bws` access token is **not** a vault login — it cannot read secure notes; a `bw` session **cannot** read Secrets Manager projects. Their commands never mix, and a credential for one is useless to the other.
+
+## This machine
+
+Both CLIs are installed here:
+
+- **`bw`** (password vault, v2026.x via Arch) — logged in as `alexkechichian1@gmail.com`. Primary use: **storing secure notes** (backups, recovery instructions, key material, fingerprints); secondary: reading credentials, scripted lookups.
+- **`bws`** 2.1.0 (Secrets Manager, binary `~/bin/bws`) — configured 2026-05-31. Token at `~/.config/bws/token.env` (mode 600). Project `home-assistant` = `18f14ed9-8ba5-4cc6-bbd4-b45b01534270`. Driving use case: **LLM API keys for Home Assistant**.
+
+Everything from here to the Secrets Manager section is the **`bw` vault**. For `bws`, jump to [Secrets Manager — the `bws` CLI](#secrets-manager--the-bws-cli).
 
 ## Mental Model
 
@@ -284,6 +302,61 @@ Quick reference; full diagnoses in [references/troubleshooting.md](references/tr
 - **If the user mentions storing something larger (file, multi-line key)** — secure notes are the right item type (`type: 2`), not custom fields. Custom fields cap at ~1KB; notes have no practical limit.
 - **If the user has many small items going in** — consider creating a folder first (`bw create folder`) so they're grouped in the UI.
 
+---
+
+## Secrets Manager — the `bws` CLI
+
+> **Different product from everything above.** The `bw` lifecycle (login/lock/unlock, master password, `BW_SESSION`, secure notes, `bw encode | bw create item`) **does not apply here.** If the task is `bws`, this section + **[references/secrets-manager.md](references/secrets-manager.md)** are your sources; ignore the `bw` recipes.
+
+### Mental model
+
+| `bws` concept | What it is |
+|---|---|
+| **Machine account** | A non-human identity (older docs say "service account"). What the token authenticates *as*. |
+| **Project** | The access boundary. A machine account can see secrets **only** in projects it's been granted. |
+| **Access token** | The credential, format `0.<id>.<secret>:<key>`, shown **once** at creation. It *is* the identity — guard it like a password. |
+| **Secret** | A `KEY` / `value` pair that lives inside a project. |
+
+Unlike `bw`, there is **no logged-out/locked/unlocked lifecycle and no master password.** The token is static and non-interactive — which is exactly why `bws` *is* friendly to one-shot scripting (the inverse of `bw`'s TTY problem). An agent may run `bws` directly via the Bash tool **provided the token is in its environment**.
+
+### Auth & token storage (this machine)
+
+- The token reaches `bws` **only** via `BWS_ACCESS_TOKEN` (env) or `--access-token`. **`bws config` does NOT store the token** — its only keys are `server-base` / `server-api` / `server-identity` / `state-dir` / `state-opt-out`.
+- Operational copy: **`~/.config/bws/token.env`**, mode 600, one line: `BWS_ACCESS_TOKEN=0.…`
+- Load it for a shell/op, then verify auth:
+  ```bash
+  set -a; source ~/.config/bws/token.env; set +a
+  bws project list -o table
+  ```
+- **Bootstrap-secret caveat:** the token must exist in readable form for unattended use, so it can't be sealed inside the vault it bootstraps. Keep a **recovery copy as a `bw` secure note** — operational copy in the 600 file, recovery copy master-password-protected. (Use the secure-note recipe above; this is the one place the two products usefully meet.)
+
+### Core commands (bws 2.1.0)
+
+| Goal | Command |
+|---|---|
+| List projects (find a project ID) | `bws project list -o table` |
+| List secrets, metadata | `bws secret list -o table` |
+| Dump secrets as `KEY=value` | `bws secret list -o env` |
+| Read one secret | `bws secret get <secret-id>` |
+| **Create** a secret | `bws secret create <KEY> <VALUE> <PROJECT_ID>` |
+| Run a command with a project's secrets injected as env vars | `bws run --project-id <id> -- <command>` |
+
+Default output is JSON; `-o` accepts `json`, `yaml`, `env`, `table`, `tsv`, `none`.
+
+### Hygiene (bws-specific)
+
+- **`bws secret create` takes the value as a positional arg → it lands in shell history.** Easiest safe path is the wrapper **`~/bin/bws-secret-add KEY [PROJECT_ID]`** (reads the value hidden, auto-loads the token, auto-resolves the project, strips plaintext from output — see `references/secrets-manager.md`). The underlying manual pattern, if you need it:
+  ```bash
+  read -rs 'val?Paste value: '
+  bws secret create OPENAI_API_KEY "$val" 18f14ed9-8ba5-4cc6-bbd4-b45b01534270
+  unset val
+  ```
+  (History keeps the literal `"$val"`, never the expansion.)
+- `bws secret get` / `bws secret list` print **plaintext secret values** — same rule as `bw get`: don't paste their output into chats or screenshares.
+- `BWS_ACCESS_TOKEN` is a bearer credential: never echo it, never commit it. **Rotate** by issuing a new token in the web UI and revoking the old one, then updating `~/.config/bws/token.env`.
+
+Full operations — token-storage patterns (600 file, systemd `EnvironmentFile`/`LoadCredential`), `bws run` injection, **Home Assistant LLM-key wiring**, rotation, and bws-specific errors — are in **[references/secrets-manager.md](references/secrets-manager.md)**.
+
 ## Reference Files
 
 Load only when the topic is active:
@@ -292,3 +365,4 @@ Load only when the topic is active:
 - **[references/scripting.md](references/scripting.md)** — Builder script template, session lifecycle helpers, pipeline patterns, output parsing with jq, cleanup hygiene
 - **[references/troubleshooting.md](references/troubleshooting.md)** — Error message catalog with root-cause analysis and recovery steps; the punycode deprecation noise you can ignore
 - **[references/ssh-keys.md](references/ssh-keys.md)** — Item type 5 (`sshKey`) schema + Bitwarden SSH Agent (Desktop) integration + recipes for importing existing keys, exporting to a new machine, and auditing vault contents
+- **[references/secrets-manager.md](references/secrets-manager.md)** — **`bws` (Secrets Manager) — the *other* product.** Machine-account / project / token lifecycle, token-storage patterns (600 file, systemd `EnvironmentFile`/`LoadCredential`, recovery-to-vault), `bws run` injection, Home Assistant LLM-API-key integration, token rotation, and bws-specific errors (401/invalid token, project-access denied, empty `run` output)
