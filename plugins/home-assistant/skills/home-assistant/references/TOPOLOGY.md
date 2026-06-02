@@ -56,8 +56,38 @@ Wyoming STT server: systemd **user** service `wyoming-sensevoice.service` on the
 
 **`HA_TOKEN`** (id `74edad23-6bd2-4617-a1d8-b45d016db173`) is an **admin long-lived
 access token** for the `komi` owner account, minted 2026-06-02 via the login flow.
-It enables the REST/WebSocket API directly, no SSH/sudo — e.g.
-`curl -H "Authorization: Bearer $HA_TOKEN" http://192.168.1.229:8123/api/states/<entity>`.
 `ha-inventory` v1 still uses SSH+sudo file reads; this token is the foundation for a
 v2 that introspects via the secret-safe WebSocket API (`config_entries/get` omits
 `data`/`options`) and works remotely without sudo.
+
+### Live API access
+
+The REST API (no SSH/sudo, works from anywhere on the LAN). Pull the token into a
+var — never echo it:
+
+```bash
+T=$(bws secret get 74edad23-6bd2-4617-a1d8-b45d016db173 | jq -r .value)
+H="http://192.168.1.229:8123/api"; A="Authorization: Bearer $T"
+
+# read one entity's live state / list all entity ids
+curl -s -H "$A" "$H/states/light.bedroom_lights" | jq '{state, attributes}'
+curl -s -H "$A" "$H/states" | jq -r '.[].entity_id'
+
+# call a service (turn on, set, run a script, toggle an AL switch, …)
+curl -s -H "$A" -H 'Content-Type: application/json' -X POST "$H/services/light/turn_on" \
+     -d '{"entity_id":"light.bedroom_lights","brightness_pct":50}'
+
+# render/validate a template — the way to check automation Jinja BEFORE it runs live
+curl -s -H "$A" -H 'Content-Type: application/json' -X POST "$H/template" \
+     -d '{"template":"{{ today_at(\"07:45\").timestamp() }}"}'
+
+# config sanity (also runnable on the host): exit 0 before any reload/restart
+ssh komi@192.168.1.229 'sudo -n docker exec homeassistant python -m homeassistant --script check_config -c /config'
+```
+
+`/api/template` is the high-value one: it lets you prove a brightness/rgb/condition
+template produces the right value across a schedule without waiting for the trigger
+(used to validate the bedroom ramp curves). Mint a fresh token with the login flow if
+`HA_TOKEN` is ever revoked (Profile → Security → Long-Lived Access Tokens, or the
+scripted login flow against `/auth/login_flow` → `/auth/token` → WS
+`auth/long_lived_access_token`).
