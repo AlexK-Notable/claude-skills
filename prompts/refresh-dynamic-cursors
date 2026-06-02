@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# refresh-dynamic-cursors — keep the dynamic-cursors plugin checked out at
+# the upstream-pinned commit for the running Hyprland version, then rebuild.
+#
+# Cron-safe contract:
+#   • Idempotent — fast no-op when current pin matches running Hyprland AND
+#     plugin is loaded
+#   • Reads the pin matrix from upstream `origin/main:hyprpm.toml`, NOT the
+#     working-tree copy (which is stale at the previous pin's hyprpm.toml)
+#   • Stops cleanly with an error if upstream has not yet published a pin for
+#     the running Hyprland (raybbian's matrix sometimes lags releases)
+#
+# Usage: ../run refresh-dynamic-cursors
+
+exec claude -p \
+'Refresh the dynamic-cursors plugin at ~/repos/dynamic-cursors so it matches the running Hyprland v0.54.x ABI.
+
+Decision logic — only do work when needed:
+
+(A) Detect state:
+  1. Get the running Hyprland git commit hash from `hyprctl version` (the long hex hash, 40 chars).
+  2. cd to ~/repos/dynamic-cursors, `git fetch origin`.
+  3. Read the pin matrix: `git show origin/main:hyprpm.toml`. Find the line whose FIRST hash matches the running Hyprland commit. The required plugin commit is the SECOND hash on that line.
+     • If no matching line exists, STOP and report: "Upstream has no pin for Hyprland <commit>; manual investigation needed". This is a real condition (raybbian sometimes lags) and should not be silently worked around.
+  4. Get current HEAD commit hash.
+  5. `hyprctl plugin list` — is "dynamic-cursors" currently loaded?
+
+(B) If current HEAD == required pin AND plugin is loaded → report "up to date, no action" and exit. Common case.
+
+(C) Otherwise:
+  1. If current HEAD != required pin: `git checkout <pin-hash>`.
+  2. Rebuild: `make clean && rm -rf out && make all`. If the build fails, STOP and report compiler errors.
+  3. Reload: `hyprctl plugin load /home/komi/repos/dynamic-cursors/out/dynamic-cursors.so`.
+  4. Verify: `hyprctl plugin list` shows "dynamic-cursors".
+
+Final summary (one concise paragraph): pin used (with the Hyprland version it maps to), checkout taken or skipped, build outcome, load outcome. If nothing was needed, say so plainly.' \
+  --allowed-tools 'Bash(cd *) Bash(git *) Bash(make *) Bash(rm *) Bash(hyprctl *) Bash(grep *) Bash(awk *) Bash(ls *) Bash(stat *) Read Glob Grep'

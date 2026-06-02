@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# refresh-hyprtasking — keep the local hyprtasking fork (komi/workspace-fixes)
+# in sync with upstream bug fixes AND in sync with the running Hyprland's ABI.
+#
+# Cron-safe contract:
+#   • Idempotent — fast no-op when everything is current
+#   • Cherry-picks (never rebases) to preserve our fork's divergence from
+#     the upstream LAYERS feature
+#   • On any cherry-pick conflict, aborts cleanly and reports — does not try
+#     to resolve
+#   • Never touches the upstream remote, never force-pushes
+#
+# Usage: ../run refresh-hyprtasking
+
+exec claude -p \
+'Refresh the Hyprtasking plugin at ~/repos/hypr-things/hyprtasking, keeping the local fork branch komi/workspace-fixes alive.
+
+Decision logic — only do work when needed:
+
+(A) Detect if anything is wrong:
+  1. `hyprctl plugin list` — is "Hyprtasking" currently loaded?
+  2. Compare mtimes: is build/libhyprtasking.so older than /usr/include/hyprland/src/version.h? (older .so → ABI may have shifted, needs rebuild)
+  3. cd to the repo, `git fetch origin`. Run `git log --no-merges origin/main..komi/workspace-fixes` and `git log --no-merges komi/workspace-fixes..origin/main`. Are there new upstream content commits that we have not yet cherry-picked?
+
+(B) If plugin loaded AND .so newer than headers AND no new upstream commits → report "up to date, no action" and exit. This is the common case.
+
+(C) Otherwise, do the minimum work needed:
+  1. If new upstream content commits exist: cherry-pick them in chronological order. SKIP merge commits (subject starts with "Merge pull request"). If any cherry-pick reports a conflict, immediately run `git cherry-pick --abort` and STOP — report the conflicting commit(s) and exit non-zero. Never try to resolve conflicts autonomously; that needs a human.
+  2. Rebuild: `rm -rf build && meson setup build --buildtype=release && ninja -C build`. If the build fails, STOP and report compiler errors.
+  3. Reload: `hyprctl plugin load /home/komi/repos/hypr-things/hyprtasking/build/libhyprtasking.so`.
+  4. Verify: `hyprctl plugin list` shows "Hyprtasking".
+
+Final summary (one concise paragraph): which actions ran, hashes of any commits cherry-picked, build outcome, load outcome. If nothing was needed, say so plainly.' \
+  --allowed-tools 'Bash(cd *) Bash(git *) Bash(meson *) Bash(ninja *) Bash(rm *) Bash(hyprctl *) Bash(stat *) Bash(ls *) Bash(test *) Bash([ *) Read Glob Grep'
