@@ -38,3 +38,11 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Fix:** wait ~10-20s and re-query before concluding a light broke post-restart
 - **Repro / verify:** `restart HA, immediately GET /api/states/light.smart_led_bulb -> unavailable, then on`
 - **Tags:** govee2mqtt, mqtt
+
+### 2026-06-02 — govee2mqtt (Govee MQTT) lights do NOT honor light.turn_on 'transition' for smooth ramps — they snap to the target within a few seconds regardless of the transition duration
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** Govee/govee2mqtt ignores or hard-caps the transition time; long fades (min/hours) don't glide
+- **Fix:** for smooth brightness/color ramps use STEPPED automations (a per-minute controller that nudges in small increments), not a single light.turn_on with a long transition
+- **Repro / verify:** `set a Govee light to 5%, then light.turn_on brightness_pct:100 transition:20; poll /api/states — jumps to 255 within ~6-10s, not a 20s glide`
+- **Tags:** govee2mqtt, transition, lighting
