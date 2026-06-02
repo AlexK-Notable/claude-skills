@@ -57,6 +57,15 @@ Two independent layers:
 
 `skill-rules.json` lives at `~/.claude/skills/skill-rules.json` (runtime config, not a skill), so it keeps working regardless of where the skills themselves load from.
 
+## Per-plugin hooks
+
+Beyond the marketplace-wide activation hook, individual plugins ship their own runtime hooks in `plugins/<name>/hooks/*.sh`. `install.sh` symlinks **every** `plugins/*/hooks/*.sh` into `~/.claude/hooks/` — a *third* deploy surface alongside `~/.claude/skills/` and `~/bin/`. Current per-plugin hooks:
+
+- `hypr-doctor/hooks/hypr-doctor-drift.sh` — SessionStart drift warning.
+- `universal-directory-organizer/hooks/{organizer-guard,organizer-logger,session-complete}.sh` — fail-closed PreToolUse guard + PostToolUse logger + Stop archiver (dormant unless an organize session manifest exists).
+
+They must be **registered in `~/.claude/settings.json`** with their event — `install.sh` symlinks the scripts but never edits `settings.json` (it's load-bearing, left manual; each plugin's README/SKILL documents the event + matcher). Because they're symlinked from tracked files, a fresh `git clone … && ./install.sh` reconstitutes them — closing the gap that previously left these scripts living only in untracked `~/.claude/`. **`~/.claude/hooks/` is a deploy surface: when verifying a deploy, sweep it for dangling symlinks too** — a hook symlink pointing at an old repo path silently no-ops (exactly how `hypr-doctor-drift.sh` was dead after the migration until re-pointed).
+
 ## Autosync ("remote always current")
 
 `install.sh` installs a `systemd --user` service running `bin/claude-skills-watch` — an `inotifywait -r` watcher (excluding `.git`) that debounces bursts and calls `bin/claude-skills-sync`. The sync does `git pull --rebase --autostash` → `add -A` → `commit` → `push`; on a rebase conflict it **stops and `notify-send`s** rather than auto-resolving (multi-machine safe). It's loop-safe: it only commits when there are non-`.git` changes, so its own commit doesn't re-trigger it. (home-network's capture loop also commits/pushes this repo — same remote.)
