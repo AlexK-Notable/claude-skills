@@ -1,0 +1,32 @@
+# GOTCHAS — journal (append-only, captured via `ha-note`)
+
+Raw, dated operational lessons. The DURABLE store in the lean model: append here
+via `ha-note`, never rewrite this file with an LLM. Promote well-worn, reconfirmed
+entries up into the curated `GOTCHAS.md` by hand, then leave the journal entry in
+place (provenance). `unverified` entries must be re-checked before you act on them.
+
+---
+
+### 2026-06-02 — govee2mqtt group devices (model BaseGroup/SameModeGroup) mirror Govee-app groups and DO have ~3 entities each — they are functional, not empty cruft
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** govee2mqtt republishes the Govee account's groups/scenes as MQTT devices
+- **Fix:** do not delete/disable assuming 0 entities; to remove for real, delete the group in the Govee app so gv2mqtt stops publishing it
+- **Repro / verify:** `count entities per device via core.entity_registry keyed on the FULL device_id (a truncated-prefix == match silently yields 0)`
+- **Tags:** govee, govee2mqtt
+
+### 2026-06-02 — A YAML-mode lovelace dashboard key must contain a hyphen or check_config fails: 'Url path needs to contain a hyphen (-)'
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** HA requires lovelace.dashboards.<url_path> slugs to contain '-'
+- **Fix:** use e.g. 'bedroom-lighting:' not 'lighting:' as the dashboards key (the title can be anything)
+- **Repro / verify:** `add lovelace.dashboards with a no-hyphen key, then run check_config`
+- **Tags:** lovelace, dashboard
+
+### 2026-06-02 — New entities (e.g. a YAML light group) don't hit on-disk core.entity_registry immediately — HA debounces registry writes, so ha-inventory (disk-based) lags by minutes
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** HA batches/debounces .storage registry saves
+- **Fix:** confirm a just-created entity via the live API (GET /api/states/<id>), not the disk snapshot; the registry flushes later and ha-inventory then shows it
+- **Repro / verify:** `add a light group w/ unique_id, restart, immediately grep core.entity_registry — absent though the state exists`
+- **Tags:** inventory, registry
