@@ -20,7 +20,7 @@ uv run cron-claude --version
 uv run cron-claude schedule --help
 
 # install the Claude skill (auto-activates on scheduling-related prompts)
-ln -s "$(pwd)/skill" ~/.claude/skills/cron-claude
+ln -s "$(pwd)/skills/cron-claude" ~/.claude/skills/cron-claude
 
 # run smoke tests
 uv run pytest
@@ -37,7 +37,7 @@ cron-claude/
 │   ├── systemd/                # module: .timer/.service writers (backend)
 │   ├── runners/                # module: ExecStart= renderers (claude -p, ...)
 │   └── tui/                    # module: Textual TUI (optional, placeholder)
-├── skill/SKILL.md              # Claude Code skill — symlink into ~/.claude/skills/
+├── skills/cron-claude/SKILL.md              # Claude Code skill — symlink into ~/.claude/skills/
 ├── tests/                      # pytest smoke tests
 ├── prompts/                    # per-prompt executables (legacy playground; CLI consumes these)
 │   └── hello                   # smoke test — proves claude -p works headless

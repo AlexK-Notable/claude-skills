@@ -5,7 +5,7 @@ description: Use when the user wants to schedule, manage, inspect, or trigger re
 
 # cron-claude
 
-A Python CLI installed at `cron-claude` (source: `~/repos/claude-dirs/cron-claude/`) for scheduling local `claude -p` jobs as systemd user timers. Use this CLI instead of writing raw cron entries or invoking `systemctl --user` directly.
+A Python CLI installed at `cron-claude` (source: `~/repos/claude-skills/plugins/cron-claude/`) for scheduling local `claude -p` jobs as systemd user timers. Use this CLI instead of writing raw cron entries or invoking `systemctl --user` directly.
 
 ## When to use this skill
 
@@ -36,7 +36,7 @@ cron-claude tui                 # interactive (needs `uv sync --extra tui`)
 
 - **Schedule names** become systemd unit basenames — keep them lowercase, hyphens, no spaces. Underlying units are written as `cron-claude-<name>.{service,timer}`.
 - **`--when`** accepts any systemd `OnCalendar=` value: `weekly`, `Sun 03:07`, `*-*-* 09:00`, `Mon..Fri 17:00`. Resolve fuzzy phrasing ("every Sunday morning") to a concrete OnCalendar spec before passing it.
-- **`--prompt`** points at a script under `~/repos/claude-dirs/cron-claude/prompts/`. Each prompt script owns its own `claude -p` invocation, allowed-tools list, and any pre/post shell logic.
+- **`--prompt`** points at a script under `~/repos/claude-skills/plugins/cron-claude/prompts/`. Each prompt script owns its own `claude -p` invocation, allowed-tools list, and any pre/post shell logic.
 - **`--json`** is supported on listing/inspection commands when you'll parse the result.
 
 ## When *not* to use this skill
@@ -47,7 +47,7 @@ cron-claude tui                 # interactive (needs `uv sync --extra tui`)
 
 ## Reference
 
-- Repo: `~/repos/claude-dirs/cron-claude/` (`AlexK-Notable/cron-claude`, private)
-- Prompts directory: `~/repos/claude-dirs/cron-claude/prompts/`
+- Repo: `~/repos/claude-skills/plugins/cron-claude/` (`AlexK-Notable/claude-skills`, private)
+- Prompts directory: `~/repos/claude-skills/plugins/cron-claude/prompts/`
 - Underlying unit files: `~/.config/systemd/user/cron-claude-<name>.{service,timer}`
 - Raw logs: `journalctl --user-unit cron-claude-<name>.service` (also via `cron-claude logs`)

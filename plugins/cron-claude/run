@@ -8,7 +8,7 @@
 set -euo pipefail
 
 NAME="${1:?usage: $(basename "$0") <prompt-name>}"
-HERE="$(cd "$(dirname "$0")" && pwd)"
+HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 PROMPT="$HERE/prompts/$NAME"
 
 if [ ! -f "$PROMPT" ]; then
