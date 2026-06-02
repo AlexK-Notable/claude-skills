@@ -1,0 +1,495 @@
+#!/usr/bin/env python3
+"""ha-inventory — regenerate a secret-safe snapshot of the Home Assistant install.
+
+Channel A of the home-assistant skill: deterministic introspection, no LLM.
+Reads the *safe* HA `.storage` registry files (+ a strict field allowlist of
+core.config_entries) over SSH+sudo and emits a terse markdown snapshot of the
+slow-moving installed state — integrations, HACS repos, areas, devices, the
+entity registry, automations, scripts, and the HA version.
+
+It deliberately does NOT capture live entity *states* (high-cardinality, would
+churn git on every run). It captures what exists, not what each thing is doing.
+
+SECRET SAFETY: the only `.storage` file containing secrets is
+core.config_entries (the `data`/`options` dicts hold tokens/passwords). This
+script never reads those keys into output — it emits a fixed allowlist
+(domain / title / source / disabled_by). Everything else (registries,
+hacs.repositories) is secret-free by nature.
+
+STALENESS: the snapshot front-matter records each source file's mtime, size,
+and sha256. `--check` re-reads and compares — so it catches changes you made
+in the HA web UI (which rewrite these files) even though no Claude tool ran.
+Exit codes (Terraform-style):  0 = fresh,  2 = drift detected,  1 = error.
+
+Usage:
+  ha-inventory                 # regenerate and write the snapshot
+  ha-inventory --check         # compare live vs snapshot; exit 0/2/1; no write
+  ha-inventory --stdout        # print snapshot to stdout, don't write the file
+  ha-inventory --diff          # like --check but print a human summary of changes
+
+Config (env overrides, normally set by the skill's config.sh):
+  HA_SSH        ssh target for the HA host           (default komi@192.168.1.229)
+  HA_CONFIG     HA config dir on that host           (default /home/komi/homeassistant/config)
+  HA_CONTAINER  docker container name for version     (default homeassistant)
+"""
+import os
+import sys
+import json
+import time
+import hashlib
+import subprocess
+from datetime import datetime, timezone
+
+def _load_config():
+    """Seed HA_* env defaults from the skill's config.sh (env still wins)."""
+    import re
+    here = os.path.dirname(os.path.realpath(__file__))
+    cfg = os.path.join(os.path.dirname(here), "skills", "home-assistant", "config.sh")
+    if not os.path.exists(cfg):
+        return
+    pat = re.compile(r'^\s*(?:export\s+)?(HA_[A-Z_]+)=["\']?([^"\'\n#]*)["\']?')
+    for line in open(cfg):
+        m = pat.match(line)
+        if m and m.group(1) not in os.environ:
+            os.environ[m.group(1)] = m.group(2).strip()
+
+
+_load_config()
+
+HA_SSH = os.environ.get("HA_SSH", "komi@192.168.1.229")
+HA_CONFIG = os.environ.get("HA_CONFIG", "/home/komi/homeassistant/config")
+HA_CONTAINER = os.environ.get("HA_CONTAINER", "homeassistant")
+STALE_AFTER_DAYS = int(os.environ.get("HA_STALE_AFTER_DAYS", "7"))
+
+# .storage files we read. None of these contain secrets EXCEPT config_entries,
+# which we field-allowlist below (never emitting data/options).
+STORAGE_FILES = [
+    "core.config_entries",
+    "core.entity_registry",
+    "core.device_registry",
+    "core.area_registry",
+    "hacs.repositories",
+]
+MARK = "===HA-INV-SECTION==="
+
+# Domains worth listing entity-by-entity: the *controllable* / actionable surface.
+# Everything else (sensor, binary_sensor, button, update, event, device_tracker, …)
+# is read-only state or device noise — high-volume and volatile, so we emit counts
+# only and tell the agent to query live for those before acting.
+CONTROLLABLE = {
+    "light", "switch", "media_player", "climate", "cover", "fan", "lock",
+    "vacuum", "humidifier", "water_heater", "script", "scene", "select",
+    "number", "input_boolean", "input_select", "input_number", "input_button",
+    "input_text", "input_datetime", "alarm_control_panel", "siren", "valve",
+    "assist_satellite", "conversation",
+}
+
+
+def _self_references_dir():
+    """Resolve <plugin>/skills/home-assistant/references next to this script.
+
+    Works whether run from the repo or via the ~/bin symlink (realpath follows
+    the symlink back into the repo)."""
+    here = os.path.dirname(os.path.realpath(__file__))          # .../scripts
+    plugin = os.path.dirname(here)                              # .../home-assistant
+    return os.path.join(plugin, "skills", "home-assistant", "references")
+
+
+SNAPSHOT_PATH = os.path.join(_self_references_dir(), "INVENTORY.generated.md")
+
+
+def fetch_remote():
+    """One SSH round-trip: stat+cat each storage file, plus version & yaml configs.
+
+    Returns dict: files[name] = {"mtime","size","sha256","json"}, plus
+    "version", "automations_yaml", "scripts_yaml"."""
+    parts = []
+    for f in STORAGE_FILES:
+        p = f"{HA_CONFIG}/.storage/{f}"
+        parts.append(f'echo "{MARK}STAT {f}"; sudo -n stat -c "%Y %s" "{p}" 2>/dev/null || echo "0 0"')
+        parts.append(f'echo "{MARK}DATA {f}"; sudo -n cat "{p}" 2>/dev/null || echo "{{}}"')
+    parts.append(f'echo "{MARK}VERSION"; sudo -n docker exec {HA_CONTAINER} python -c '
+                 f'"import homeassistant.const as c;print(c.__version__)" 2>/dev/null || echo unknown')
+    parts.append(f'echo "{MARK}AUTOMATIONS"; cat "{HA_CONFIG}/automations.yaml" 2>/dev/null || echo ""')
+    parts.append(f'echo "{MARK}SCRIPTS"; cat "{HA_CONFIG}/scripts.yaml" 2>/dev/null || echo ""')
+    remote = "; ".join(parts)
+
+    try:
+        out = subprocess.run(
+            ["ssh", "-o", "ConnectTimeout=10", "-o", "BatchMode=yes", HA_SSH, remote],
+            capture_output=True, text=True, timeout=60,
+        )
+    except subprocess.TimeoutExpired:
+        die(f"timed out reaching {HA_SSH}")
+    if out.returncode != 0:
+        die(f"ssh to {HA_SSH} failed (rc={out.returncode}): {out.stderr.strip()[:300]}")
+
+    return parse_remote(out.stdout)
+
+
+def parse_remote(blob):
+    data = {"files": {}, "version": "unknown", "automations_yaml": "", "scripts_yaml": ""}
+    # Split into labelled sections.
+    chunks = blob.split(MARK)
+    pending_stat = {}
+    for ch in chunks:
+        if not ch.strip():
+            continue
+        head, _, body = ch.partition("\n")
+        head = head.strip()
+        if head.startswith("STAT "):
+            name = head[5:].strip()
+            try:
+                mtime_s, size_s = body.strip().split()
+                pending_stat[name] = (int(mtime_s), int(size_s))
+            except ValueError:
+                pending_stat[name] = (0, 0)
+        elif head.startswith("DATA "):
+            name = head[5:].strip()
+            raw = body if body.endswith("\n") else body
+            try:
+                parsed = json.loads(raw) if raw.strip() else {}
+            except json.JSONDecodeError:
+                parsed = {}
+            mtime, size = pending_stat.get(name, (0, 0))
+            data["files"][name] = {
+                "mtime": mtime,
+                "size": size,
+                "sha256": hashlib.sha256(raw.encode("utf-8", "replace")).hexdigest()[:16],
+                "json": parsed,
+            }
+        elif head == "VERSION":
+            data["version"] = body.strip() or "unknown"
+        elif head == "AUTOMATIONS":
+            data["automations_yaml"] = body
+        elif head == "SCRIPTS":
+            data["scripts_yaml"] = body
+    return data
+
+
+# ---- extractors (each returns plain rows; never touches data/options) ----
+
+def x_integrations(d):
+    entries = (d["files"].get("core.config_entries", {}).get("json", {})
+               .get("data", {}).get("entries", []))
+    rows = []
+    for e in entries:
+        rows.append({
+            "domain": e.get("domain", "?"),
+            "title": e.get("title", "") or "",
+            "source": e.get("source", ""),
+            "disabled_by": e.get("disabled_by"),
+        })
+    rows.sort(key=lambda r: (r["domain"], r["title"]))
+    return rows
+
+
+def x_areas(d):
+    areas = (d["files"].get("core.area_registry", {}).get("json", {})
+             .get("data", {}).get("areas", []))
+    # Area registry keys the id as `id` (NOT `area_id`); registries elsewhere
+    # *reference* it as `area_id`.
+    return {a.get("id"): a.get("name", a.get("id")) for a in areas}
+
+
+def x_device_area(d):
+    """device_id -> area_id, so entities can inherit their device's area."""
+    devs = (d["files"].get("core.device_registry", {}).get("json", {})
+            .get("data", {}).get("devices", []))
+    return {dev.get("id"): dev.get("area_id") for dev in devs}
+
+
+def x_devices(d):
+    devs = (d["files"].get("core.device_registry", {}).get("json", {})
+            .get("data", {}).get("devices", []))
+    rows = []
+    for dev in devs:
+        rows.append({
+            "name": dev.get("name_by_user") or dev.get("name") or "(unnamed)",
+            "manufacturer": dev.get("manufacturer") or "",
+            "model": dev.get("model") or "",
+            "area_id": dev.get("area_id"),
+        })
+    return rows
+
+
+def x_entities(d):
+    ents = (d["files"].get("core.entity_registry", {}).get("json", {})
+            .get("data", {}).get("entities", []))
+    rows = []
+    for e in ents:
+        rows.append({
+            "entity_id": e.get("entity_id", "?"),
+            "platform": e.get("platform", ""),
+            "area_id": e.get("area_id"),
+            "device_id": e.get("device_id"),
+            "name": e.get("name") or e.get("original_name") or "",
+            "disabled_by": e.get("disabled_by"),
+            "hidden_by": e.get("hidden_by"),
+        })
+    rows.sort(key=lambda r: r["entity_id"])
+    return rows
+
+
+def x_hacs(d):
+    repos = d["files"].get("hacs.repositories", {}).get("json", {})
+    data = repos.get("data", repos)
+    rows = []
+    if isinstance(data, dict):
+        for _, r in data.items():
+            if isinstance(r, dict) and r.get("installed"):
+                rows.append({
+                    "full_name": r.get("full_name", "?"),
+                    "category": r.get("category", "?"),
+                    "version": r.get("installed_version") or r.get("selected_tag") or r.get("ref") or "",
+                })
+    rows.sort(key=lambda r: (r["category"], r["full_name"]))
+    return rows
+
+
+def x_yaml_blocks(text):
+    """Cheap enumeration of UI-managed automations/scripts: id + alias.
+
+    Avoids a YAML dep — these files have a stable `- id:` / `alias:` shape."""
+    rows = []
+    cur = {}
+    for line in text.splitlines():
+        s = line.strip()
+        if s.startswith("- id:"):
+            if cur:
+                rows.append(cur)
+            cur = {"id": s.split(":", 1)[1].strip().strip('"\''), "alias": ""}
+        elif s.startswith("alias:") and cur:
+            cur["alias"] = s.split(":", 1)[1].strip().strip('"\'')
+    if cur:
+        rows.append(cur)
+    return rows
+
+
+# ---- rendering ----
+
+def render(d):
+    areas = x_areas(d)
+    dev_area = x_device_area(d)
+    ints = x_integrations(d)
+    devs = x_devices(d)
+    ents = x_entities(d)
+
+    def eff_area(e):
+        """Entity's explicit area, else inherited from its device."""
+        return areas.get(e["area_id"] or dev_area.get(e["device_id"]), "")
+    hacs = x_hacs(d)
+    autos = x_yaml_blocks(d["automations_yaml"])
+    scripts = x_yaml_blocks(d["scripts_yaml"])
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # entity counts by domain
+    dom_counts = {}
+    for e in ents:
+        dom = e["entity_id"].split(".", 1)[0]
+        dom_counts[dom] = dom_counts.get(dom, 0) + 1
+    disabled = [e for e in ents if e["disabled_by"]]
+    hidden = [e for e in ents if e["hidden_by"]]
+
+    L = []
+    # GENERATED banner + front-matter (machine-readable staleness fingerprint)
+    L.append("<!-- GENERATED by ha-inventory — DO NOT EDIT. Regenerate; manual edits are overwritten. -->")
+    L.append("<!-- ha-inventory:fingerprint")
+    fp = {"generated_at": now, "ha_version": d["version"], "source": HA_SSH,
+          "stale_after_days": STALE_AFTER_DAYS,
+          "files": {n: {"mtime": m["mtime"], "size": m["size"], "sha256": m["sha256"]}
+                    for n, m in d["files"].items()}}
+    L.append(json.dumps(fp, indent=2))
+    L.append("-->")
+    L.append("")
+    L.append("# Home Assistant — installed inventory (snapshot)")
+    L.append("")
+    L.append(f"- **Generated:** {now}  ·  **HA version:** {d['version']}  ·  **Source:** `{HA_SSH}`")
+    L.append(f"- **Staleness:** treat as *last observed*, not current. Re-run `ha-inventory --check` "
+             f"before any mutating action; this snapshot does not see HA UI edits until regenerated.")
+    L.append("")
+
+    L.append(f"## Integrations ({len(ints)})")
+    L.append("")
+    L.append("| Domain | Title | Source |")
+    L.append("|---|---|---|")
+    for r in ints:
+        dis = "  _(disabled)_" if r["disabled_by"] else ""
+        L.append(f"| `{r['domain']}` | {r['title']}{dis} | {r['source']} |")
+    L.append("")
+
+    L.append(f"## HACS ({len(hacs)})")
+    L.append("")
+    if hacs:
+        L.append("| Category | Repo | Version |")
+        L.append("|---|---|---|")
+        for r in hacs:
+            L.append(f"| {r['category']} | `{r['full_name']}` | {r['version']} |")
+    else:
+        L.append("_none detected_")
+    L.append("")
+
+    L.append(f"## Areas ({len(areas)})")
+    L.append("")
+    L.append(", ".join(f"`{n}`" for n in sorted(areas.values())) or "_none_")
+    L.append("")
+
+    L.append(f"## Devices ({len(devs)}) by area")
+    L.append("")
+    by_area = {}
+    for dv in devs:
+        an = areas.get(dv["area_id"], "(unassigned)")
+        by_area.setdefault(an, []).append(dv)
+    for an in sorted(by_area):
+        L.append(f"**{an}**")
+        for dv in sorted(by_area[an], key=lambda x: x["name"].lower()):
+            mm = " · ".join(p for p in [dv["manufacturer"], dv["model"]] if p)
+            L.append(f"- {dv['name']}" + (f"  ({mm})" if mm else ""))
+        L.append("")
+
+    L.append(f"## Entities ({len(ents)} registry-tracked"
+             f"; {len(disabled)} disabled, {len(hidden)} hidden)")
+    L.append("")
+    L.append("Counts by domain: " + ", ".join(f"`{k}`×{v}" for k, v in sorted(dom_counts.items())))
+    L.append("")
+    L.append("Listed below: the **controllable** surface only (lights, switches, media, etc.). "
+             "Read-only domains (sensor/binary_sensor/button/update/…) are counts-only above — "
+             "**query HA live for those entity_ids before acting** (this snapshot omits them by design).")
+    L.append("")
+    ctrl = [e for e in ents if e["entity_id"].split(".", 1)[0] in CONTROLLABLE]
+    by_dom = {}
+    for e in ctrl:
+        by_dom.setdefault(e["entity_id"].split(".", 1)[0], []).append(e)
+    for dom in sorted(by_dom):
+        L.append(f"**{dom}** ({len(by_dom[dom])})")
+        for e in by_dom[dom]:
+            an = eff_area(e)
+            nm = f" — {e['name']}" if e["name"] else ""
+            flags = "".join(f" [{x}]" for x in (["disabled"] if e["disabled_by"] else []) +
+                            (["hidden"] if e["hidden_by"] else []))
+            L.append(f"- `{e['entity_id']}`{nm}" + (f" → {an}" if an else "") + flags)
+        L.append("")
+    # Always surface disabled/hidden regardless of domain — they're actionable.
+    odd = [e for e in ents if (e["disabled_by"] or e["hidden_by"])
+           and e["entity_id"].split(".", 1)[0] not in CONTROLLABLE]
+    if odd:
+        L.append(f"**disabled/hidden (other domains)** ({len(odd)})")
+        for e in odd:
+            flags = "".join(f" [{x}]" for x in (["disabled"] if e["disabled_by"] else []) +
+                            (["hidden"] if e["hidden_by"] else []))
+            L.append(f"- `{e['entity_id']}`{flags}")
+        L.append("")
+
+    L.append(f"## Automations ({len(autos)})")
+    L.append("")
+    for a in autos:
+        L.append(f"- `{a['id']}` — {a['alias'] or '(no alias)'}")
+    L.append("")
+    L.append(f"## Scripts ({len(scripts)})")
+    L.append("")
+    for s in scripts:
+        L.append(f"- `{s['id']}` — {s['alias'] or '(no alias)'}")
+    L.append("")
+
+    return "\n".join(L) + "\n", fp
+
+
+def read_snapshot_fingerprint():
+    if not os.path.exists(SNAPSHOT_PATH):
+        return None
+    try:
+        with open(SNAPSHOT_PATH) as f:
+            txt = f.read()
+    except OSError:
+        return None
+    start = txt.find("<!-- ha-inventory:fingerprint")
+    if start == -1:
+        return None
+    start = txt.find("\n", start) + 1
+    end = txt.find("-->", start)
+    if end == -1:
+        return None
+    try:
+        return json.loads(txt[start:end].strip())
+    except json.JSONDecodeError:
+        return None
+
+
+def compare(old_fp, new_fp):
+    """Return list of human-readable change strings (empty == no drift)."""
+    changes = []
+    if old_fp is None:
+        return ["no prior snapshot exists"]
+    if old_fp.get("ha_version") != new_fp.get("ha_version"):
+        changes.append(f"HA version {old_fp.get('ha_version')} → {new_fp.get('ha_version')}")
+    of, nf = old_fp.get("files", {}), new_fp.get("files", {})
+    for name in sorted(set(of) | set(nf)):
+        o, n = of.get(name), nf.get(name)
+        if o is None:
+            changes.append(f"{name}: newly present")
+        elif n is None:
+            changes.append(f"{name}: vanished")
+        elif o.get("sha256") != n.get("sha256"):
+            changes.append(f"{name}: content changed")
+    return changes
+
+
+def die(msg):
+    print(f"ha-inventory: error: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def staleness_note(fp):
+    try:
+        gen = datetime.strptime(fp["generated_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        age_days = (datetime.now(timezone.utc) - gen).total_seconds() / 86400
+        return age_days
+    except Exception:
+        return None
+
+
+def main():
+    mode = "write"
+    if "--check" in sys.argv:
+        mode = "check"
+    elif "--diff" in sys.argv:
+        mode = "diff"
+    elif "--stdout" in sys.argv:
+        mode = "stdout"
+
+    d = fetch_remote()
+    md, new_fp = render(d)
+
+    if mode == "stdout":
+        sys.stdout.write(md)
+        return 0
+
+    if mode in ("check", "diff"):
+        old_fp = read_snapshot_fingerprint()
+        changes = compare(old_fp, new_fp)
+        if not changes:
+            age = staleness_note(old_fp) if old_fp else None
+            agestr = f" (snapshot age {age:.1f}d)" if age is not None else ""
+            print(f"ha-inventory: fresh — live HA matches the committed snapshot{agestr}")
+            return 0
+        print("ha-inventory: DRIFT — live HA differs from the committed snapshot:")
+        for c in changes:
+            print(f"  • {c}")
+        print("Run `ha-inventory` (no args) to regenerate.")
+        return 2
+
+    # write mode
+    os.makedirs(os.path.dirname(SNAPSHOT_PATH), exist_ok=True)
+    tmp = SNAPSHOT_PATH + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(md)
+    os.replace(tmp, SNAPSHOT_PATH)
+    print(f"ha-inventory: wrote {SNAPSHOT_PATH}")
+    print(f"  HA {d['version']} · {len(x_integrations(d))} integrations · "
+          f"{len(x_hacs(d))} HACS · {len(x_entities(d))} entities · "
+          f"{len(x_areas(d))} areas")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,22 @@
+{
+  "name": "home-assistant",
+  "version": "0.1.0",
+  "description": "Operate the user's self-hosted Home Assistant safely. Safe-mutation discipline (back up + check_config before edits; .storage edits require HA stopped), a secret-safe deterministic inventory snapshot (ha-inventory, with content-hash drift detection that catches UI edits), and lean append-only gotcha capture (ha-note). References cover the .storage schema, the Assist voice pipeline, and the file/API-vs-UI capability map. Companions with the bitwarden-cli plugin for secret routing.",
+  "author": {
+    "name": "Alex Kechichian",
+    "email": "alexkechichian1@gmail.com",
+    "url": "https://github.com/AlexK-Notable"
+  },
+  "license": "MIT",
+  "keywords": [
+    "home-assistant",
+    "hass",
+    "smart-home",
+    "voice-assistant",
+    "assist",
+    "automation",
+    "self-healing",
+    "inventory",
+    "agentic"
+  ]
+}

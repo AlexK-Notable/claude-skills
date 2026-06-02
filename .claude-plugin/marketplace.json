@@ -23,6 +23,12 @@
       "version": "0.3.0"
     },
     {
+      "name": "home-assistant",
+      "source": "./plugins/home-assistant",
+      "description": "Operate self-hosted Home Assistant safely — safe-mutation discipline, a secret-safe inventory snapshot with drift detection (ha-inventory), and append-only gotcha capture (ha-note).",
+      "version": "0.1.0"
+    },
+    {
       "name": "cron-claude",
       "source": "./plugins/cron-claude",
       "description": "Schedule recurring claude -p jobs as systemd user timers.",

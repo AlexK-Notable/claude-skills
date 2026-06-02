@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+"""ha-note — capture one operational gotcha to the home-assistant skill's journal.
+
+Channel B of the home-assistant skill, lean model: NO LLM, append-only. Every
+call atomically appends one structured entry to references/GOTCHAS.journal.md.
+The journal is the durable artifact; promotion of well-worn entries into the
+curated GOTCHAS.md is done by hand (an edit), never by an automated rewrite.
+
+Why structured + provenance (not freeform): the research on self-learning agents
+is blunt that the cardinal failure is capturing a WRONG lesson and then acting on
+it confidently later. So every entry records:
+  - status: verified | unverified  (unverified = do NOT act on without re-checking)
+  - a repro/verify command          (how to re-confirm it's still true)
+  - the HA version it was seen on    (gotchas are version-sensitive)
+  - applies-when                     (kills "misapplied in the wrong context")
+
+CAPTURE ONLY non-discoverable failures/surprises (see the skill's checklist):
+version-specific behavior changes, undocumented service/entity quirks, a
+documented fact that was wrong, or an integration gotcha. Do NOT log successes
+or anything re-derivable from the code/inventory.
+
+Usage:
+  ha-note "summary" --cause "..." --fix "..." \
+      [--verified | --unverified] [--repro "command"] \
+      [--ha-version 2026.5.4] [--applies "container install only"] \
+      [--tag bluetooth --tag govee]
+
+  ha-note --list            # print the journal
+  ha-note --selftest        # append + verify a synthetic entry grew the journal (then prints how to remove)
+"""
+import os
+import sys
+import fcntl
+import argparse
+from datetime import datetime, timezone
+
+
+def _references_dir():
+    here = os.path.dirname(os.path.realpath(__file__))      # .../scripts
+    plugin = os.path.dirname(here)                          # .../home-assistant
+    return os.path.join(plugin, "skills", "home-assistant", "references")
+
+
+JOURNAL = os.path.join(_references_dir(), "GOTCHAS.journal.md")
+JOURNAL_HEADER = """\
+# GOTCHAS — journal (append-only, captured via `ha-note`)
+
+Raw, dated operational lessons. The DURABLE store in the lean model: append here
+via `ha-note`, never rewrite this file with an LLM. Promote well-worn, reconfirmed
+entries up into the curated `GOTCHAS.md` by hand, then leave the journal entry in
+place (provenance). `unverified` entries must be re-checked before you act on them.
+
+---
+"""
+
+
+def append_entry(text):
+    os.makedirs(os.path.dirname(JOURNAL), exist_ok=True)
+    # Create with header if absent.
+    if not os.path.exists(JOURNAL):
+        with open(JOURNAL, "w") as f:
+            f.write(JOURNAL_HEADER)
+    # Atomic append under an exclusive lock (safe across concurrent callers).
+    with open(JOURNAL, "a") as f:
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+        try:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        finally:
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+
+
+def build_entry(a):
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    status = "verified" if a.verified else "unverified"
+    lines = [f"\n### {now} — {a.summary}"]
+    lines.append(f"- **Status:** {status}"
+                 + ("  ⚠ re-check before acting" if not a.verified else ""))
+    if a.ha_version:
+        lines.append(f"- **HA version:** {a.ha_version}")
+    if a.cause:
+        lines.append(f"- **Cause:** {a.cause}")
+    if a.fix:
+        lines.append(f"- **Fix:** {a.fix}")
+    if a.repro:
+        lines.append(f"- **Repro / verify:** `{a.repro}`")
+    if a.applies:
+        lines.append(f"- **Applies when:** {a.applies}")
+    if a.tag:
+        lines.append(f"- **Tags:** " + ", ".join(a.tag))
+    return "\n".join(lines) + "\n"
+
+
+def main():
+    p = argparse.ArgumentParser(add_help=True)
+    p.add_argument("summary", nargs="?", help="one-line symptom/lesson")
+    p.add_argument("--cause")
+    p.add_argument("--fix")
+    p.add_argument("--repro", help="exact command that demonstrates/verifies it")
+    p.add_argument("--applies", help="scope: HA version range, container vs HAOS, host, etc.")
+    p.add_argument("--ha-version", dest="ha_version")
+    p.add_argument("--tag", action="append", default=[])
+    g = p.add_mutually_exclusive_group()
+    g.add_argument("--verified", action="store_true")
+    g.add_argument("--unverified", action="store_true")
+    p.add_argument("--list", action="store_true")
+    p.add_argument("--selftest", action="store_true")
+    a = p.parse_args()
+
+    if a.list:
+        if os.path.exists(JOURNAL):
+            sys.stdout.write(open(JOURNAL).read())
+        else:
+            print("(journal empty — nothing captured yet)")
+        return 0
+
+    if a.selftest:
+        before = os.path.getsize(JOURNAL) if os.path.exists(JOURNAL) else 0
+        marker = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        append_entry(f"\n### SELFTEST {marker}\n- **Status:** verified (self-test, delete me)\n")
+        after = os.path.getsize(JOURNAL)
+        ok = after > before
+        print(f"ha-note selftest: journal grew {before}->{after} bytes — "
+              + ("OK" if ok else "FAILED"))
+        print(f"  remove the test entry with: sed -i '/SELFTEST {marker}/,+1d' {JOURNAL}")
+        return 0 if ok else 1
+
+    if not a.summary:
+        p.error("summary is required (or use --list / --selftest)")
+    # Default to unverified unless the caller asserts verification — fail safe.
+    if not a.verified:
+        a.verified = False
+
+    append_entry(build_entry(a))
+    status = "verified" if a.verified else "unverified (re-check before acting)"
+    print(f"ha-note: captured [{status}] → {JOURNAL}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
