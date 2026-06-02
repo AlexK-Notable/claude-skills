@@ -43,19 +43,19 @@ known-unfixable lag doesn't erode the signal. Rebuild output is captured to
 
 ## Bootstrap on a fresh machine
 
-Clone the repo, then symlink:
+hypr-doctor ships as a plugin inside the **claude-skills** monorepo — bootstrap
+the whole repo rather than this plugin alone:
 
 ```bash
-git clone git@github.com:AlexK-Notable/hypr-doctor.git ~/repos/claude-dirs/hypr-doctor
-cd ~/repos/claude-dirs/hypr-doctor
-
-mkdir -p ~/.claude/skills ~/.claude/hooks ~/bin
-ln -s "$PWD/skills/hypr-doctor"       ~/.claude/skills/hypr-doctor
-ln -s "$PWD/hooks/hypr-doctor-drift.sh" ~/.claude/hooks/hypr-doctor-drift.sh
-ln -s "$PWD/bin/hypr-doctor"           ~/bin/hypr-doctor
+git clone git@github.com:AlexK-Notable/claude-skills.git ~/repos/claude-skills
+cd ~/repos/claude-skills
+./install.sh   # symlinks the skill dir, ~/bin/hypr-doctor, and the drift hook
 ```
 
-Then register the SessionStart hook in `~/.claude/settings.json`:
+`install.sh` creates all three hypr-doctor symlinks (the skill dir, the
+`~/bin/hypr-doctor` CLI, and the `~/.claude/hooks/hypr-doctor-drift.sh`
+SessionStart hook). It does **not** edit `~/.claude/settings.json` (that file is
+load-bearing and left manual) — register the SessionStart hook there yourself:
 
 ```json
 "SessionStart": [
@@ -68,7 +68,7 @@ Then register the SessionStart hook in `~/.claude/settings.json`:
 ]
 ```
 
-Edit `skills/hypr-doctor/plugins.json` to match this machine's local-build
+Then edit `skills/hypr-doctor/plugins.json` to match this machine's local-build
 plugins (the manifest is machine-specific by design — paths, branches,
 build commands).
 
