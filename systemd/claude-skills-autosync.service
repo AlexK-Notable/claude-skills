@@ -1,0 +1,12 @@
+[Unit]
+Description=Watch claude-skills and autosync to remote on change
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/repos/claude-skills/bin/claude-skills-watch
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

@@ -71,8 +71,12 @@ EOF
 
 # locate the skill repo (same logic as home-net-learn)
 locate_skill_dir() {
+  # Derive from this script's own real path first — survives repo moves/renames.
+  local self; self="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." 2>/dev/null && pwd || true)"
   local candidates=(
+    "$self"
     "${CLAUDE_PLUGIN_ROOT:-/nonexistent}"
+    "$HOME/repos/claude-skills/plugins/home-network"
     "$HOME/repos/home-network-skill/plugins/home-network"
     "$HOME/.claude/plugins/cache/komi-home-toolkit/plugins/home-network"
     "$HOME/.claude/plugins/marketplaces/home-network-skill/plugins/home-network"
@@ -212,7 +216,7 @@ GIT WORKFLOW (after any successful update):
   cd $SKILL_DIR
   git add skills/home-network/references/
   git commit -m "capture: <one-line summary of changes>"
-  git push origin main   # user has explicitly authorized auto-push
+  git push origin HEAD   # user has explicitly authorized auto-push (umbrella default branch)
 
   If git push fails (network, auth, conflict), DO NOT panic — leave the
   commit local and include the failure in your verdict.

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# claude-skills-watch — recursive inotify watch on the repo; debounce-sync on change.
+# Run as a systemd --user service (claude-skills-autosync.service).
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+command -v inotifywait >/dev/null || { echo "claude-skills-watch: needs inotify-tools" >&2; exit 1; }
+
+# Block until something under REPO changes (ignoring .git churn), then debounce a
+# burst of edits and sync once. Loop forever; the sync is loop-safe.
+while inotifywait -r -q -e modify,create,delete,move --exclude '/\.git/' "$REPO" >/dev/null 2>&1; do
+  sleep 5
+  "$REPO/bin/claude-skills-sync" || true
+done

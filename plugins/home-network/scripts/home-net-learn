@@ -54,8 +54,12 @@ EOF
 locate_skill_dir() {
   # Walk in priority order: under-Claude env var, dev clone (post-restructure),
   # installed-via-plugin locations.
+  # Derive from this script's own real path first — survives repo moves/renames.
+  local self; self="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." 2>/dev/null && pwd || true)"
   local candidates=(
+    "$self"
     "${CLAUDE_PLUGIN_ROOT:-/nonexistent}"
+    "$HOME/repos/claude-skills/plugins/home-network"
     "$HOME/repos/home-network-skill/plugins/home-network"
     "$HOME/.claude/plugins/cache/komi-home-toolkit/plugins/home-network"
     "$HOME/.claude/plugins/marketplaces/home-network-skill/plugins/home-network"
@@ -292,7 +296,7 @@ VERIFICATION TASKS:
      - Run: cd $SKILL_DIR && git add skills/home-network/references/DEVICES.md
        skills/home-network/references/DEVICES.draft.${TASK_ID}.md &&
        git commit -m "home-net-learn: add ${RESOLVED_NAME:-${RESOLVED_IP}}" &&
-       git push origin main
+       git push origin HEAD
      - If git push fails (network, auth, conflict), DO NOT panic — leave
        the commit local and include "push failed" in your verdict reasoning.
 

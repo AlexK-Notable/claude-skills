@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# claude-skills-sync — keep the claude-skills remote current. Loop-safe.
+# Commits + pushes only when there are real (non-.git) changes; rebases before
+# pushing for multi-machine safety; stops + notifies on conflict (never auto-resolves).
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO"
+
+note() { command -v notify-send >/dev/null && notify-send "claude-skills sync" "$1" || echo "$1" >&2; }
+
+# Nothing to commit? just keep up with the remote and exit (no loop).
+if [ -z "$(git status --porcelain)" ]; then
+  git fetch -q origin || true
+  git merge --ff-only -q "@{u}" 2>/dev/null || true
+  exit 0
+fi
+
+if ! git pull --rebase --autostash -q; then
+  git rebase --abort 2>/dev/null || true
+  note "rebase conflict — resolve manually in $REPO"
+  exit 1
+fi
+
+git add -A
+git commit -q -m "autosync $(date -u +%Y-%m-%dT%H:%M:%SZ)" || true
+if ! git push -q; then
+  note "push failed (network/auth) — will retry on next change"
+  exit 1
+fi
