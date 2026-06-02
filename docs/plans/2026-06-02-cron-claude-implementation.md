@@ -961,6 +961,12 @@ app.add_typer(schedule_app, name="schedule")
 console = Console()
 err_console = Console(stderr=True)
 
+_STARTER_TEMPLATE = """\
+#!/usr/bin/env bash
+# cron-claude prompt: {name}. Owns its own `claude -p` invocation + allowlist.
+exec claude -p 'REPLACE ME: describe this scheduled job' --allowed-tools 'Bash(echo *)'
+"""
+
 
 def _fail(exc: CronClaudeError) -> "typer.Exit":
     err_console.print(f"[red]error:[/red] {exc}")
@@ -998,6 +1004,7 @@ def schedule_add(
     permission_mode: Annotated[Optional[str], typer.Option("--permission-mode", help="Text prompts only.")] = None,
     dangerously_skip: Annotated[bool, typer.Option("--dangerously-skip-permissions", help="Text prompts only.")] = False,
     randomized_delay: Annotated[int, typer.Option("--randomized-delay", help="RandomizedDelaySec.")] = 0,
+    scaffold: Annotated[bool, typer.Option("--scaffold", "-s", help="If --prompt is missing, create an executable starter there.")] = False,
 ) -> None:
     """Create a new scheduled job (writes a .service + .timer unit pair)."""
     try:
@@ -1006,8 +1013,14 @@ def schedule_add(
                 f"schedule {name!r} already exists; remove it first: cron-claude schedule rm {name}"
             )
         control.validate_calendar(when)
+        prompt_path = prompt.expanduser()
+        if not prompt_path.exists() and scaffold:
+            prompt_path.parent.mkdir(parents=True, exist_ok=True)
+            prompt_path.write_text(_STARTER_TEMPLATE.format(name=name))
+            prompt_path.chmod(0o755)
+            console.print(f"[yellow]scaffolded[/yellow] {prompt_path} — edit it before the first run")
         runner = select_runner(
-            prompt.expanduser(),
+            prompt_path,
             allowed_tools=tuple(allowed_tools or ()),
             permission_mode=permission_mode,
             dangerously_skip=dangerously_skip,
@@ -1021,7 +1034,7 @@ def schedule_add(
             name=name,
             on_calendar=when,
             exec_start=runner.to_exec_start(),
-            prompt_path=str(prompt.expanduser().resolve()),
+            prompt_path=str(prompt_path.resolve()),
             runner="script" if is_script else "claude",
             description=description,
             randomized_delay_sec=randomized_delay,
