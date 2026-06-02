@@ -172,7 +172,14 @@ If yes to ANY: capture. If no to all: skip — don't manufacture findings.
 
 Anything secret — host passwords, API tokens, SSH private keys, vault recovery codes — goes into Bitwarden, **never into `DEVICES.md` or any reference file in this repo**. The repo is private but still gets cloned across machines; secrets in a versioned doc are permanent leaks waiting to happen.
 
-The pattern: invoke the [bitwarden-cli skill](../../bitwarden-cli/SKILL.md)'s **Self-destructing handoff script** recipe. The flow:
+**Two Bitwarden tools are available — pick by *who reads the secret back*:**
+
+- **`bw` (password vault)** — the default for host passwords, SSH keys, and recovery codes that *you* retrieve later, interactively, with the master password. This is what the self-destructing-handoff recipe below uses, and what the `bwu` / `bw-ssh` / `bw-get-key` zsh helpers pull from (handy for the "can't reach a host over SSH" case — `bwu` then `bw-ssh '<item>' user@host`). Right for almost everything a network admin stores by hand.
+- **`bws` (Secrets Manager)** — for secrets a *machine* consumes unattended: a daemon on a LAN host (nova, a Pi, the CB2 / Klipper box) that needs an API key or SSH key injected at boot with no human present. Store it as a secret in a `bws` project and inject via `bws run`. Reach for this only when there's no interactive unlock in the loop — it's a separate product with token-based (not master-password) auth.
+
+Both are documented in the [bitwarden-cli skill](../../bitwarden-cli/SKILL.md), which routes between them; `bws`-specific operations live in its `references/secrets-manager.md`.
+
+For the common case (a credential you'll retrieve by hand), the pattern is the [bitwarden-cli skill](../../bitwarden-cli/SKILL.md)'s **Self-destructing handoff script** recipe. The flow:
 
 1. Generate or capture the secret (e.g., `bw generate --length 28 --uppercase --lowercase --number --special`, or read it from somewhere)
 2. Write it to `/tmp/<secret-name>-<pid>` (mode 600)
