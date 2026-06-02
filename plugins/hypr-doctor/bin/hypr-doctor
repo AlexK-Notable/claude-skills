@@ -306,7 +306,7 @@ check_bin_shims() {
         [[ -e "$f" || -L "$f" ]] || continue
 
         # Dangling symlink — the exact class that silently kills hypr-doctor's
-        # own SessionStart hook if claude-dirs ever moves.
+        # own SessionStart hook if its repo ever moves.
         if [[ -L "$f" ]]; then
             checked=$((checked+1))
             if [[ ! -e "$f" ]]; then

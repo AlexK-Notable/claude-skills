@@ -42,15 +42,15 @@ Skill auto-activates on networking-related prompts.
 ### Option B — manual
 
 ```bash
-git clone git@github.com:AlexK-Notable/home-network-skill.git ~/repos/home-network-skill
-~/repos/home-network-skill/install.sh
+git clone git@github.com:AlexK-Notable/claude-skills.git ~/repos/claude-skills
+~/repos/claude-skills/install.sh
 ```
 
-`install.sh` does:
-- Symlinks each script in `scripts/` into `~/bin/` (refuses to clobber)
-- Symlinks `skills/home-network/` into `~/.claude/skills/`
-- Runs `home-net-doctor` to report tool availability for this distro
-- Does NOT install any packages — reports what's missing and how to get it
+`install.sh` (monorepo-wide) does:
+- Symlinks each plugin's `scripts/` into `~/bin/` (backs up any real file to `.bak`)
+- Symlinks each `skills/<name>/` into `~/.claude/skills/`
+- Bundles per-plugin hooks into `~/.claude/hooks/` and enables the autosync watcher
+- Runs `home-net-doctor` to report tool availability — installs no packages
 
 ## Tool dependencies
 
