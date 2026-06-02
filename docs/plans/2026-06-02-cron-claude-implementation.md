@@ -919,6 +919,14 @@ def test_list_json(monkeypatch, tmp_path):
     r = runner.invoke(app, ["schedule", "list", "--json"])
     assert r.exit_code == 0
     assert '"name": "j"' in r.output
+
+
+def test_add_scaffold_creates_executable(monkeypatch, tmp_path):
+    _patch(monkeypatch, tmp_path)
+    prompt = tmp_path / "prompts" / "newjob"
+    r = runner.invoke(app, ["schedule", "add", "nj", "--when", "daily", "--prompt", str(prompt), "--scaffold"])
+    assert r.exit_code == 0, r.output
+    assert prompt.exists() and (prompt.stat().st_mode & 0o111)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -1176,7 +1184,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `cd $CC && uv run pytest tests/test_cli.py tests/test_smoke.py -q`
-Expected: `5 passed` (cli) + `3 passed` (smoke).
+Expected: `6 passed` (cli) + `3 passed` (smoke).
 
 - [ ] **Step 5: Commit**
 
