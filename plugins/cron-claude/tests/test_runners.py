@@ -1,5 +1,4 @@
 """Runner selection + ExecStart rendering (flags verified vs `claude --help`)."""
-import os
 from pathlib import Path
 
 import pytest
@@ -60,7 +59,9 @@ def test_clauderunner_renders_expected_command(tmp_path):
 def test_clauderunner_optional_flags(tmp_path):
     p = tmp_path / "job.txt"
     p.write_text("x")
-    runner = ClaudeRunner(prompt_path=p, bare=False, permission_mode="bypassPermissions", dangerously_skip=True)
+    runner = ClaudeRunner(
+        prompt_path=p, bare=False, permission_mode="bypassPermissions", dangerously_skip=True
+    )
     out = runner.to_exec_start()
     assert "--bare" not in out
     assert "--permission-mode bypassPermissions" in out
@@ -79,3 +80,10 @@ def test_clauderunner_rejects_bad_output_format(tmp_path):
     p.write_text("x")
     with pytest.raises(CronClaudeError):
         ClaudeRunner(prompt_path=p, output_format="yaml").validate()
+
+
+def test_clauderunner_rejects_path_with_single_quote(tmp_path):
+    p = tmp_path / "it's a prompt.txt"
+    p.write_text("x")
+    with pytest.raises(CronClaudeError, match="single quote"):
+        ClaudeRunner(prompt_path=p).to_exec_start()

@@ -25,4 +25,5 @@ class ScriptRunner:
             raise CronClaudeError(f"prompt is not executable: {p}")
 
     def to_exec_start(self) -> str:
+        self.validate()
         return str(self.prompt_path.resolve())

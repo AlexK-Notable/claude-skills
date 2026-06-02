@@ -6,7 +6,7 @@ allowlist, per the safe-cron model).
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from cron_claude.errors import CronClaudeError
@@ -18,12 +18,11 @@ VALID_FORMATS = ("text", "json", "stream-json")
 @dataclass(slots=True, frozen=True)
 class ClaudeRunner:
     prompt_path: Path
-    allowed_tools: tuple[str, ...] = field(default_factory=tuple)
+    allowed_tools: tuple[str, ...] = ()
     bare: bool = True
     output_format: str = "json"
     permission_mode: str | None = None
     dangerously_skip: bool = False
-    timeout_sec: int | None = 120
 
     def validate(self) -> None:
         if not self.prompt_path.is_file():

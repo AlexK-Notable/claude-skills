@@ -32,7 +32,6 @@ def select_runner(
     output_format: str = "json",
     permission_mode: str | None = None,
     dangerously_skip: bool = False,
-    timeout_sec: int | None = None,
 ) -> Runner:
     if not prompt_path.exists():
         raise CronClaudeError(f"prompt not found: {prompt_path}")
@@ -45,8 +44,7 @@ def select_runner(
         output_format=output_format,
         permission_mode=permission_mode,
         dangerously_skip=dangerously_skip,
-        timeout_sec=timeout_sec,
     )
 
 
-__all__ = ["Runner", "ClaudeRunner", "ScriptRunner", "select_runner"]
+__all__ = ["ClaudeRunner", "Runner", "ScriptRunner", "select_runner"]
