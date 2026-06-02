@@ -30,3 +30,11 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Fix:** confirm a just-created entity via the live API (GET /api/states/<id>), not the disk snapshot; the registry flushes later and ha-inventory then shows it
 - **Repro / verify:** `add a light group w/ unique_id, restart, immediately grep core.entity_registry — absent though the state exists`
 - **Tags:** inventory, registry
+
+### 2026-06-02 — govee2mqtt (MQTT) light entities read 'unavailable' for a few seconds after an HA restart until state repopulates from the broker — not a fault
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** MQTT entities have no state until govee2mqtt reconnects and (re)publishes after HA boots
+- **Fix:** wait ~10-20s and re-query before concluding a light broke post-restart
+- **Repro / verify:** `restart HA, immediately GET /api/states/light.smart_led_bulb -> unavailable, then on`
+- **Tags:** govee2mqtt, mqtt
