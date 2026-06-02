@@ -75,4 +75,4 @@ run "systemctl --user daemon-reload"
 run "systemctl --user enable --now claude-skills-autosync.service"
 
 say ""
-say "done.${DRY:+ (dry-run — no changes made)}"
+if [ "$DRY" = 1 ]; then say "done. (dry-run — no changes made)"; else say "done."; fi
