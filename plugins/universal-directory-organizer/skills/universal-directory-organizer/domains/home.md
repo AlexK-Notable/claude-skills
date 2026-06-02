@@ -6,15 +6,19 @@ These paths must be listed in `protected_paths` when organizing `~/`:
 
 ```json
 [
-  "/home/komi/.config",
-  "/home/komi/.local",
-  "/home/komi/.ssh",
-  "/home/komi/.gnupg",
-  "/home/komi/.claude",
-  "/home/komi/repos",
-  "/home/komi/bin"
+  "~/.config",
+  "~/.local",
+  "~/.ssh",
+  "~/.gnupg",
+  "~/.claude",
+  "~/repos",
+  "~/bin"
 ]
 ```
+
+> Shown with `~` for portability. Expand `~` to the absolute `$HOME` when you
+> write these into `protected_paths` — the guard hook matches literal absolute
+> paths and does **not** expand `~` or `$HOME`.
 
 Ask the user if they want to add more (e.g., `~/.steam`, `~/.wine` if actively gaming).
 

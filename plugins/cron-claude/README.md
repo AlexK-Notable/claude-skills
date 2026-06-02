@@ -67,7 +67,7 @@ The runner (`./run NAME`) is just a thin convenience that:
 ## Running a prompt by hand
 
 ```bash
-cd ~/repos/claude-dirs/cron-claude
+cd ~/repos/claude-skills/plugins/cron-claude
 ./run hello
 ```
 
@@ -78,7 +78,7 @@ You should see the prompt's output streamed to your terminal AND saved to
 
 ```cron
 # weekly Sunday 03:00 — note: not 03:00 sharp; jitter via :07 to be polite
-7 3 * * 0  /home/komi/repos/claude-dirs/cron-claude/run hello
+7 3 * * 0  /home/komi/repos/claude-skills/plugins/cron-claude/run hello
 ```
 
 Things to know:

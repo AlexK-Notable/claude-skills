@@ -174,7 +174,7 @@ it via `jq`; you read it via the Read tool. Schema:
   `~/.cache/hypr-doctor/`; continues to next plugin. User must investigate
   the build error (usually upstream API drift requiring a cherry-pick).
 - **hypr-doctor's own shim breaks** → `~/bin/hypr-doctor` is a symlink into
-  `~/repos/claude-dirs/hypr-doctor`. If that repo moves, the symlink dangles,
+  `~/repos/claude-skills/plugins/hypr-doctor`. If that repo moves, the symlink dangles,
   the SessionStart hook silently no-ops (it's `|| true; exit 0`), and drift
   stops being surfaced. The shim-integrity check flags this *while it can still
   run* — but if it's already dangling, re-point the symlink to the repo's new

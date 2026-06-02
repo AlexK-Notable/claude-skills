@@ -32,8 +32,7 @@
     }
   ],
   "watched_venvs": [
-    "/home/komi/repos/claude-dirs/ccx",
-    "/home/komi/repos/claude-dirs/cron-claude"
+    "/home/komi/repos/claude-dirs/ccx"
   ],
   "$watched_venvs_note": "Project dirs containing a .venv whose interpreter health hypr-doctor checks. Catches the 'python got bumped / repo moved → venv orphaned' class (e.g. ccx broke this way on 2026-05-30 when its repo moved to claude-dirs). Each entry is a project dir; the check runs <dir>/.venv/bin/python --version and, on failure, prints the recreate recipe.",
   "suppressions": {
