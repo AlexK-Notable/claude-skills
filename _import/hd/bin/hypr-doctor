@@ -1,0 +1,589 @@
+#!/usr/bin/env bash
+# hypr-doctor — post-Arch-update health check for the Hyprland/Wayland stack.
+#
+# Subcommands:
+#   audit               (default) read-only diagnostic report
+#   rebuild             apply fixes: rebuild drifted plugins + reload via hyprctl
+#   abi-drift           terse output for SessionStart hook (silent if healthy)
+#   ack-skew            acknowledge the current PyQt6↔Qt6 skew (silences the hook)
+#   plugin-rebuild NAME rebuild a single plugin by name
+#   help                show this message
+#
+# Manifest:
+#   ~/.claude/skills/hypr-doctor/plugins.json  (edit to add/retire plugins)
+#
+# State:
+#   ~/.cache/hypr-doctor/last-run              (timestamp of last successful audit)
+
+# Note: -e intentionally omitted — diagnostics must keep going past partial failures.
+set -uo pipefail
+
+MANIFEST="${HYPR_DOCTOR_MANIFEST:-$HOME/.claude/skills/hypr-doctor/plugins.json}"
+PACMAN_LOG="/var/log/pacman.log"
+STATE_DIR="$HOME/.cache/hypr-doctor"
+LAST_RUN="$STATE_DIR/last-run"
+HYPRLAND_BIN="/usr/bin/Hyprland"
+
+mkdir -p "$STATE_DIR"
+
+# ── color / formatting ────────────────────────────────────────────────────────
+if [[ -t 1 ]]; then
+    BOLD=$'\e[1m'; DIM=$'\e[2m'; RESET=$'\e[0m'
+    RED=$'\e[31m'; GREEN=$'\e[32m'; YELLOW=$'\e[33m'; BLUE=$'\e[34m'
+else
+    BOLD=""; DIM=""; RESET=""; RED=""; GREEN=""; YELLOW=""; BLUE=""
+fi
+
+ok()    { printf "  %s✓%s  %s\n"   "$GREEN"  "$RESET" "$*"; }
+warn()  { printf "  %s⚠%s  %s\n"   "$YELLOW" "$RESET" "$*"; }
+fail()  { printf "  %s✗%s  %s\n"   "$RED"    "$RESET" "$*"; }
+info()  { printf "  %s•%s  %s\n"   "$DIM"    "$RESET" "$*"; }
+header(){ printf "\n%s%s%s\n" "$BOLD" "$*" "$RESET"; }
+
+# Counters — used to set exit code and trigger drift outputs.
+DRIFT=0
+FAILED=0
+
+# ── helpers ───────────────────────────────────────────────────────────────────
+
+# Read a jq query from manifest, returns raw text.
+manifest() { jq -r "$1" "$MANIFEST" 2>/dev/null; }
+
+# All package names in stack_packages.*
+stack_packages() { manifest '.stack_packages | to_entries[] | select(.key|startswith("$")|not) | .value[]'; }
+
+# Has hyprctl available and Hyprland responding?
+hyprctl_alive() {
+    command -v hyprctl >/dev/null && hyprctl version >/dev/null 2>&1
+}
+
+# Return the mtime (epoch seconds) of a path, or 0 if missing.
+mtime() { stat -c %Y "$1" 2>/dev/null || echo 0; }
+
+# The name hyprctl reports for plugin $i in `plugin list` (e.g. "Hyprtasking").
+# Manifest .loaded_name is authoritative; fall back to capitalized .name.
+plugin_loaded_name() {
+    local idx="$1" name ln
+    ln=$(manifest ".plugins[$idx].loaded_name // empty")
+    if [[ -z "$ln" ]]; then
+        name=$(manifest ".plugins[$idx].name")
+        ln="${name^}"
+    fi
+    printf '%s' "$ln"
+}
+
+# Is a plugin currently loaded in live Hyprland? Verifies against the live
+# plugin list (ground truth) — NOT against `hyprctl plugin load` output, which
+# exits 0 and prints "loaded" on BOTH success ("loaded successfully") and
+# failure ("could not be loaded"), making its output useless as a signal.
+# plugin list lines look like: "Plugin Hyprtasking by raybbian:"
+plugin_is_loaded() {
+    local loaded_name="$1"
+    hyprctl plugin list 2>/dev/null | grep -qE "^Plugin ${loaded_name}([: ]|\$)"
+}
+
+# ── checks ────────────────────────────────────────────────────────────────────
+
+check_recent_stack_updates() {
+    header "Recent stack updates"
+    local since since_epoch
+    if [[ -f "$LAST_RUN" ]]; then
+        since=$(cat "$LAST_RUN")
+        info "since last run: $since"
+    else
+        since=$(date -d '7 days ago' -Iseconds)
+        info "no prior run — showing last 7 days"
+    fi
+    since_epoch=$(date -d "$since" +%s 2>/dev/null || echo 0)
+
+    local pkgs
+    pkgs=$(stack_packages | sort -u | paste -sd'|')
+    [[ -z "$pkgs" ]] && { warn "manifest has no stack packages"; return; }
+
+    # Compare by EPOCH, not by string. pacman logs local time with a no-colon
+    # offset (-0700) while `date -Iseconds` emits -07:00, and the offset itself
+    # shifts at DST boundaries — so lexicographic comparison is wrong. awk first
+    # narrows to lines upgrading a watched package (≈150 over all history), then
+    # each candidate is converted to absolute epoch and compared.
+    # pacman line format: [TIMESTAMP] [ALPM] upgraded NAME (OLD -> NEW)
+    local found=0 ts line ev_epoch
+    while IFS=$'\t' read -r ts line; do
+        [[ -z "$ts" ]] && continue
+        ev_epoch=$(date -d "$ts" +%s 2>/dev/null) || continue
+        if [[ "$ev_epoch" -ge "$since_epoch" ]]; then
+            found=$((found+1))
+            printf "    %s\n" "${line//\[ALPM\] /}"
+        fi
+    done < <(awk -v re="$pkgs" '
+        match($0, /^\[([^]]+)\] \[ALPM\] upgraded ([^ ]+)/, m) {
+            if (m[2] ~ "^(" re ")$") print m[1] "\t" $0
+        }
+    ' "$PACMAN_LOG")
+
+    [[ "$found" -eq 0 ]] && ok "no stack-relevant upgrades"
+}
+
+check_hypr_plugin_abi() {
+    header "Hyprland plugins (ABI vs build mtime)"
+    local hypr_mtime
+    hypr_mtime=$(mtime "$HYPRLAND_BIN")
+    if [[ "$hypr_mtime" -eq 0 ]]; then
+        fail "$HYPRLAND_BIN missing — is Hyprland installed?"
+        return
+    fi
+    info "Hyprland binary: $(date -d "@$hypr_mtime" -Iseconds)"
+
+    local hypr_running
+    if hyprctl_alive; then
+        hypr_running=true
+        info "live ABI: $(hyprctl version | awk '/Version ABI/{print $NF}')"
+    else
+        hypr_running=false
+        warn "hyprctl unresponsive (Hyprland not running?) — skipping live load check"
+    fi
+
+    # Walk the plugin manifest
+    local n
+    n=$(manifest '.plugins | length')
+    for ((i=0; i<n; i++)); do
+        local name enabled so_path so_mtime
+        name=$(manifest ".plugins[$i].name")
+        enabled=$(manifest ".plugins[$i].enabled")
+        so_path=$(manifest ".plugins[$i].so_path")
+
+        if [[ "$enabled" != "true" ]]; then
+            local reason
+            reason=$(manifest ".plugins[$i].disabled_reason // \"manually disabled\"")
+            info "$name: disabled — $reason"
+            continue
+        fi
+
+        so_mtime=$(mtime "$so_path")
+        if [[ "$so_mtime" -eq 0 ]]; then
+            fail "$name: .so missing at $so_path — needs build"
+            DRIFT=$((DRIFT+1))
+            continue
+        fi
+
+        if [[ "$so_mtime" -lt "$hypr_mtime" ]]; then
+            fail "$name: .so built $(date -d "@$so_mtime" '+%Y-%m-%d') < Hyprland $(date -d "@$hypr_mtime" '+%Y-%m-%d') → ABI mismatch likely"
+            DRIFT=$((DRIFT+1))
+        elif $hypr_running; then
+            # Confirm it's actually loaded right now (ground truth: plugin list)
+            if plugin_is_loaded "$(plugin_loaded_name "$i")"; then
+                ok "$name: built $(date -d "@$so_mtime" '+%Y-%m-%d'), loaded"
+            else
+                warn "$name: .so newer than Hyprland but not loaded — check the exec-once in hyprland.conf"
+            fi
+        else
+            ok "$name: built $(date -d "@$so_mtime" '+%Y-%m-%d') (load state unverified)"
+        fi
+    done
+}
+
+check_qt_python_skew() {
+    header "Qt6 ↔ PyQt6/PySide6 binding skew"
+    # Get major.minor of qt6-base, and same for python bindings.
+    # A skew at major.minor indicates broken bindings (e.g., today's 6.11.0 vs 6.11.1).
+    local qt_ver pyqt_ver pyside_ver
+    qt_ver=$(pacman -Q qt6-base 2>/dev/null | awk '{print $2}' | sed 's/-.*//')
+    pyqt_ver=$(pacman -Q python-pyqt6 2>/dev/null | awk '{print $2}' | sed 's/-.*//')
+    pyside_ver=$(pacman -Q pyside6 2>/dev/null | awk '{print $2}' | sed 's/-.*//')
+
+    if [[ -z "$qt_ver" ]]; then
+        info "qt6-base not installed — skipping skew check"
+        return
+    fi
+    info "qt6-base:      $qt_ver"
+
+    # PyQt6 is the historical culprit (often lags Qt6 minor bumps by hours-to-days)
+    if [[ -n "$pyqt_ver" ]]; then
+        if [[ "$pyqt_ver" == "$qt_ver" ]]; then
+            ok "python-pyqt6: $pyqt_ver matches"
+        elif [[ "$pyqt_ver vs $qt_ver" == "$(manifest '.suppressions.pyqt_skew_ack // empty')" ]]; then
+            # Acknowledged & unfixable-locally — visible here, silent in the hook,
+            # not counted. Auto-revives if either package version changes.
+            warn "python-pyqt6: $pyqt_ver ≠ qt6-base $qt_ver (acknowledged — waiting on Arch; suppressed in hook)"
+        else
+            fail "python-pyqt6: $pyqt_ver ≠ qt6-base $qt_ver → Python+Qt apps will SIGABRT on init"
+            FAILED=$((FAILED+1))
+        fi
+    fi
+    if [[ -n "$pyside_ver" ]]; then
+        if [[ "$pyside_ver" == "$qt_ver" ]]; then
+            ok "pyside6:      $pyside_ver matches"
+        else
+            warn "pyside6:      $pyside_ver ≠ qt6-base $qt_ver"
+        fi
+    fi
+}
+
+check_systemd_user_failed() {
+    header "systemd user units"
+    local failed
+    failed=$(systemctl --user --failed --no-legend --plain 2>/dev/null)
+    if [[ -z "$failed" ]]; then
+        ok "no failed user units"
+        return
+    fi
+
+    local count; count=$(grep -c . <<<"$failed")
+    fail "$count failed user unit(s):"
+    FAILED=$((FAILED+count))
+
+    # Per-unit triage. The exit code is the actual signal — a blanket
+    # "reset-failed" is wrong advice for a path/interpreter failure (it just
+    # clears the state and lets it fail again). ExecMainStatus is the process
+    # exit code; Result is systemd's verdict (exit-code/timeout/signal/oom).
+    local line unit status result hint
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        unit=$(awk '{print $1}' <<<"$line")
+        status=$(systemctl --user show "$unit" -p ExecMainStatus --value 2>/dev/null)
+        result=$(systemctl --user show "$unit" -p Result --value 2>/dev/null)
+        printf "      %s%s%s  (exit=%s result=%s)\n" "$BOLD" "$unit" "$RESET" "${status:-?}" "${result:-?}"
+        case "$status" in
+            127) hint="command not found — ExecStart or a wrapper it calls is missing. Moved repo? Check the ~/bin shim it invokes (see the shim-integrity section)." ;;
+            126) hint="found but not runnable — bad interpreter or permissions. A venv or shebang target likely moved; recreate the venv (see the venv-health section)." ;;
+            203) hint="systemd couldn't exec ExecStart — bad path or not executable. Check the unit's ExecStart= line." ;;
+            0)   if [[ "$result" == "timeout" ]]; then hint="timed out — ran past TimeoutStartSec."
+                 else hint="exited 0 but marked failed ($result) — check Type=/RemainAfterExit= or a killed dependency."; fi ;;
+            "")  hint="no recorded exit (likely signal/oom, result=$result) — journalctl --user -u $unit -e" ;;
+            *)   hint="runtime error exit $status — journalctl --user -u $unit -e" ;;
+        esac
+        printf "        ↳ %s\n" "$hint"
+    done <<<"$failed"
+
+    info "once the cause is fixed: systemctl --user reset-failed <unit> && systemctl --user start <unit>"
+}
+
+check_xdg_desktop_portal() {
+    header "xdg-desktop-portal stack"
+    # Portals are DBus-activated, so 'inactive' isn't necessarily failed.
+    # We only care if any portal unit is in 'failed' state.
+    local portals=(xdg-desktop-portal xdg-desktop-portal-hyprland xdg-desktop-portal-gtk xdg-desktop-portal-kde)
+    local any_failed=0
+    for p in "${portals[@]}"; do
+        local state
+        state=$(systemctl --user is-failed "${p}.service" 2>/dev/null || true)
+        if [[ "$state" == "failed" ]]; then
+            fail "$p: failed"
+            any_failed=1
+            FAILED=$((FAILED+1))
+        fi
+    done
+    [[ "$any_failed" -eq 0 ]] && ok "no portal failures (inactive is OK — these are DBus-activated)"
+}
+
+check_aur_rebuild_hints() {
+    header "AUR rebuild hints"
+    if ! command -v checkrebuild >/dev/null; then
+        info "rebuild-detector not installed — skipping (install with: pacman -S rebuild-detector)"
+        return
+    fi
+    local hints
+    hints=$(checkrebuild 2>/dev/null || true)
+    if [[ -z "$hints" ]]; then
+        ok "no AUR packages flagged for rebuild"
+    else
+        warn "rebuild-detector suggests rebuilding these AUR packages:"
+        echo "$hints" | sed 's/^/      /'
+        # checkrebuild prints "<reason>\t<pkgname>"; last field is the name.
+        # Emit a ready-to-paste command (we never run it — AUR builds need the
+        # user's privileges and judgement).
+        local pkgs; pkgs=$(awk '{print $NF}' <<<"$hints" | paste -sd' ')
+        [[ -n "$pkgs" ]] && info "rebuild with: paru -S --rebuild $pkgs"
+    fi
+}
+
+check_bin_shims() {
+    header "~/bin shim integrity"
+    local bindir="$HOME/bin"
+    [[ -d "$bindir" ]] || { info "no ~/bin directory — skipping"; return; }
+
+    local broken=0 checked=0 f
+    for f in "$bindir"/*; do
+        [[ -e "$f" || -L "$f" ]] || continue
+
+        # Dangling symlink — the exact class that silently kills hypr-doctor's
+        # own SessionStart hook if claude-dirs ever moves.
+        if [[ -L "$f" ]]; then
+            checked=$((checked+1))
+            if [[ ! -e "$f" ]]; then
+                fail "$(basename "$f"): dangling symlink → $(readlink "$f")"
+                broken=$((broken+1)); FAILED=$((FAILED+1))
+            fi
+            continue
+        fi
+
+        # Thin exec-wrapper whose absolute/~ target no longer exists (the ccx
+        # pattern: repo moved, wrapper still points at the old path).
+        if [[ -f "$f" && "$(head -c2 "$f" 2>/dev/null)" == "#!" ]]; then
+            local target
+            target=$(awk '/^[[:space:]]*exec[[:space:]]+[~\/]/ {t=$2; gsub(/["'\''"]/,"",t); print t; exit}' "$f" 2>/dev/null)
+            [[ -z "$target" ]] && continue
+            checked=$((checked+1))
+            local expanded="${target/#\~/$HOME}"
+            if [[ ! -e "$expanded" ]]; then
+                fail "$(basename "$f"): exec target missing → $target"
+                broken=$((broken+1)); FAILED=$((FAILED+1))
+            fi
+        fi
+    done
+
+    [[ "$broken" -eq 0 ]] && ok "all $checked shim(s)/symlink(s) resolve"
+}
+
+check_venvs() {
+    header "Python venv health"
+    local n; n=$(manifest '(.watched_venvs // []) | length')
+    if [[ -z "$n" || "$n" -eq 0 ]]; then
+        info "no watched venvs in manifest — skipping"
+        return
+    fi
+
+    local i
+    for ((i=0; i<n; i++)); do
+        local dir base venv
+        dir=$(manifest ".watched_venvs[$i]")
+        base=$(basename "$dir")
+        venv="$dir/.venv"
+
+        if [[ ! -d "$dir" ]]; then
+            warn "$base: project dir missing ($dir) — stale manifest entry?"
+            continue
+        fi
+        if [[ ! -d "$venv" ]]; then
+            info "$base: no .venv yet — skipping"
+            continue
+        fi
+        # Run the venv's own interpreter. Fails if it's a dangling symlink to a
+        # removed system python, or the whole tree moved out from under it.
+        if "$venv/bin/python" --version >/dev/null 2>&1; then
+            ok "$base: venv healthy ($("$venv/bin/python" --version 2>&1))"
+        else
+            fail "$base: venv broken — interpreter won't run"
+            info "  fix: rm -rf '$venv' && python -m venv '$venv' && '$venv/bin/pip' install -e '$dir'"
+            FAILED=$((FAILED+1))
+        fi
+    done
+}
+
+# ── subcommands ───────────────────────────────────────────────────────────────
+
+cmd_audit() {
+    printf "%shypr-doctor audit%s — read-only health check\n" "$BOLD" "$RESET"
+    check_recent_stack_updates
+    check_hypr_plugin_abi
+    check_qt_python_skew
+    check_systemd_user_failed
+    check_xdg_desktop_portal
+    check_bin_shims
+    check_venvs
+    check_aur_rebuild_hints
+
+    header "Summary"
+    if [[ "$DRIFT" -eq 0 && "$FAILED" -eq 0 ]]; then
+        ok "everything healthy"
+    else
+        [[ "$DRIFT"  -gt 0 ]] && warn "$DRIFT plugin(s) drifted — run: hypr-doctor rebuild"
+        [[ "$FAILED" -gt 0 ]] && warn "$FAILED unit/binding issue(s) — see above for recovery hints"
+    fi
+
+    date -Iseconds > "$LAST_RUN"
+    [[ "$DRIFT" -gt 0 || "$FAILED" -gt 0 ]] && return 1
+    return 0
+}
+
+cmd_rebuild() {
+    printf "%shypr-doctor rebuild%s — applying fixes\n" "$BOLD" "$RESET"
+    local n; n=$(manifest '.plugins | length')
+    local rebuilt=0
+
+    for ((i=0; i<n; i++)); do
+        local name enabled repo build_cmd so_path
+        name=$(manifest ".plugins[$i].name")
+        enabled=$(manifest ".plugins[$i].enabled")
+        [[ "$enabled" != "true" ]] && continue
+        repo=$(manifest ".plugins[$i].repo_dir")
+        build_cmd=$(manifest ".plugins[$i].build_cmd")
+        so_path=$(manifest ".plugins[$i].so_path")
+
+        local hypr_mtime so_mtime
+        hypr_mtime=$(mtime "$HYPRLAND_BIN")
+        so_mtime=$(mtime "$so_path")
+
+        # Skip if .so newer than Hyprland binary
+        if [[ "$so_mtime" -ge "$hypr_mtime" && "$so_mtime" -gt 0 ]]; then
+            ok "$name: .so up-to-date, skipping rebuild"
+            continue
+        fi
+
+        header "Rebuilding $name"
+        info "repo: $repo"
+        info "cmd:  $build_cmd"
+        # Capture build output to a log instead of flooding stdout (a clean
+        # rebuild is ~30KB of deprecation warnings). Show a pointer on success;
+        # show the tail — where the actual error is — on failure.
+        local log="$STATE_DIR/rebuild-${name}.log"
+        info "log:  $log  (tail -f to watch live)"
+        if ! ( cd "$repo" && eval "$build_cmd" ) >"$log" 2>&1; then
+            fail "$name: build FAILED — last 15 lines:"
+            tail -n 15 "$log" | sed 's/^/        /'
+            info "full log: $log"
+            FAILED=$((FAILED+1))
+            continue
+        fi
+        ok "$name: build succeeded ($(grep -c '' "$log") lines → $log)"
+        rebuilt=$((rebuilt+1))
+
+        # Reload in live Hyprland (unload→load to swap the in-memory .so).
+        # Verify against the live plugin list, never against `load`'s own output
+        # (it lies — see plugin_is_loaded). Capture load output once for errors.
+        if hyprctl_alive; then
+            local loaded_name load_out
+            loaded_name=$(plugin_loaded_name "$i")
+            hyprctl plugin unload "$so_path" >/dev/null 2>&1
+            load_out=$(hyprctl plugin load "$so_path" 2>&1)
+            if plugin_is_loaded "$loaded_name"; then
+                ok "$name: reloaded in live Hyprland"
+            else
+                fail "$name: live reload failed — ${load_out:-not present in plugin list}"
+                FAILED=$((FAILED+1))
+            fi
+        else
+            info "$name: Hyprland not running, will load on next session"
+        fi
+    done
+
+    header "Summary"
+    if [[ "$rebuilt" -eq 0 ]]; then
+        ok "nothing to rebuild"
+    else
+        ok "$rebuilt plugin(s) rebuilt"
+    fi
+    [[ "$FAILED" -gt 0 ]] && return 1
+    return 0
+}
+
+cmd_abi_drift() {
+    # Terse mode for the SessionStart hook. Print drift only, exit 0 always.
+    local hypr_mtime; hypr_mtime=$(mtime "$HYPRLAND_BIN")
+    [[ "$hypr_mtime" -eq 0 ]] && return 0  # Hyprland not installed; silent.
+
+    local n; n=$(manifest '.plugins | length' 2>/dev/null || echo 0)
+    local hits=()
+    for ((i=0; i<n; i++)); do
+        local name enabled so_path so_mtime
+        name=$(manifest ".plugins[$i].name")
+        enabled=$(manifest ".plugins[$i].enabled")
+        [[ "$enabled" != "true" ]] && continue
+        so_path=$(manifest ".plugins[$i].so_path")
+        so_mtime=$(mtime "$so_path")
+        if [[ "$so_mtime" -lt "$hypr_mtime" ]]; then
+            hits+=("$name")
+        fi
+    done
+
+    # Also flag Qt/PyQt skew (today's exact symptom)
+    local qt_ver pyqt_ver
+    qt_ver=$(pacman -Q qt6-base 2>/dev/null | awk '{print $2}' | sed 's/-.*//')
+    pyqt_ver=$(pacman -Q python-pyqt6 2>/dev/null | awk '{print $2}' | sed 's/-.*//')
+
+    local qt_skew=""
+    if [[ -n "$qt_ver" && -n "$pyqt_ver" && "$qt_ver" != "$pyqt_ver" ]]; then
+        # Suppress an acknowledged skew so the hook stays silent on drift the
+        # user already knows about and can't fix. Any version change revives it.
+        if [[ "$pyqt_ver vs $qt_ver" != "$(manifest '.suppressions.pyqt_skew_ack // empty')" ]]; then
+            qt_skew="python-pyqt6 ($pyqt_ver) lags qt6-base ($qt_ver)"
+        fi
+    fi
+
+    # Output only if there's something to say.
+    if [[ "${#hits[@]}" -gt 0 || -n "$qt_skew" ]]; then
+        printf "⚠ hypr-doctor: post-update drift detected\n"
+        for h in "${hits[@]}"; do
+            printf "    • plugin '%s' .so older than Hyprland binary (ABI mismatch likely)\n" "$h"
+        done
+        [[ -n "$qt_skew" ]] && printf "    • %s — Python+Qt apps may SIGABRT on launch\n" "$qt_skew"
+        printf "  Run: %shypr-doctor rebuild%s  (or %shypr-doctor audit%s for details)\n" \
+            "$BOLD" "$RESET" "$BOLD" "$RESET"
+    fi
+    return 0
+}
+
+cmd_plugin_rebuild() {
+    local target="$1"
+    local n; n=$(manifest '.plugins | length')
+    for ((i=0; i<n; i++)); do
+        local name; name=$(manifest ".plugins[$i].name")
+        if [[ "$name" == "$target" ]]; then
+            local repo build_cmd so_path
+            repo=$(manifest ".plugins[$i].repo_dir")
+            build_cmd=$(manifest ".plugins[$i].build_cmd")
+            so_path=$(manifest ".plugins[$i].so_path")
+
+            header "Rebuilding $name"
+            ( cd "$repo" && eval "$build_cmd" ) || { fail "build failed"; return 1; }
+            ok "build succeeded"
+
+            if hyprctl_alive; then
+                local loaded_name load_out
+                loaded_name=$(plugin_loaded_name "$i")
+                hyprctl plugin unload "$so_path" >/dev/null 2>&1
+                load_out=$(hyprctl plugin load "$so_path" 2>&1)
+                if plugin_is_loaded "$loaded_name"; then
+                    ok "$name: reloaded in live Hyprland"
+                else
+                    fail "$name: live reload failed — ${load_out:-not present in plugin list}"
+                    return 1
+                fi
+            else
+                info "Hyprland not running; will load on next session"
+            fi
+            return 0
+        fi
+    done
+    fail "plugin '$target' not in manifest at $MANIFEST"
+    return 1
+}
+
+cmd_ack_skew() {
+    # Record the current python-pyqt6-vs-qt6-base pair as acknowledged, so the
+    # SessionStart hook stops nagging about a skew you can't fix locally.
+    local qt_ver pyqt_ver
+    qt_ver=$(pacman -Q qt6-base 2>/dev/null | awk '{print $2}' | sed 's/-.*//')
+    pyqt_ver=$(pacman -Q python-pyqt6 2>/dev/null | awk '{print $2}' | sed 's/-.*//')
+    if [[ -z "$qt_ver" || -z "$pyqt_ver" ]]; then
+        fail "can't read qt6-base / python-pyqt6 versions — nothing to acknowledge"
+        return 1
+    fi
+    if [[ "$qt_ver" == "$pyqt_ver" ]]; then
+        ok "python-pyqt6 ($pyqt_ver) already matches qt6-base — no skew to acknowledge"
+        return 0
+    fi
+    local pair="$pyqt_ver vs $qt_ver" tmp
+    tmp=$(mktemp)
+    if jq --arg p "$pair" '.suppressions.pyqt_skew_ack = $p' "$MANIFEST" > "$tmp" && mv "$tmp" "$MANIFEST"; then
+        ok "acknowledged skew: $pair (hook now silent until either version changes)"
+    else
+        rm -f "$tmp"
+        fail "failed to write manifest at $MANIFEST"
+        return 1
+    fi
+}
+
+cmd_help() {
+    sed -n '2,/^$/{s/^# \?//;p}' "$0"
+}
+
+# ── dispatch ──────────────────────────────────────────────────────────────────
+case "${1:-audit}" in
+    audit)          cmd_audit ;;
+    rebuild)        cmd_rebuild ;;
+    abi-drift)      cmd_abi_drift ;;
+    ack-skew)       cmd_ack_skew ;;
+    plugin-rebuild) shift; cmd_plugin_rebuild "${1:?usage: hypr-doctor plugin-rebuild NAME}" ;;
+    -h|--help|help) cmd_help ;;
+    *) echo "Unknown subcommand: $1" >&2; cmd_help; exit 1 ;;
+esac
