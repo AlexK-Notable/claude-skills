@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# port-check — TCP port fanout for one host (parallel, pure bash).
+#
+# Uses /dev/tcp (a bash builtin, not a real file). Always available where
+# bash is. No external tools required.
+
+set -euo pipefail
+
+if [[ -t 1 ]] && command -v tput >/dev/null 2>&1; then
+  C_OK=$(tput setaf 2); C_BAD=$(tput setaf 1); C_DIM=$(tput dim); C_BOLD=$(tput bold); C_RESET=$(tput sgr0)
+else
+  C_OK=""; C_BAD=""; C_DIM=""; C_BOLD=""; C_RESET=""
+fi
+
+usage() {
+  cat <<'EOF'
+port-check — TCP port probe (parallel, pure bash)
+
+USAGE:
+  port-check HOST PORT [PORT...]
+  port-check HOST              # defaults to top ports (22 80 443 8080 8123)
+  port-check HOST --top         # explicit top-ports mode
+  port-check HOST --klipper     # klipper preset (22 80 7125 7136)
+  port-check HOST --apple       # apple preset (22 5000 7000)
+  port-check HOST --windows     # windows preset (135 139 445 3389)
+
+OPTIONS:
+  --timeout N    seconds per probe (default 2)
+  --no-color     disable colored output
+
+OUTPUT:
+  open      = connection succeeded
+  closed    = active refusal (RST)
+  filtered  = no response (firewall dropping)
+
+EXIT CODES:
+  0 = at least one port open
+  1 = all probed ports closed/filtered
+  2 = bad usage
+EOF
+}
+
+# --- args ---
+HOST=""
+PORTS=()
+TIMEOUT=2
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --timeout) TIMEOUT="$2"; shift 2 ;;
+    --no-color) C_OK=""; C_BAD=""; C_DIM=""; C_BOLD=""; C_RESET=""; shift ;;
+    --top) PORTS+=(22 80 443 8080 8123); shift ;;
+    --klipper) PORTS+=(22 80 7125 7136); shift ;;
+    --apple) PORTS+=(22 5000 7000); shift ;;
+    --windows) PORTS+=(135 139 445 3389); shift ;;
+    -*) echo "unknown flag: $1" >&2; usage >&2; exit 2 ;;
+    *)
+      if [[ -z "$HOST" ]]; then
+        HOST="$1"
+      else
+        PORTS+=("$1")
+      fi
+      shift
+      ;;
+  esac
+done
+
+[[ -z "$HOST" ]] && { usage >&2; exit 2; }
+
+# default port list if none specified
+if [[ ${#PORTS[@]} -eq 0 ]]; then
+  PORTS=(22 80 443 8080 8123)
+fi
+
+echo "${C_BOLD}port-check${C_RESET} $HOST  ${C_DIM}(timeout ${TIMEOUT}s per port)${C_RESET}"
+echo
+
+probe_one() {
+  local port="$1"
+  local result
+  # exec the connection in a subshell so we can distinguish refused vs timeout
+  if timeout "$TIMEOUT" bash -c "exec 3<>/dev/tcp/$HOST/$port" 2>/dev/null; then
+    result="open"
+    exec 3<&-
+  else
+    rc=$?
+    if (( rc == 124 )); then
+      result="filtered"
+    else
+      result="closed"
+    fi
+  fi
+  echo "$port:$result"
+}
+
+# probe all ports in parallel, collect results
+declare -A RESULTS
+while read -r line; do
+  port="${line%%:*}"
+  state="${line##*:}"
+  RESULTS["$port"]="$state"
+done < <(
+  for port in "${PORTS[@]}"; do
+    probe_one "$port" &
+  done
+  wait
+)
+
+# output sorted by port number
+opened=0
+for port in $(printf '%s\n' "${PORTS[@]}" | sort -n); do
+  state="${RESULTS[$port]:-?}"
+  case "$state" in
+    open)
+      printf "  ${C_OK}● %-6s open${C_RESET}\n" "$port"
+      opened=$((opened+1))
+      ;;
+    closed)
+      printf "  ${C_BAD}○ %-6s closed${C_RESET}\n" "$port"
+      ;;
+    filtered)
+      printf "  ${C_DIM}◌ %-6s filtered${C_RESET}\n" "$port"
+      ;;
+    *)
+      printf "  ? %-6s unknown\n" "$port"
+      ;;
+  esac
+done
+
+(( opened > 0 )) || exit 1
