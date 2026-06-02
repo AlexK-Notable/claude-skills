@@ -68,6 +68,17 @@ if [ -f "$SETTINGS" ] && ! grep -q 'skill-activation-prompt' "$SETTINGS" 2>/dev/
   say "                 $HOOKS_DIR/skill-activation-prompt.sh   (left manual — settings.json is load-bearing)"
 fi
 
+say "== python plugins (uv sync) =="
+if command -v uv >/dev/null; then
+  while IFS= read -r pyproj; do
+    pdir="$(dirname "$pyproj")"
+    say "  uv sync  ${pdir/#$HOME/\~}"
+    run "uv sync --project '$pdir' --all-extras"
+  done < <(find "$REPO"/plugins -maxdepth 2 -name pyproject.toml 2>/dev/null || true)
+else
+  say "  NOTE: 'uv' not found — skipping; install uv to build Python plugins (cron-claude)"
+fi
+
 say "== per-plugin hooks (bundled, live) =="
 while IFS= read -r hk; do
   [ -n "$hk" ] && [ -f "$hk" ] && link "$hk" "$HOOKS_DIR/$(basename "$hk")"

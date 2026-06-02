@@ -1,6 +1,6 @@
 [project]
 name = "cron-claude"
-version = "0.0.1"
+version = "0.1.0"
 description = "Schedule and manage local claude -p invocations via systemd user timers."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -30,7 +30,9 @@ packages = ["src/cron_claude"]
 [dependency-groups]
 dev = [
     "pytest>=8.0",
+    "pytest-asyncio>=0.23",
     "ruff>=0.5",
+    "textual>=0.80",
 ]
 
 [tool.ruff]
@@ -43,3 +45,5 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+asyncio_mode = "auto"
+markers = ["integration: touches real systemd --user"]

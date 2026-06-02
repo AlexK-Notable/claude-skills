@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Self-locating shim → the plugin's uv-managed venv entry point.
+# Auto-deployed into ~/bin by the monorepo install.sh `plugins/*/bin/*` loop.
+set -euo pipefail
+here="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"   # -> plugins/cron-claude
+venv_bin="$here/.venv/bin/cron-claude"
+if [ ! -x "$venv_bin" ]; then
+  echo "cron-claude: venv missing — run: (cd '$here' && uv sync)" >&2
+  exit 127
+fi
+exec "$venv_bin" "$@"

@@ -4,9 +4,9 @@ A Python CLI + Claude Code skill for scheduling local `claude -p` jobs as
 **systemd user timers**. Headless Claude on a schedule, with full local
 file access — what `/schedule` (remote) and `/loop` (in-REPL) both miss.
 
-> **Status:** scaffold-only. CLI surface is wired, all commands raise
-> `NotImplementedError`. The shell playground (`./run`, `prompts/`, `logs/`)
-> still works as before — it's the substrate the CLI will eventually drive.
+> **Status:** working. All commands implemented; installed on PATH via the
+> monorepo `install.sh` (`uv sync` + a self-locating `bin/cron-claude` shim).
+> The legacy `./run` + `prompts/` playground still works for ad-hoc runs.
 
 ## Quickstart
 
@@ -14,7 +14,7 @@ file access — what `/schedule` (remote) and `/loop` (in-REPL) both miss.
 # install (creates .venv, sets up entry point)
 uv sync
 
-# poke around — every command stubbed for now
+# every command works now
 uv run cron-claude --help
 uv run cron-claude --version
 uv run cron-claude schedule --help
@@ -36,7 +36,7 @@ cron-claude/
 │   ├── cli.py                  # Typer entry point (cron-claude ...)
 │   ├── systemd/                # module: .timer/.service writers (backend)
 │   ├── runners/                # module: ExecStart= renderers (claude -p, ...)
-│   └── tui/                    # module: Textual TUI (optional, placeholder)
+│   └── tui/                    # module: Textual TUI (optional dep)
 ├── skills/cron-claude/SKILL.md              # Claude Code skill — symlink into ~/.claude/skills/
 ├── tests/                      # pytest smoke tests
 ├── prompts/                    # per-prompt executables (legacy playground; CLI consumes these)
@@ -49,8 +49,6 @@ The `systemd` and `runners` modules are intentionally separate — the systemd
 side knows nothing about claude, and the claude runner knows nothing about
 unit files. Adding a new runner type (plain shell, python script, pacman
 hook trigger) means a new file in `runners/`, no changes elsewhere.
-
-## Legacy playground (still valid)
 
 ## Conventions
 
