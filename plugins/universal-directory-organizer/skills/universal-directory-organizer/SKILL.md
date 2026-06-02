@@ -228,6 +228,20 @@ During active sessions, a PreToolUse guard hook validates every Bash command:
 
 The guard is **fail-closed** — any unexpected error in the hook blocks the command rather than allowing it through. Requires `jq` to be installed.
 
+**Hook deployment**: the three hooks live in the plugin at
+`plugins/universal-directory-organizer/hooks/` and are symlinked into
+`~/.claude/hooks/` by the monorepo's `install.sh`. They must be registered in
+`~/.claude/settings.json` (left manual — it is load-bearing):
+
+| Hook | Event | Matcher |
+|------|-------|---------|
+| `organizer-guard.sh` | `PreToolUse` | `Bash` |
+| `organizer-logger.sh` | `PostToolUse` | `Bash` |
+| `session-complete.sh` | `Stop` | — |
+
+All three are dormant until a session manifest (`~/.claude/organizer-session.json`)
+exists, so they add no overhead outside an active organize session.
+
 ---
 
 ## Anti-Patterns
