@@ -1,0 +1,50 @@
+{
+  "name": "claude-skills",
+  "owner": {
+    "name": "Alex Kechichian",
+    "email": "alexkechichian1@gmail.com",
+    "url": "https://github.com/AlexK-Notable"
+  },
+  "metadata": {
+    "description": "Personal Claude Code skills — daily-driver tooling for desktop maintenance, dotfiles, home LAN, secrets, and post-update repair. A live, directory-source marketplace.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "bitwarden-cli",
+      "source": "./plugins/bitwarden-cli",
+      "description": "Bitwarden workflows for both CLIs — bw (vault: secure notes, SSH keys) and bws (Secrets Manager: machine tokens, projects, runtime injection).",
+      "version": "1.0.0"
+    },
+    {
+      "name": "home-network",
+      "source": "./plugins/home-network",
+      "description": "Home LAN discovery, troubleshooting, ufw, and self-healing device inventory via background claude -p agents.",
+      "version": "0.3.0"
+    },
+    {
+      "name": "cron-claude",
+      "source": "./plugins/cron-claude",
+      "description": "Schedule recurring claude -p jobs as systemd user timers.",
+      "version": "1.0.0"
+    },
+    {
+      "name": "hypr-doctor",
+      "source": "./plugins/hypr-doctor",
+      "description": "Post-update triage and repair for the Arch/CachyOS Hyprland desktop.",
+      "version": "1.0.0"
+    },
+    {
+      "name": "chezmoi",
+      "source": "./plugins/chezmoi",
+      "description": "Dotfiles management with chezmoi — apply/diff, templating, age encryption.",
+      "version": "1.0.0"
+    },
+    {
+      "name": "universal-directory-organizer",
+      "source": "./plugins/universal-directory-organizer",
+      "description": "Interactive directory cleanup and organization with safety hooks.",
+      "version": "1.0.0"
+    }
+  ]
+}

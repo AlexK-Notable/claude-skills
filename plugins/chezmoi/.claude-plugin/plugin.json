@@ -1,0 +1,17 @@
+{
+  "name": "chezmoi",
+  "version": "1.0.0",
+  "description": "Dotfiles management with chezmoi — add/re-add/apply/diff, machine-specific templating, age-encrypted secrets, and the AlexK-Notable/dotfiles workflow.",
+  "author": {
+    "name": "Alex Kechichian",
+    "email": "alexkechichian1@gmail.com",
+    "url": "https://github.com/AlexK-Notable"
+  },
+  "homepage": "https://github.com/AlexK-Notable/claude-skills",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AlexK-Notable/claude-skills.git"
+  },
+  "license": "MIT",
+  "keywords": ["chezmoi", "dotfiles", "config", "templating", "age", "encryption"]
+}

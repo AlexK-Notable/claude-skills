@@ -1,0 +1,17 @@
+{
+  "name": "universal-directory-organizer",
+  "version": "1.0.0",
+  "description": "Interactive directory cleanup and organization for any directory — scan, categorize, deduplicate, archive, and recover disk space. Always interactive; safety-enforced via PreToolUse guard hooks.",
+  "author": {
+    "name": "Alex Kechichian",
+    "email": "alexkechichian1@gmail.com",
+    "url": "https://github.com/AlexK-Notable"
+  },
+  "homepage": "https://github.com/AlexK-Notable/claude-skills",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AlexK-Notable/claude-skills.git"
+  },
+  "license": "MIT",
+  "keywords": ["organize", "cleanup", "declutter", "deduplication", "filesystem", "disk-space"]
+}

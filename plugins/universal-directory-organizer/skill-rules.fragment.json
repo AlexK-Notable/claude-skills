@@ -1,0 +1,46 @@
+{
+  "universal-directory-organizer": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "high",
+    "description": "Interactive directory cleanup, organization, and disk space recovery for any directory",
+    "promptTriggers": {
+      "keywords": [
+        "organize home",
+        "organize directory",
+        "organize downloads",
+        "organize folder",
+        "clean up home",
+        "clean up directory",
+        "clean up downloads",
+        "clean up project",
+        "declutter",
+        "directory mess",
+        "home directory mess",
+        "disk space",
+        "reclaim space",
+        "free up space",
+        "stale files",
+        "duplicate files",
+        "cleanup home",
+        "directory cleanup",
+        "folder cleanup",
+        "disk usage",
+        "tidy up",
+        "directory organization",
+        "home directory audit",
+        "directory audit"
+      ],
+      "intentPatterns": [
+        "(organize|clean|tidy|declutter|audit).*?(home|~/|directory|files|folder|downloads|project)",
+        "(home|~/|directory|folder).*?(mess|cluttered|disorganized|chaotic)",
+        "(reclaim|free|recover|save).*?(space|disk|storage)",
+        "(find|remove|delete).*?(stale|old|unused|duplicate).*?(files|directories|dirs|folders)",
+        "(what|where).*?(taking up|using|wasting).*?space",
+        "(merge|consolidate|combine).*?(directories|folders|dirs)",
+        "organize\\s+/",
+        "clean\\s+up\\s+/"
+      ]
+    }
+  }
+}

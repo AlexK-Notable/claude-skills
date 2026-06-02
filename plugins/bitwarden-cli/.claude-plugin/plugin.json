@@ -1,0 +1,17 @@
+{
+  "name": "bitwarden-cli",
+  "version": "1.0.0",
+  "description": "Bitwarden workflows for both CLIs — `bw` (password vault: secure notes, SSH keys, the self-destructing handoff recipe) and `bws` (Secrets Manager: machine-account tokens, projects, runtime secret injection via `bws run`). Ships the bws-secret-add helper.",
+  "author": {
+    "name": "Alex Kechichian",
+    "email": "alexkechichian1@gmail.com",
+    "url": "https://github.com/AlexK-Notable"
+  },
+  "homepage": "https://github.com/AlexK-Notable/claude-skills",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AlexK-Notable/claude-skills.git"
+  },
+  "license": "MIT",
+  "keywords": ["bitwarden", "bw", "bws", "secrets-manager", "secure-notes", "ssh-keys", "credentials", "vault"]
+}

@@ -1,0 +1,49 @@
+{
+  "chezmoi": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "high",
+    "description": "Managing dotfiles and config files with chezmoi",
+    "promptTriggers": {
+      "keywords": [
+        "chezmoi",
+        "dotfiles",
+        "dotfile",
+        "config files",
+        "backup config",
+        "sync config",
+        "manage config",
+        "new machine setup",
+        "machine setup",
+        ".config",
+        "home directory",
+        "config sync",
+        "dotfile manager"
+      ],
+      "intentPatterns": [
+        "(backup|sync|manage|track).*?(config|dotfile|dotfiles|settings)",
+        "(setup|configure|bootstrap).*?(new|fresh).*?(machine|system|computer)",
+        "(add|manage|track).*?(\\.config|~\\/|home)",
+        "chezmoi.*?(init|add|apply|diff|edit|update|managed|unmanaged)",
+        "(encrypt|template).*?(config|secret|dotfile)",
+        "(sync|share|transfer).*?(config|dotfile|settings).*?(machine|computer|system)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [
+        "**/.local/share/chezmoi/**/*",
+        "**/chezmoi/**/*",
+        "**/.chezmoi*",
+        "**/chezmoi.toml"
+      ],
+      "contentPatterns": [
+        "\\.chezmoi\\.",
+        "chezmoi\\s+(init|add|apply|diff)",
+        "dot_",
+        "private_dot_",
+        "run_once_",
+        "run_onchange_"
+      ]
+    }
+  }
+}

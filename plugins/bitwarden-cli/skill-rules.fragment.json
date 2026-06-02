@@ -1,0 +1,52 @@
+{
+  "bitwarden-cli": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "high",
+    "description": "TWO different Bitwarden products — disambiguate first. bw = password-vault CLI (master-password unlock, BW_SESSION, secure notes, personal credentials). bws = Secrets Manager CLI (BWS_ACCESS_TOKEN machine-account auth, projects + secrets, runtime injection via 'bws run', e.g. LLM API keys into Home Assistant).",
+    "promptTriggers": {
+      "keywords": [
+        "bitwarden",
+        "bws",
+        "bws cli",
+        "secrets manager",
+        "bitwarden secrets manager",
+        "BWS_ACCESS_TOKEN",
+        "machine account",
+        "bws run",
+        "bws project",
+        "bws secret",
+        "bw cli",
+        "bw unlock",
+        "bw login",
+        "bw lock",
+        "bw create item",
+        "bw list items",
+        "BW_SESSION",
+        "secure note",
+        "secure notes",
+        "password vault",
+        "store in vault",
+        "store a secret",
+        "store this in bitwarden",
+        "save to bitwarden",
+        "back up to bitwarden",
+        "rotate credential",
+        "invalid_grant",
+        "vault is locked"
+      ],
+      "intentPatterns": [
+        "(store|save|backup|put|stash).*?(in|to|into).*?(bitwarden|vault|secure note|password manager)",
+        "(retrieve|look ?up|fetch|read|get).*?(from|in).*?(bitwarden|vault|secure note)",
+        "(rotate|regenerate|update).*?(credential|api key|secret|token).*?(bitwarden|vault)",
+        "bw\\s+(unlock|lock|login|logout|status|sync|list|get|create|edit|delete|encode|generate)",
+        "(invalid_grant|vault is locked|master password unlock data was not found)",
+        "(create|add|make).*?(secure note|bitwarden item|login item|vault entry)",
+        "bws\\s+(project|secret|run|config|list|get|create|edit|delete)",
+        "(set ?up|configure|use|wire ?up).*?(bitwarden )?secrets manager",
+        "(machine account|access token|BWS_ACCESS_TOKEN).*?(bitwarden|secrets manager|bws|inject|project)",
+        "(inject|provide|pass|load).*?(secret|api key|credential)s?.*?(bws|secrets manager|home ?assistant)"
+      ]
+    }
+  }
+}
