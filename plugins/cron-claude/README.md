@@ -36,7 +36,7 @@ cron-claude/
 │   ├── cli.py                  # Typer entry point (cron-claude ...)
 │   ├── systemd/                # module: .timer/.service writers (backend)
 │   ├── runners/                # module: ExecStart= renderers (claude -p, ...)
-│   └── tui/                    # module: Textual TUI (optional, placeholder)
+│   └── tui/                    # module: Textual TUI (optional dep)
 ├── skills/cron-claude/SKILL.md              # Claude Code skill — symlink into ~/.claude/skills/
 ├── tests/                      # pytest smoke tests
 ├── prompts/                    # per-prompt executables (legacy playground; CLI consumes these)
@@ -49,8 +49,6 @@ The `systemd` and `runners` modules are intentionally separate — the systemd
 side knows nothing about claude, and the claude runner knows nothing about
 unit files. Adding a new runner type (plain shell, python script, pacman
 hook trigger) means a new file in `runners/`, no changes elsewhere.
-
-## Legacy playground (still valid)
 
 ## Conventions
 
