@@ -50,8 +50,14 @@ Wyoming STT server: systemd **user** service `wyoming-sensevoice.service` on the
 
 ## Secrets (all in bws, project `home-assistant` = 18f14ed9-8ba5-4cc6-bbd4-b45b01534270)
 
-`HA_OWNER_PASSWORD`, `HA-Anthropic`, `HA-Spotify`, `MQTT_PASSWORD`, `GOVEE_API_KEY`,
-`GOVEE_EMAIL`, `GOVEE_PASSWORD`, `HA_BACKUP_KEY`. Read with `bws secret get <id>`;
-never echo values. There is **no** HA long-lived API token yet — `ha-inventory` v1
-uses SSH+sudo file reads, not the API. (Minting an admin token → bws `HA_TOKEN` is
-the documented v2 upgrade for API-based, no-sudo, remote introspection.)
+`HA_OWNER_PASSWORD`, `HA_TOKEN`, `HA-Anthropic`, `HA-Spotify`, `MQTT_PASSWORD`,
+`GOVEE_API_KEY`, `GOVEE_EMAIL`, `GOVEE_PASSWORD`, `HA_BACKUP_KEY`. Read with
+`bws secret get <id>`; never echo values.
+
+**`HA_TOKEN`** (id `74edad23-6bd2-4617-a1d8-b45d016db173`) is an **admin long-lived
+access token** for the `komi` owner account, minted 2026-06-02 via the login flow.
+It enables the REST/WebSocket API directly, no SSH/sudo — e.g.
+`curl -H "Authorization: Bearer $HA_TOKEN" http://192.168.1.229:8123/api/states/<entity>`.
+`ha-inventory` v1 still uses SSH+sudo file reads; this token is the foundation for a
+v2 that introspects via the secret-safe WebSocket API (`config_entries/get` omits
+`data`/`options`) and works remotely without sudo.
