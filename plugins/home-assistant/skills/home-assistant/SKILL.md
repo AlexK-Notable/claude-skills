@@ -31,9 +31,13 @@ and the HA version live in **[references/TOPOLOGY.md](references/TOPOLOGY.md)**.
    ```
    On drift, `ha-inventory` (no args) regenerates it. The check compares content
    hashes of HA's registry files, so it catches UI-made changes too.
-3. For an entity's *live* state or an exact id in a read-only domain
-   (sensor/binary_sensor/button/…), **query HA live** — the snapshot omits those
-   by design (they're high-volume and volatile).
+3. For an entity's *live* state, an exact id in a read-only domain
+   (sensor/binary_sensor/button/…), or to **confirm a change took**, query HA live
+   via the **API** (the snapshot omits volatile state by design). There's an admin
+   token in bws (`HA_TOKEN`); the recipes — `GET /api/states/<id>`, `POST
+   /api/services/<domain>/<service>`, and `POST /api/template` (to **validate
+   automation Jinja before it runs live**) — are in
+   [TOPOLOGY.md](references/TOPOLOGY.md#live-api-access). Never echo the token.
 
 ## Safe-mutation discipline (the core rule)
 
