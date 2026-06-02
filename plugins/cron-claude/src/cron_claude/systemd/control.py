@@ -76,3 +76,13 @@ def journal(unit: str, tail: int = 50, follow: bool = False) -> int:
     if follow:
         argv.append("-f")
     return subprocess.run(argv).returncode
+
+
+def journal_text(unit: str, tail: int = 50) -> str:
+    """Return journal output as a string (for embedding in a TUI / string context)."""
+    proc = subprocess.run(
+        ["journalctl", "--user-unit", unit, "-n", str(tail), "--no-pager"],
+        capture_output=True,
+        text=True,
+    )
+    return proc.stdout or proc.stderr

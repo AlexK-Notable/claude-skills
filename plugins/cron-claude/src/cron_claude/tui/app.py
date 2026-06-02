@@ -75,5 +75,6 @@ class CronClaudeApp(App):
         name = self._selected()
         if not name:
             return
-        self._log(f"[dim]$ journalctl --user-unit {timers.service_unit(name)} -n 20[/dim]")
-        control.journal(timers.service_unit(name), tail=20)
+        unit = timers.service_unit(name)
+        self._log(f"[dim]$ journalctl --user-unit {unit} -n 20[/dim]")
+        self._log(control.journal_text(unit, tail=20))

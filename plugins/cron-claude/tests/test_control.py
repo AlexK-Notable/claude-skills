@@ -45,3 +45,8 @@ def test_validate_calendar_rejects_invalid(monkeypatch):
     monkeypatch.setattr(subprocess, "run", _fake_run(returncode=0, stdout=bad_out))
     with pytest.raises(InvalidCalendar):
         c.validate_calendar("x")
+
+
+def test_journal_text_returns_stdout(monkeypatch):
+    monkeypatch.setattr(subprocess, "run", _fake_run(stdout="line1\nline2\n"))
+    assert c.journal_text("cron-claude-x.service", tail=5) == "line1\nline2\n"
