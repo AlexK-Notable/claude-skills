@@ -40,6 +40,7 @@ new small modules and the shim).
 | `runners/claude.py` | Render `ExecStart` for a **text** prompt | implement `to_exec_start` |
 | `runners/script.py` *(new)* | Render `ExecStart` for an **executable** prompt | new |
 | `runners/__init__.py` | `Runner` protocol + `select_runner(path)` factory | extend |
+| `errors.py` *(new)* | `CronClaudeError` exception hierarchy | new |
 | `cli.py` | Orchestrate runner → systemd → control; Rich output | implement all 6 bodies |
 | `tui/app.py` | Textual app over the same `systemd` module | implement |
 | `bin/cron-claude` *(new)* | self-locating shim → sibling `.venv/bin/cron-claude` | new |
@@ -101,8 +102,8 @@ X-CronClaude-Runner=<script|claude>
 Type=oneshot
 Environment=PATH=%h/.local/bin:%h/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=<spec.exec_start>
-# TimeoutStartSec=<n>   (only when a timeout is set; covers BOTH runner types —
-#                        no `timeout` binary wrapping needed)
+# TimeoutStartSec=<n>   (from TimerSpec.timeout_sec / `schedule add --timeout`;
+#                        covers BOTH runner types — no `timeout` binary needed)
 ```
 
 **`cron-claude-<name>.timer`**
@@ -123,6 +124,9 @@ WantedBy=timers.target
 - `%h` is the systemd home specifier (portable across users/machines).
 - The `X-CronClaude-*` keys in `[Unit]` (systemd ignores unknown `X-` keys) let
   `list_units` / `show` reconstruct the `TimerSpec` by parsing — no re-derivation.
+- `TimerSpec` gains an optional `timeout_sec: int | None` field (→ rendered as
+  `TimeoutStartSec`), set from a new `schedule add --timeout` option; applies to
+  both runner types uniformly (no `timeout(1)` wrapping).
 - `remove_units(name)` unlinks both files (caller stops/disables first).
 - `list_units()` scans `UNITS_DIR` for `cron-claude-*.timer`, reads the marker +
   metadata from the paired `.service`, yields reconstructed `TimerSpec`s.
