@@ -68,6 +68,12 @@ if [ -f "$SETTINGS" ] && ! grep -q 'skill-activation-prompt' "$SETTINGS" 2>/dev/
   say "                 $HOOKS_DIR/skill-activation-prompt.sh   (left manual — settings.json is load-bearing)"
 fi
 
+say "== per-plugin hooks (bundled, live) =="
+while IFS= read -r hk; do
+  [ -n "$hk" ] && [ -f "$hk" ] && link "$hk" "$HOOKS_DIR/$(basename "$hk")"
+done < <(find "$REPO"/plugins/*/hooks -maxdepth 1 -type f -name '*.sh' 2>/dev/null || true)
+say "  (register each per-plugin hook in $SETTINGS with its event — see the plugin's README/SKILL)"
+
 say "== autosync (systemd --user inotify watcher) =="
 command -v inotifywait >/dev/null || say "  NOTE: install 'inotify-tools' for the watcher to run"
 link "$REPO/systemd/claude-skills-autosync.service" "$UNIT_DIR/claude-skills-autosync.service"
