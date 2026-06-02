@@ -175,6 +175,12 @@ duplication. Gated behind the `textual` extra (already wired).
 red to stderr, and `raise typer.Exit(code=1)`. `control.py` raises `SystemdError`
 carrying the failed argv + captured stderr so messages are actionable.
 
+**Calendar-validation caveat (verified 2026-06-02):** `systemd-analyze calendar
+<spec>` **exits 0 even for invalid specs** (it prints `Failed to parse calendar
+specification …`). Determine validity by inspecting stdout — `Next elapse:`
+present = valid; `Failed to parse` present = invalid — **never** the exit code.
+Raise `InvalidCalendar` on the failure text.
+
 ## Packaging / install
 
 - **`plugins/cron-claude/bin/cron-claude`** (tracked, executable): a shim that
