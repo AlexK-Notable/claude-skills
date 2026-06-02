@@ -149,11 +149,11 @@ it; non-zero exit raises `SystemdError(argv, stderr)`.
 
 | Command | Flow |
 |---|---|
-| `schedule add` | validate `OnCalendar` via `systemd-analyze calendar` → refuse if schedule exists → `select_runner` → `to_exec_start()` → `TimerSpec` → `write_units` → `daemon_reload` → `enable_now` → print unit names + next firing. If `--prompt` missing: offer to scaffold an executable starter under `prompts/`. |
+| `schedule add` | validate `OnCalendar` via `systemd-analyze calendar` → refuse if schedule exists → `select_runner` → `to_exec_start()` → `TimerSpec` (incl. optional `--timeout`) → `write_units` → `daemon_reload` → `enable_now` → print unit names + next firing. If `--prompt` missing: offer to scaffold an executable starter under `prompts/`. |
 | `schedule list [--json]` | `list_units()` → Rich table (name · schedule · next run · last result · description) or JSON. |
 | `schedule rm [--force]` | confirm unless `--force` → `stop` + `disable_now` + `remove_units` + `daemon_reload`. |
 | `schedule show` | unit file contents + next elapse + last `Result`/`ExecMainStatus` + recent journal lines. |
-| `run` | `start(service)` → stream journal until the oneshot exits → print exit status. |
+| `run` | `start(service)` — for a `Type=oneshot` unit `systemctl start` blocks until the job finishes — then print last `Result`/exit status + recent journal lines. |
 | `logs [--tail N] [--follow]` | proxy to `control.journal`. |
 | `tui` | launch `CronClaudeApp` (existing ImportError guard for the `textual` extra stays). |
 
