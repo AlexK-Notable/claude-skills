@@ -38,7 +38,8 @@ def test_add_duplicate_fails(monkeypatch, tmp_path):
     prompt = tmp_path / "job.txt"
     prompt.write_text("x")
     args = ["schedule", "add", "dup", "--when", "daily", "--prompt", str(prompt)]
-    assert runner.invoke(app, args).exit_code == 0
+    first = runner.invoke(app, args)
+    assert first.exit_code == 0, first.output
     r = runner.invoke(app, args)
     assert r.exit_code == 1
     assert "already exists" in r.output

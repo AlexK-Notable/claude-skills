@@ -224,7 +224,7 @@ def schedule_show(
     """Show details for a single scheduled job."""
     try:
         svc, tmr = timers.unit_paths(name)
-        if not tmr.exists():
+        if not svc.exists() or not tmr.exists():
             raise ScheduleNotFound(f"schedule {name!r} not found")
     except CronClaudeError as exc:
         raise _fail(exc) from exc
