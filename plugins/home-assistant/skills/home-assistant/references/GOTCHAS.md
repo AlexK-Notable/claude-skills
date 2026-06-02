@@ -95,3 +95,8 @@ Each entry: what bit us, why, the fix, and when it applies. `unverified` entries
 - **Status:** verified · **Applies when:** parsing `core.area_registry`
 - **Cause:** the area registry stores `id`; every other registry *references* it as `area_id`. An early `ha-inventory` mapped `{None: <name>}` and tagged every entity with one wrong area.
 - **Fix:** read `a["id"]` for the area's own id; resolve an entity's effective area as `entity.area_id or device_registry[entity.device_id].area_id`.
+
+### New entities lag the on-disk registry (HA debounces saves)
+- **Status:** verified · **Applies when:** just created an entity (e.g. a YAML light group) and `ha-inventory` doesn't show it
+- **Cause:** HA batches `.storage` registry writes; the entity exists live but isn't on disk yet.
+- **Fix:** confirm via `GET /api/states/<id>`, not the disk snapshot; the registry flushes within minutes and `ha-inventory` then shows it.
