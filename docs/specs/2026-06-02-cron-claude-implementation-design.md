@@ -68,22 +68,26 @@ def select_runner(prompt_path: Path, **opts) -> Runner:
 - **`ScriptRunner(prompt_path)`** — `to_exec_start()` returns the absolute path
   to the executable (it has its own shebang and owns its `claude -p` call, like
   `prompts/hello`). Zero systemd-quoting risk.
-- **`ClaudeRunner(prompt_path, allowed_tools, bare, permission_mode,
-  output_format, max_turns, timeout_sec)`** — `to_exec_start()` renders:
+- **`ClaudeRunner(prompt_path, allowed_tools, bare, output_format,
+  permission_mode, dangerously_skip, timeout_sec)`** — `to_exec_start()` renders:
   ```
   /bin/bash -c 'claude -p "$(cat <shlex-quoted abs prompt>)" \
-    --bare --permission-mode <mode> --output-format <fmt> \
-    --max-turns <n> [--allowed-tools "<tools>"]'
+    [--bare] --output-format <fmt> [--allowed-tools "<tools>"] \
+    [--permission-mode <mode>] [--dangerously-skip-permissions]'
   ```
   Inner command assembled with `shlex.quote` on the prompt path; `allowed_tools`
-  joined space-separated.
+  joined space-separated. Bracketed flags render only when their field is set.
 
-> **Implementation verification point:** the scaffold's `ClaudeRunner` field
-> defaults (`permission_mode="dontAsk"`, etc.) are placeholders and may not match
-> the real CLI. Verify every rendered flag against `claude --help` during
-> implementation (likely `--permission-mode`, `--output-format`, `--max-turns`,
-> `--allowed-tools`, `--bare`). A rendered job that uses a wrong flag fails
-> silently in the timer — this is the highest-risk detail.
+> **Flags verified against `claude --help` (2026-06-02):** `--print`/`-p`,
+> `--bare`, `--output-format <text|json|stream-json>`, `--allowed-tools`
+> (comma/space list, e.g. `"Bash(git *) Edit"`), `--permission-mode` (valid:
+> `acceptEdits`, `auto`, `bypassPermissions`, `default`, `plan`),
+> `--dangerously-skip-permissions`. **Corrections to the scaffold:** there is
+> **no `--max-turns`** flag (drop the `max_turns` field entirely); and
+> `permission_mode="dontAsk"` is **invalid** — default it to *unset* (None) so a
+> job relies on the `--allowed-tools` allowlist (the README's safe-cron model),
+> and permissive runs opt in via `--permission-mode bypassPermissions` or
+> `--dangerously-skip-permissions`.
 
 ### systemd units (`systemd/timers.py`)
 
