@@ -85,3 +85,11 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Fix:** Diagnose: 'docker ps' (container Up), curl /api/ (API running), 'docker logs --since 5m | grep -iE DNS|Connection lost|moonraker down' shows the blip window; getent hosts on the Nova confirms DNS recovered. It self-heals in ~1-2 min (sensors return, e.g. print state back to 'printing'). The PRINT is unaffected — Klipper runs on the printer board independent of HA. Durable fix: move the Nova to wired ethernet (enP4p65s0) and optionally disable wlan0 so it can't flap.
 - **Repro / verify:** `Watch docker logs during a wifi blip: spotify 'Timeout while contacting DNS servers' + BrokenPipeError/ConnectionError + moonraker 'connection down, restarting', all clearing within ~2 min.`
 - **Tags:** network, nova
+
+### 2026-06-03 — light.bedroom_lights group reports color_temp_kelvin=None → attribute-based 'active scene' detection on the dashboard doesn't work
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** HA light groups only expose an attribute when members agree; the Govee/bulb group reports color_temp_kelvin=None whenever any member is in RGB mode (or members disagree). brightness/state ARE reliable, color_temp is not. So Mushroom scene-button coloring keyed on color_temp_kelvin always evaluates false.
+- **Fix:** Don't key dashboard scene-active state on the group's color_temp_kelvin. Either use fixed/always-on button colors, or drive active-state from an input_select.bedroom_scene helper set by per-scene scripts (robust source of truth). Verify any dashboard Jinja with POST /api/template before relying on it — check_config does NOT validate Lovelace templates.
+- **Repro / verify:** `POST /api/template: {{ state_attr('light.bedroom_lights','color_temp_kelvin') }} -> None even with bulbs at a warm temp.`
+- **Tags:** lovelace, lights
