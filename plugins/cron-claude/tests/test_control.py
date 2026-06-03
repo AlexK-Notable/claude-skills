@@ -11,7 +11,7 @@ from cron_claude.errors import InvalidCalendar, SystemdError
 
 
 def _fake_run(returncode=0, stdout="", stderr=""):
-    def runner(argv, capture_output=False, text=False):
+    def runner(argv, capture_output=False, text=False, **kwargs):
         runner.argv = argv
         return types.SimpleNamespace(returncode=returncode, stdout=stdout, stderr=stderr)
     return runner

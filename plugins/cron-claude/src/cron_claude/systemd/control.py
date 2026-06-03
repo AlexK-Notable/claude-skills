@@ -5,6 +5,7 @@ Every helper builds an argv and runs it; non-zero exit raises SystemdError
 """
 from __future__ import annotations
 
+import os
 import subprocess
 from datetime import UTC, datetime
 
@@ -68,7 +69,13 @@ def next_elapse(timer: str) -> datetime | None:
 
 def validate_calendar(spec: str) -> None:
     # NB: systemd-analyze exits 0 even on invalid input — inspect stdout.
-    proc = subprocess.run(["systemd-analyze", "calendar", spec], capture_output=True, text=True)
+    # Force the C locale so the "Next elapse:" marker is stable regardless of LC_ALL.
+    proc = subprocess.run(
+        ["systemd-analyze", "calendar", spec],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "LC_ALL": "C"},
+    )
     if "Next elapse:" not in proc.stdout:
         detail = (proc.stdout + proc.stderr).strip() or "unrecognized calendar spec"
         raise InvalidCalendar(f"invalid OnCalendar {spec!r}: {detail}")

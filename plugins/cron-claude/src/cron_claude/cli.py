@@ -107,6 +107,14 @@ def schedule_add(
         bool,
         typer.Option("--dangerously-skip-permissions", help="Text prompts only."),
     ] = False,
+    bare: Annotated[
+        bool,
+        typer.Option("--bare/--no-bare", help="Text prompts: pass --bare (default on)."),
+    ] = True,
+    output_format: Annotated[
+        str,
+        typer.Option("--output-format", help="Text prompts: --output-format (default json)."),
+    ] = "json",
     randomized_delay: Annotated[
         int,
         typer.Option("--randomized-delay", help="RandomizedDelaySec."),
@@ -140,6 +148,8 @@ def schedule_add(
         runner = select_runner(
             prompt_path,
             allowed_tools=tuple(allowed_tools or ()),
+            bare=bare,
+            output_format=output_format,
             permission_mode=permission_mode,
             dangerously_skip=dangerously_skip,
         )

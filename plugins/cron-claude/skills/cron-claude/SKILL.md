@@ -34,9 +34,10 @@ cron-claude tui                 # interactive (needs `uv sync --extra tui`)
 
 ## Conventions
 
-- **Schedule names** become systemd unit basenames — keep them lowercase, hyphens, no spaces. Underlying units are written as `cron-claude-<name>.{service,timer}`.
+- **Schedule names** become systemd unit basenames and are validated to `[A-Za-z0-9_-]+` (letters, digits, hyphens, underscores — no spaces or slashes). Underlying units are written as `cron-claude-<name>.{service,timer}`.
 - **`--when`** accepts any systemd `OnCalendar=` value: `weekly`, `Sun 03:07`, `*-*-* 09:00`, `Mon..Fri 17:00`. Resolve fuzzy phrasing ("every Sunday morning") to a concrete OnCalendar spec before passing it.
-- **`--prompt`** points at a script under `~/repos/claude-skills/plugins/cron-claude/prompts/`. Each prompt script owns its own `claude -p` invocation, allowed-tools list, and any pre/post shell logic.
+- **`--prompt`** accepts **any path**: an *executable* file (which owns its own `claude -p` invocation + allowlist, like those in `prompts/`) runs directly; a *non-executable text* file is wrapped by cron-claude in a `claude -p "$(cat …)"` call. Pass `--scaffold` to create an executable starter when the path doesn't exist yet.
+- **Text-prompt flags** (ignored for executable prompts): `--allowed-tools` (repeatable), `--permission-mode`, `--dangerously-skip-permissions`, `--no-bare`, `--output-format`. Defaults: `--bare --output-format json` with no permission mode (relying on the allowlist). `--no-bare` keeps OAuth/keychain auth.
 - **`--json`** is supported on listing/inspection commands when you'll parse the result.
 
 ## When *not* to use this skill

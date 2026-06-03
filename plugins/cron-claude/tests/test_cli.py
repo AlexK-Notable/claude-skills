@@ -145,3 +145,17 @@ def test_logs_missing_fails(monkeypatch, tmp_path):
     r = runner.invoke(app, ["logs", "ghost"])
     assert r.exit_code == 1
     assert "not found" in r.output
+
+
+def test_add_bare_and_format_flags(monkeypatch, tmp_path):
+    _patch(monkeypatch, tmp_path)
+    prompt = tmp_path / "job.txt"
+    prompt.write_text("summarize")
+    r = runner.invoke(app, [
+        "schedule", "add", "fmt", "--when", "daily", "--prompt", str(prompt),
+        "--no-bare", "--output-format", "text",
+    ])
+    assert r.exit_code == 0, r.output
+    svc = (tmp_path / "cron-claude-fmt.service").read_text()
+    assert "--bare" not in svc
+    assert "--output-format text" in svc

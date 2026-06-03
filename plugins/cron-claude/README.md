@@ -72,25 +72,31 @@ cd ~/repos/claude-skills/plugins/cron-claude
 You should see the prompt's output streamed to your terminal AND saved to
 `logs/hello-<timestamp>.log`. Re-running creates a new log file each time.
 
-## Wiring a prompt into cron
+## Scheduling a prompt
 
-```cron
-# weekly Sunday 03:00 — note: not 03:00 sharp; jitter via :07 to be polite
-7 3 * * 0  /home/komi/repos/claude-skills/plugins/cron-claude/run hello
+Use the CLI — it writes a systemd `.timer`+`.service` pair (no crontab):
+
+```bash
+# weekly, Sunday 03:07 — an executable prompt runs directly
+cron-claude schedule add weekly-hello --when 'Sun 03:07' --prompt prompts/hello
+
+# a non-executable text file is wrapped in `claude -p "$(cat …)"`; narrow the tools
+cron-claude schedule add inbox --when daily --prompt ./inbox.txt \
+  --allowed-tools 'Bash(ls *)' --timeout 300
 ```
 
-Things to know:
-- Cron runs with a near-empty environment. The `run` script exports `PATH` so
-  `claude` is reachable, but if your prompt itself depends on shell rc state
-  (aliases, functions, custom `PATH` entries beyond the standard ones), you'll
-  need to source what you need explicitly inside the prompt script.
-- Auth: cron'd Claude reads `~/.claude/.credentials.json`. If that expires
-  (token rotation, etc.), the cron runs will silently fail until you `claude`
-  login interactively at least once to refresh.
-- **No sudo.** Cron has no TTY → pam_unix conversation fails → pam_faillock
-  ticks toward locking your account after 3 failures. Anything requiring root
-  needs to live in a pacman hook or systemd unit, not in a `claude -p` prompt.
-- Each cron run consumes Claude Code API quota. Be deliberate with frequency.
+Things to know (apply to any scheduled run):
+- The generated `.service` sets `Environment=PATH=…` so `claude` resolves under
+  the timer's clean environment. If a prompt depends on extra shell rc state
+  (aliases, functions, custom `PATH`), source what you need inside the prompt.
+- Auth: scheduled Claude reads `~/.claude/.credentials.json`. If that expires
+  (token rotation, etc.), runs silently fail until you `claude` login once to
+  refresh. For text prompts, the default `--bare` switches auth to
+  `ANTHROPIC_API_KEY`/`apiKeyHelper` only — pass `--no-bare` to keep the keychain.
+- **No sudo.** A scheduled run has no TTY → pam_unix fails → pam_faillock ticks
+  toward locking your account. Anything needing root belongs in a pacman hook or
+  a separate systemd unit, not a `claude -p` prompt.
+- Each run consumes Claude Code API quota. Be deliberate with frequency.
 
 ## Permissions model
 
@@ -123,7 +129,14 @@ Cron'd Claude can't pop a permission prompt. Two choices per prompt:
 cp prompts/hello prompts/my-new-thing
 chmod +x prompts/my-new-thing
 $EDITOR prompts/my-new-thing
-./run my-new-thing  # test it
+./run my-new-thing                     # smoke-test ad-hoc (legacy playground)
 ```
 
-Then add a cron line pointing at `./run my-new-thing`.
+Then schedule it:
+
+```bash
+cron-claude schedule add my-job --when 'Sun 03:07' --prompt prompts/my-new-thing
+```
+
+(Or let the CLI scaffold an executable starter for you with
+`--prompt prompts/my-new-thing --scaffold`.)
