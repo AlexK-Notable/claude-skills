@@ -5,6 +5,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+from cron_claude.errors import CronClaudeError
+
 UNITS_DIR: Path = Path.home() / ".config" / "systemd" / "user"
 CRON_CLAUDE_MARKER: str = "X-CronClaude-Managed=1"
 UNIT_PREFIX: str = "cron-claude-"
@@ -35,20 +37,32 @@ def unit_paths(name: str) -> tuple[Path, Path]:
     return UNITS_DIR / service_unit(name), UNITS_DIR / timer_unit(name)
 
 
+def _sanitize_unit_value(label: str, value: str) -> str:
+    """Reject newlines in any value written into a unit file (directive injection)."""
+    if "\n" in value or "\r" in value:
+        raise CronClaudeError(
+            f"systemd unit field {label!r} must not contain newlines: {value!r}"
+        )
+    return value
+
+
 def _render_service(spec: TimerSpec) -> str:
-    desc = spec.description or f"cron-claude: {spec.name}"
+    desc = _sanitize_unit_value("description", spec.description or f"cron-claude: {spec.name}")
+    name = _sanitize_unit_value("name", spec.name)
+    prompt_path = _sanitize_unit_value("prompt_path", spec.prompt_path)
+    exec_start = _sanitize_unit_value("exec_start", spec.exec_start)
     lines = [
         "[Unit]",
         f"Description={desc}",
         CRON_CLAUDE_MARKER,
-        f"X-CronClaude-Name={spec.name}",
-        f"X-CronClaude-Prompt={spec.prompt_path}",
+        f"X-CronClaude-Name={name}",
+        f"X-CronClaude-Prompt={prompt_path}",
         f"X-CronClaude-Runner={spec.runner}",
         "",
         "[Service]",
         "Type=oneshot",
         "Environment=PATH=%h/.local/bin:%h/bin:/usr/local/bin:/usr/bin:/bin",
-        f"ExecStart={spec.exec_start}",
+        f"ExecStart={exec_start}",
     ]
     if spec.timeout_sec:
         lines.append(f"TimeoutStartSec={spec.timeout_sec}")
@@ -56,7 +70,9 @@ def _render_service(spec: TimerSpec) -> str:
 
 
 def _render_timer(spec: TimerSpec) -> str:
-    desc = spec.description or f"cron-claude timer: {spec.name}"
+    desc = _sanitize_unit_value(
+        "description", spec.description or f"cron-claude timer: {spec.name}"
+    )
     lines = [
         "[Unit]",
         f"Description={desc}",

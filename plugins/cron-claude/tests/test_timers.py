@@ -1,5 +1,8 @@
 """write_units → list_units round-trip + unit file content."""
+import pytest
+
 import cron_claude.systemd.timers as t
+from cron_claude.errors import CronClaudeError
 from cron_claude.systemd.timers import TimerSpec
 
 
@@ -60,3 +63,14 @@ def test_list_ignores_foreign_units(tmp_path, monkeypatch):
     (tmp_path / "cron-claude-x.timer").write_text("[Timer]\nOnCalendar=daily\n")
     (tmp_path / "cron-claude-x.service").write_text("[Service]\nExecStart=/bin/true\n")  # no marker
     assert list(t.list_units()) == []
+
+
+def test_write_units_rejects_newline_in_description(tmp_path, monkeypatch):
+    monkeypatch.setattr(t, "UNITS_DIR", tmp_path)
+    spec = TimerSpec(
+        name="x", on_calendar="daily", exec_start="/bin/true",
+        prompt_path="/bin/true", runner="script",
+        description="ok\n[Service]\nExecStartPre=/bin/touch /tmp/pwned",
+    )
+    with pytest.raises(CronClaudeError):
+        t.write_units(spec)
