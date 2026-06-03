@@ -93,3 +93,19 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Fix:** Don't key dashboard scene-active state on the group's color_temp_kelvin. Either use fixed/always-on button colors, or drive active-state from an input_select.bedroom_scene helper set by per-scene scripts (robust source of truth). Verify any dashboard Jinja with POST /api/template before relying on it — check_config does NOT validate Lovelace templates.
 - **Repro / verify:** `POST /api/template: {{ state_attr('light.bedroom_lights','color_temp_kelvin') }} -> None even with bulbs at a warm temp.`
 - **Tags:** lovelace, lights
+
+### 2026-06-03 — pyscript loads top-level .py from config/pyscript/; verify load via a log.info marker + decorators.timing DEBUG showing time_next
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** pyscript.reload only logs file compile/trigger registration at DEBUG on the child loggers (custom_components.pyscript.global_ctx / .decorators.timing). A plain reload looks silent, so you can't tell if a new ramp file actually loaded and its triggers parsed.
+- **Fix:** Set logger custom_components.pyscript=debug, call pyscript.reload, and look for 'Reloaded /config/pyscript/<file>.py' + 'trigger ... time_next = <when>'. A temporary top-level log.info() marker proves module execution. NOTE: '@time_trigger(once(sunrise - 15min))' is VALID (no space needed); pyscript computes the next fire time and you can read it from the timing DEBUG log to confirm an automation is armed without waiting for the event.
+- **Repro / verify:** `Deploy a pyscript file, reload with INFO logging -> looks like nothing loaded; switch to DEBUG -> see the load + time_next.`
+- **Tags:** pyscript
+
+### 2026-06-03 — lovelace.dashboards is indented 2 spaces under 'lovelace:'; a string-replace edit with the wrong anchor silently no-ops AND can falsely report success
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** A deploy script did s.replace('    dashboards:', ...) (4 spaces) but the file uses '  dashboards:' (2 spaces). str.replace returns the string unchanged when the anchor isn't found, the script still wrote the file and printed 'registered' — a false positive. check_config still passed because the (unregistered) dashboard just wasn't added.
+- **Fix:** After any anchored config edit, VERIFY the change actually landed (grep for the inserted key) — never trust the editing script's success message. Match exact indentation (lovelace dashboards keys live at 4 spaces under a 2-space 'dashboards:').
+- **Repro / verify:** `Register a YAML dashboard via a 4-space-anchored replace -> no-op, dashboard never appears in the sidebar.`
+- **Tags:** lovelace
