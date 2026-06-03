@@ -48,8 +48,11 @@ def last_result(service: str) -> tuple[str, int]:
         check=False,
     )
     kv = dict(line.split("=", 1) for line in proc.stdout.splitlines() if "=" in line)
-    status = kv.get("ExecMainStatus", "")
-    return kv.get("Result", "unknown"), int(status) if status.isdigit() else -1
+    try:
+        code = int(kv.get("ExecMainStatus", ""))
+    except ValueError:
+        code = -1
+    return kv.get("Result", "unknown"), code
 
 
 def next_elapse(timer: str) -> datetime | None:

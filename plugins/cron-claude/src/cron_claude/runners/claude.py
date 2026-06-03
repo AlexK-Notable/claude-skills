@@ -14,6 +14,19 @@ from cron_claude.errors import CronClaudeError
 VALID_MODES = ("acceptEdits", "auto", "bypassPermissions", "default", "plan")
 VALID_FORMATS = ("text", "json", "stream-json")
 
+# Characters that would break out of the `/bin/bash -c '<inner>'` wrapper or its
+# inner double-quoted tokens, or inject systemd directives (newlines).
+_SHELL_UNSAFE = frozenset("\"'`$\\\n\r\0")
+
+
+def _validate_shell_safe(label: str, value: str) -> None:
+    bad = sorted({c for c in _SHELL_UNSAFE if c in value}, key=repr)
+    if bad:
+        raise CronClaudeError(
+            f"{label} contains shell-unsafe character(s) "
+            f"{', '.join(repr(c) for c in bad)}: {value!r}"
+        )
+
 
 @dataclass(slots=True, frozen=True)
 class ClaudeRunner:
@@ -41,6 +54,12 @@ class ClaudeRunner:
     def to_exec_start(self) -> str:
         self.validate()
         abs_prompt = str(self.prompt_path.resolve())
+        # Every value interpolated into the bash -c wrapper must be free of shell
+        # metacharacters. shlex.quote() can't help here — its single quotes would
+        # terminate the outer `bash -c '...'` string. So validate, don't escape.
+        _validate_shell_safe("prompt path", abs_prompt)
+        for tool in self.allowed_tools:
+            _validate_shell_safe("allowed-tools entry", tool)
         parts = ["claude", "-p", f'"$(cat "{abs_prompt}")"']
         if self.bare:
             parts.append("--bare")
@@ -52,9 +71,4 @@ class ClaudeRunner:
         if self.dangerously_skip:
             parts.append("--dangerously-skip-permissions")
         inner = " ".join(parts)
-        if "'" in inner:
-            raise CronClaudeError(
-                "rendered command contains a single quote (prompt path or tool "
-                "spec); unsupported in the bash -c wrapper"
-            )
         return f"/bin/bash -c '{inner}'"

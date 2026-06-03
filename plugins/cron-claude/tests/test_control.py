@@ -2,6 +2,7 @@
 calendar validator inspects OUTPUT TEXT (systemd-analyze exits 0 on bad input)."""
 import subprocess
 import types
+from datetime import datetime
 
 import pytest
 
@@ -50,3 +51,41 @@ def test_validate_calendar_rejects_invalid(monkeypatch):
 def test_journal_text_returns_stdout(monkeypatch):
     monkeypatch.setattr(subprocess, "run", _fake_run(stdout="line1\nline2\n"))
     assert c.journal_text("cron-claude-x.service", tail=5) == "line1\nline2\n"
+
+
+def test_last_result_success(monkeypatch):
+    monkeypatch.setattr(subprocess, "run", _fake_run(stdout="Result=success\nExecMainStatus=0\n"))
+    assert c.last_result("cron-claude-x.service") == ("success", 0)
+
+
+def test_last_result_failed(monkeypatch):
+    monkeypatch.setattr(subprocess, "run", _fake_run(stdout="Result=exit-code\nExecMainStatus=1\n"))
+    assert c.last_result("cron-claude-x.service") == ("exit-code", 1)
+
+
+def test_last_result_signal_keeps_negative_exit(monkeypatch):
+    # Regression: a SIGKILL'd job reports ExecMainStatus=-9; must NOT collapse to -1.
+    monkeypatch.setattr(subprocess, "run", _fake_run(stdout="Result=signal\nExecMainStatus=-9\n"))
+    assert c.last_result("cron-claude-x.service") == ("signal", -9)
+
+
+def test_last_result_empty_output(monkeypatch):
+    monkeypatch.setattr(subprocess, "run", _fake_run(stdout=""))
+    assert c.last_result("cron-claude-x.service") == ("unknown", -1)
+
+
+def test_next_elapse_valid(monkeypatch):
+    monkeypatch.setattr(
+        subprocess, "run", _fake_run(stdout="NextElapseUSecRealtime=1799999999000000\n")
+    )
+    assert isinstance(c.next_elapse("cron-claude-x.timer"), datetime)
+
+
+def test_next_elapse_zero_is_none(monkeypatch):
+    monkeypatch.setattr(subprocess, "run", _fake_run(stdout="NextElapseUSecRealtime=0\n"))
+    assert c.next_elapse("cron-claude-x.timer") is None
+
+
+def test_next_elapse_empty_is_none(monkeypatch):
+    monkeypatch.setattr(subprocess, "run", _fake_run(stdout="NextElapseUSecRealtime=\n"))
+    assert c.next_elapse("cron-claude-x.timer") is None

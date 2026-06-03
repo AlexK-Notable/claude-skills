@@ -82,8 +82,17 @@ def test_clauderunner_rejects_bad_output_format(tmp_path):
         ClaudeRunner(prompt_path=p, output_format="yaml").validate()
 
 
-def test_clauderunner_rejects_path_with_single_quote(tmp_path):
-    p = tmp_path / "it's a prompt.txt"
+@pytest.mark.parametrize("badchar", ['"', "'", "$", "`"])
+def test_clauderunner_rejects_shell_unsafe_path(tmp_path, badchar):
+    p = tmp_path / f"bad{badchar}.txt"
     p.write_text("x")
-    with pytest.raises(CronClaudeError, match="single quote"):
+    with pytest.raises(CronClaudeError, match="shell-unsafe"):
         ClaudeRunner(prompt_path=p).to_exec_start()
+
+
+def test_clauderunner_rejects_shell_unsafe_tool(tmp_path):
+    p = tmp_path / "ok.txt"
+    p.write_text("x")
+    runner = ClaudeRunner(prompt_path=p, allowed_tools=('"; touch /tmp/pwned; echo "',))
+    with pytest.raises(CronClaudeError, match="shell-unsafe"):
+        runner.to_exec_start()

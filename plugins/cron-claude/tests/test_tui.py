@@ -18,3 +18,62 @@ async def test_tui_lists_schedules(monkeypatch, tmp_path):
         await pilot.pause()
         table = app.query_one("#schedules")
         assert table.row_count == 1
+
+
+def _write_demo(tmp_path):
+    timers.write_units(TimerSpec(
+        name="demo", on_calendar="daily", exec_start="/bin/true",
+        prompt_path="/bin/true", runner="script",
+    ))
+
+
+@pytest.mark.asyncio
+async def test_tui_action_run_logs_result(monkeypatch, tmp_path):
+    monkeypatch.setattr(timers, "UNITS_DIR", tmp_path)
+    import cron_claude.systemd.control as control
+    monkeypatch.setattr(control, "start", lambda s: None)
+    monkeypatch.setattr(control, "last_result", lambda s: ("success", 0))
+    _write_demo(tmp_path)
+    from cron_claude.tui.app import CronClaudeApp
+    app = CronClaudeApp()
+    logged: list[str] = []
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        monkeypatch.setattr(app, "_log", logged.append)
+        await pilot.press("r")
+        await pilot.pause()
+    assert any("ran demo" in m for m in logged)
+
+
+@pytest.mark.asyncio
+async def test_tui_action_remove_drops_row(monkeypatch, tmp_path):
+    monkeypatch.setattr(timers, "UNITS_DIR", tmp_path)
+    import cron_claude.systemd.control as control
+    for fn in ("disable_now", "stop", "daemon_reload"):
+        monkeypatch.setattr(control, fn, lambda *a, **k: None)
+    _write_demo(tmp_path)
+    from cron_claude.tui.app import CronClaudeApp
+    app = CronClaudeApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert app.query_one("#schedules").row_count == 1
+        await pilot.press("x")
+        await pilot.pause()
+        assert app.query_one("#schedules").row_count == 0
+
+
+@pytest.mark.asyncio
+async def test_tui_action_logs_writes_journal(monkeypatch, tmp_path):
+    monkeypatch.setattr(timers, "UNITS_DIR", tmp_path)
+    import cron_claude.systemd.control as control
+    monkeypatch.setattr(control, "journal_text", lambda *a, **k: "JOURNAL-XYZ")
+    _write_demo(tmp_path)
+    from cron_claude.tui.app import CronClaudeApp
+    app = CronClaudeApp()
+    logged: list[str] = []
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        monkeypatch.setattr(app, "_log", logged.append)
+        await pilot.press("l")
+        await pilot.pause()
+    assert any("JOURNAL-XYZ" in m for m in logged)

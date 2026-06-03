@@ -17,6 +17,8 @@ def _patch(monkeypatch, tmp_path):
     monkeypatch.setattr(cli.control, "stop", lambda s: None)
     monkeypatch.setattr(cli.control, "next_elapse", lambda t: None)
     monkeypatch.setattr(cli.control, "last_result", lambda s: ("success", 0))
+    monkeypatch.setattr(cli.control, "start", lambda s: None)
+    monkeypatch.setattr(cli.control, "journal", lambda *a, **k: 0)
 
 
 def test_add_then_list(monkeypatch, tmp_path):
@@ -81,3 +83,65 @@ def test_add_scaffold_creates_executable(monkeypatch, tmp_path):
     )
     assert r.exit_code == 0, r.output
     assert prompt.exists() and (prompt.stat().st_mode & 0o111)
+
+
+def test_add_rejects_traversal_name(monkeypatch, tmp_path):
+    _patch(monkeypatch, tmp_path)
+    prompt = tmp_path / "job.txt"
+    prompt.write_text("x")
+    r = runner.invoke(
+        app, ["schedule", "add", "foo/../../evil", "--when", "daily", "--prompt", str(prompt)]
+    )
+    assert r.exit_code == 1
+    assert "letters, digits" in r.output
+    assert not list(tmp_path.glob("*evil*"))
+
+
+def test_show(monkeypatch, tmp_path):
+    _patch(monkeypatch, tmp_path)
+    prompt = tmp_path / "job.txt"
+    prompt.write_text("x")
+    runner.invoke(app, ["schedule", "add", "sh", "--when", "daily", "--prompt", str(prompt)])
+    r = runner.invoke(app, ["schedule", "show", "sh"])
+    assert r.exit_code == 0, r.output
+    assert "OnCalendar=daily" in r.output
+
+
+def test_show_missing_fails(monkeypatch, tmp_path):
+    _patch(monkeypatch, tmp_path)
+    r = runner.invoke(app, ["schedule", "show", "ghost"])
+    assert r.exit_code == 1
+    assert "not found" in r.output
+
+
+def test_run(monkeypatch, tmp_path):
+    _patch(monkeypatch, tmp_path)
+    prompt = tmp_path / "job.txt"
+    prompt.write_text("x")
+    runner.invoke(app, ["schedule", "add", "rn", "--when", "daily", "--prompt", str(prompt)])
+    r = runner.invoke(app, ["run", "rn"])
+    assert r.exit_code == 0, r.output
+    assert "done" in r.output
+
+
+def test_run_missing_fails(monkeypatch, tmp_path):
+    _patch(monkeypatch, tmp_path)
+    r = runner.invoke(app, ["run", "ghost"])
+    assert r.exit_code == 1
+    assert "not found" in r.output
+
+
+def test_logs_proxies_journal(monkeypatch, tmp_path):
+    _patch(monkeypatch, tmp_path)
+    prompt = tmp_path / "job.txt"
+    prompt.write_text("x")
+    runner.invoke(app, ["schedule", "add", "lg", "--when", "daily", "--prompt", str(prompt)])
+    r = runner.invoke(app, ["logs", "lg"])
+    assert r.exit_code == 0
+
+
+def test_logs_missing_fails(monkeypatch, tmp_path):
+    _patch(monkeypatch, tmp_path)
+    r = runner.invoke(app, ["logs", "ghost"])
+    assert r.exit_code == 1
+    assert "not found" in r.output

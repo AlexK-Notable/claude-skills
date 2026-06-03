@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Annotated
 
@@ -34,6 +35,18 @@ _STARTER_TEMPLATE = """\
 # cron-claude prompt: {name}. Owns its own `claude -p` invocation + allowlist.
 exec claude -p 'REPLACE ME: describe this scheduled job' --allowed-tools 'Bash(echo *)'
 """
+
+_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _validate_name(name: str) -> None:
+    # Names become systemd unit basenames and path components — keep them strict
+    # to prevent unit-file path traversal and directive injection.
+    if not _NAME_RE.fullmatch(name):
+        raise CronClaudeError(
+            f"schedule name {name!r} must contain only letters, digits, "
+            "hyphens, and underscores"
+        )
 
 
 def _fail(exc: CronClaudeError) -> typer.Exit:
@@ -108,6 +121,7 @@ def schedule_add(
 ) -> None:
     """Create a new scheduled job (writes a .service + .timer unit pair)."""
     try:
+        _validate_name(name)
         if timers.unit_paths(name)[0].exists():
             raise ScheduleExists(
                 f"schedule {name!r} already exists; "
@@ -229,8 +243,8 @@ def schedule_show(
     except CronClaudeError as exc:
         raise _fail(exc) from exc
     console.rule(f"{name}")
-    console.print(tmr.read_text())
-    console.print(svc.read_text())
+    console.print(tmr.read_text(), markup=False)
+    console.print(svc.read_text(), markup=False)
     nxt = control.next_elapse(timers.timer_unit(name))
     result, status = control.last_result(timers.service_unit(name))
     console.print(f"next run: {nxt:%Y-%m-%d %H:%M:%S %Z}" if nxt else "next run: —")
