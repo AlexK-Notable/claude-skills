@@ -109,3 +109,11 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Fix:** After any anchored config edit, VERIFY the change actually landed (grep for the inserted key) — never trust the editing script's success message. Match exact indentation (lovelace dashboards keys live at 4 spaces under a 2-space 'dashboards:').
 - **Repro / verify:** `Register a YAML dashboard via a 4-space-anchored replace -> no-op, dashboard never appears in the sidebar.`
 - **Tags:** lovelace
+
+### 2026-06-03 — Bare relative light commands (dim / dimmer / brighter / 'lights down') have NO built-in HA intent sentence, so with prefer_local_intents the local agent finds no match and they fall through to the conversation LLM (Claude), which then verbosely enumerates every affected bulb. Built-in HassLightSet responses are already terse ('Brightness set') and every built-in sentence REQUIRES an explicit <brightness> value; HassTurnOn/Off have zero dim/bright sentences.
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** home_assistant_intents/data/en.json: all 38 HassLightSet sentences require a <brightness> slot; no relative-brightness intent exists. Verbose per-bulb output therefore always means the LLM agent handled it, not the local intents.
+- **Fix:** Add local conversation sentence-trigger automations for the relative/vague phrasings, acting on the room's light group with set_conversation_response for a one-phrase reply. Standard on/off/set-percent already resolve locally + tersely via area-aware Assist because the Voice PE satellite is assigned to its area.
+- **Repro / verify:** `Read en.json intents.HassLightSet.data[].sentences — none match bare 'dim the lights'. Say 'dim the lights' to a pipeline whose conversation agent is the LLM; it handles + enumerates instead of a terse local reply.`
+- **Tags:** voice, assist, conversation
