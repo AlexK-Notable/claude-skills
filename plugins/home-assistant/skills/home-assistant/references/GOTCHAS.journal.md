@@ -77,3 +77,11 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Fix:** Set grid_options:{columns:N} per card (N in 3/6/9/12; 12 or 'full' = full width). For dynamic-height cards (mini-graph-card, cameras/picture-entity, markdown) add rows:auto or they clip. For a wide column_span section that won't span when placed after taller columns, set view-level 'dense: true' (row-dense backfill) AND/OR put the wide section FIRST. max_columns is a cap, not a target — to pack more columns on a tablet lower theme var ha-view-sections-column-min-width (default 320px).
 - **Repro / verify:** `Put two custom:mushroom-* cards in a type:grid section with no grid_options -> they render half-width side by side, not full width.`
 - **Tags:** lovelace, sections
+
+### 2026-06-03 — 'Did HA go down?' is usually the Nova's Wi-Fi blipping, not HA crashing
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** The Nova (HA host) runs on Wi-Fi (wlan0; RTL8821CS/rtw88, known-flaky — ethernet enP4p65s0 is down). A brief Wi-Fi drop loses DNS + all sockets for ~1-2 min: the browser websocket drops (frontend shows 'Connection lost' = looks like HA died) and moonraker/other integration entities go 'unavailable'. HA core never restarts.
+- **Fix:** Diagnose: 'docker ps' (container Up), curl /api/ (API running), 'docker logs --since 5m | grep -iE DNS|Connection lost|moonraker down' shows the blip window; getent hosts on the Nova confirms DNS recovered. It self-heals in ~1-2 min (sensors return, e.g. print state back to 'printing'). The PRINT is unaffected — Klipper runs on the printer board independent of HA. Durable fix: move the Nova to wired ethernet (enP4p65s0) and optionally disable wlan0 so it can't flap.
+- **Repro / verify:** `Watch docker logs during a wifi blip: spotify 'Timeout while contacting DNS servers' + BrokenPipeError/ConnectionError + moonraker 'connection down, restarting', all clearing within ~2 min.`
+- **Tags:** network, nova
