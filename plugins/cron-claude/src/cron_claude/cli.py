@@ -12,6 +12,7 @@ from rich.table import Table
 
 from cron_claude import __version__
 from cron_claude.errors import CronClaudeError, ScheduleExists, ScheduleNotFound
+from cron_claude.operations import remove_schedule
 from cron_claude.runners import ScriptRunner, select_runner
 from cron_claude.systemd import control, timers
 
@@ -130,7 +131,7 @@ def schedule_add(
     """Create a new scheduled job (writes a .service + .timer unit pair)."""
     try:
         _validate_name(name)
-        if timers.unit_paths(name)[0].exists():
+        if timers.schedule_exists(name):
             raise ScheduleExists(
                 f"schedule {name!r} already exists; "
                 f"remove it first: cron-claude schedule rm {name}"
@@ -228,14 +229,11 @@ def schedule_rm(
 ) -> None:
     """Remove a scheduled job (disables, stops, and deletes both unit files)."""
     try:
-        if not timers.unit_paths(name)[0].exists():
+        if not timers.schedule_exists(name):
             raise ScheduleNotFound(f"schedule {name!r} not found")
         if not force and not typer.confirm(f"Remove schedule {name!r}?"):
             raise typer.Abort()
-        control.disable_now(timers.timer_unit(name))
-        control.stop(timers.service_unit(name))
-        timers.remove_units(name)
-        control.daemon_reload()
+        remove_schedule(name)
     except CronClaudeError as exc:
         raise _fail(exc) from exc
     console.print(f"[green]✓[/green] removed [bold]{name}[/bold]")
@@ -248,7 +246,7 @@ def schedule_show(
     """Show details for a single scheduled job."""
     try:
         svc, tmr = timers.unit_paths(name)
-        if not svc.exists() or not tmr.exists():
+        if not timers.schedule_exists(name):
             raise ScheduleNotFound(f"schedule {name!r} not found")
     except CronClaudeError as exc:
         raise _fail(exc) from exc
@@ -259,6 +257,8 @@ def schedule_show(
     result, status = control.last_result(timers.service_unit(name))
     console.print(f"next run: {nxt:%Y-%m-%d %H:%M:%S %Z}" if nxt else "next run: —")
     console.print(f"last result: {result} (exit {status})")
+    active = "active" if control.is_active(timers.timer_unit(name)) else "inactive"
+    console.print(f"timer: {active}")
     console.rule("recent log")
     control.journal(timers.service_unit(name), tail=20)
 
@@ -269,7 +269,7 @@ def run_now(
 ) -> None:
     """Trigger a scheduled job to run immediately (blocks until it finishes)."""
     try:
-        if not timers.unit_paths(name)[0].exists():
+        if not timers.schedule_exists(name):
             raise ScheduleNotFound(f"schedule {name!r} not found")
         console.print(f"running [bold]{name}[/bold] …")
         control.start(timers.service_unit(name))  # oneshot: blocks until done
@@ -288,7 +288,7 @@ def logs(
 ) -> None:
     """View logs for a scheduled job's recent runs."""
     try:
-        if not timers.unit_paths(name)[0].exists():
+        if not timers.schedule_exists(name):
             raise ScheduleNotFound(f"schedule {name!r} not found")
     except CronClaudeError as exc:
         raise _fail(exc) from exc

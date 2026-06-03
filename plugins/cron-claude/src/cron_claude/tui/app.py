@@ -7,6 +7,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding, BindingType
 from textual.widgets import DataTable, Footer, Header, RichLog
 
+from cron_claude import operations
 from cron_claude.systemd import control, timers
 
 
@@ -62,10 +63,7 @@ class CronClaudeApp(App):
         if not name:
             return
         try:
-            control.disable_now(timers.timer_unit(name))
-            control.stop(timers.service_unit(name))
-            timers.remove_units(name)
-            control.daemon_reload()
+            operations.remove_schedule(name)
             self._log(f"[yellow]removed {name}[/yellow]")
             self.refresh_table()
         except Exception as exc:

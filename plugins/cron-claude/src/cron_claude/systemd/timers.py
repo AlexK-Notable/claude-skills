@@ -1,7 +1,6 @@
 """Systemd .timer + .service unit pair writers/parsers."""
 from __future__ import annotations
 
-from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -35,6 +34,11 @@ def timer_unit(name: str) -> str:
 
 def unit_paths(name: str) -> tuple[Path, Path]:
     return UNITS_DIR / service_unit(name), UNITS_DIR / timer_unit(name)
+
+
+def schedule_exists(name: str) -> bool:
+    """True only when BOTH unit files are present (a fully-written schedule)."""
+    return all(p.exists() for p in unit_paths(name))
 
 
 def _sanitize_unit_value(label: str, value: str) -> str:
@@ -131,7 +135,7 @@ def _parse_spec(name: str, svc_text: str, tmr_text: str) -> TimerSpec:
     )
 
 
-def list_units() -> Iterable[TimerSpec]:
+def list_units() -> list[TimerSpec]:
     if not UNITS_DIR.is_dir():
         return []
     specs: list[TimerSpec] = []

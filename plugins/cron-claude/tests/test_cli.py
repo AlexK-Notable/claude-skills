@@ -19,6 +19,7 @@ def _patch(monkeypatch, tmp_path):
     monkeypatch.setattr(cli.control, "last_result", lambda s: ("success", 0))
     monkeypatch.setattr(cli.control, "start", lambda s: None)
     monkeypatch.setattr(cli.control, "journal", lambda *a, **k: 0)
+    monkeypatch.setattr(cli.control, "is_active", lambda u: False)
 
 
 def test_add_then_list(monkeypatch, tmp_path):
@@ -105,6 +106,7 @@ def test_show(monkeypatch, tmp_path):
     r = runner.invoke(app, ["schedule", "show", "sh"])
     assert r.exit_code == 0, r.output
     assert "OnCalendar=daily" in r.output
+    assert "timer: inactive" in r.output
 
 
 def test_show_missing_fails(monkeypatch, tmp_path):
