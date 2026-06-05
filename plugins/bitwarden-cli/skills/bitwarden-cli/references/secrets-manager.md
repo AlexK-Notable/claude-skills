@@ -247,7 +247,7 @@ Snapshot (verified 2026-05-31 — re-derive with `bws project list` if in doubt)
 |---|---|
 | Binary | `~/bin/bws` (v2.1.0) |
 | Token file | `~/.config/bws/token.env` (mode 600, `BWS_ACCESS_TOKEN=…`) |
-| Project | `home-assistant` = `18f14ed9-8ba5-4cc6-bbd4-b45b01534270` |
+| Projects | `home-assistant` = `18f14ed9-8ba5-4cc6-bbd4-b45b01534270`<br>`system` = `42bc5902-a0d6-43f4-b832-b460000651e5` (misc/general env-injectable keys, created 2026-06-05) |
 | Machine account | this desktop (read/write on `home-assistant`) |
 | `bws config` | default (`~/.config/bws/config`); server is Bitwarden cloud — no overrides set |
 | Driving use case | LLM API keys (OpenAI/Anthropic/…) for Home Assistant |
