@@ -8,7 +8,7 @@ section when `audit` flags an issue and you're deciding what to do.
 ### Symptom
 - `hyprctl plugin load <so>` returns `Mismatched headers! Can't proceed.`
 - Plugin missing from `hyprctl plugin list`.
-- For Hyprtasking specifically: `$mainMod + G` does nothing.
+- A plugin's keybind or feature silently does nothing (the `.so` failed to load).
 
 ### Root cause
 The plugin `.so` was compiled against a different version of the Hyprland
@@ -18,7 +18,7 @@ and sometimes patch (0.55.1 → 0.55.2) bump.
 ### Fix
 ```bash
 hypr-doctor rebuild              # rebuild all drifted plugins
-hypr-doctor plugin-rebuild hyprtasking   # just one
+hypr-doctor plugin-rebuild <name>   # just one (name from plugins.json)
 ```
 
 The script does: `cd <repo> && eval <build_cmd>` then
@@ -35,12 +35,13 @@ git log origin/main --oneline | head -10   # find the API-adaptation commits
 git cherry-pick <commit>                    # NEVER rebase — see CLAUDE.md
 ```
 
-For hyprtasking specifically, the active branch is `komi/workspace-fixes-v55`
-and the upstream divergence concern is the LAYERS feature (see CLAUDE.md
-"Plugin Management" section).
+If you maintain a local fork on a long-lived feature branch, cherry-pick the
+upstream API-adaptation commits onto your branch rather than rebasing, so your
+own patches don't get reordered or dropped.
 
-For dynamic-cursors, check `git show origin/main:hyprpm.toml` for the
-correct pinned commit for the current Hyprland version.
+If a plugin pins to a `hyprpm.toml` commit matrix, check
+`git show origin/main:hyprpm.toml` for the correct pinned commit for the
+current Hyprland version.
 
 ## Qt6 ↔ Python bindings skew
 
@@ -81,11 +82,11 @@ Don't mask things you actually use — accept the noise if the app is needed.
 - `systemctl --user --failed` lists them.
 
 ### Root cause
-Many. Today's swaync case was a launch race: an `exec-once` in Hyprland's
-autostart raced the D-Bus activation systemd unit; the loser got "already
-running" and exited 1; systemd's `Restart=on-failure` retried until
-`StartLimitBurst` left the unit failed even though notifications themselves
-worked.
+Many. A common one is a launch race: an `exec-once` in Hyprland's autostart
+races the D-Bus activation systemd unit (a notification daemon is a typical
+culprit); the loser gets "already running" and exits 1; systemd's
+`Restart=on-failure` retries until `StartLimitBurst` leaves the unit failed
+even though the app itself works.
 
 ### Fix
 **Do not just `reset-failed` blindly.** That clears the symptom but leaves

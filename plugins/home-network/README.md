@@ -13,7 +13,7 @@ skills/home-network/
   SKILL.md                       Strategy + decision tree (auto-loads into Claude)
   references/
     DISCOVERY.md                 mDNS / ARP / TCP probe playbook
-    DEVICES.md                   Personal device inventory
+    DEVICES.md                   Device inventory (example/template — fill with your own)
     FIREWALL.md                  ufw recipes and conventions
     TROUBLESHOOTING.md           "host unreachable" decision tree
     TOOLS.md                     Per-tool reference + cross-distro install
@@ -34,7 +34,7 @@ install.sh                       Bootstrap on any machine
 
 ```bash
 # inside Claude Code (or via CLI)
-claude plugin install https://github.com/AlexK-Notable/home-network-skill
+claude plugin install https://github.com/your-username/claude-skills
 ```
 
 Skill auto-activates on networking-related prompts.
@@ -42,7 +42,7 @@ Skill auto-activates on networking-related prompts.
 ### Option B — manual
 
 ```bash
-git clone git@github.com:AlexK-Notable/claude-skills.git ~/repos/claude-skills
+git clone git@github.com:your-username/claude-skills.git ~/repos/claude-skills
 ~/repos/claude-skills/install.sh
 ```
 
@@ -75,8 +75,8 @@ a minimal install.
 The big experiment in this skill: `home-net-learn` doesn't block your shell.
 
 ```bash
-home-net-learn nova                  # probes by hostname
-home-net-learn 192.168.1.221         # probes by IP
+home-net-learn sbc.local             # probes by hostname
+home-net-learn 192.168.1.10          # probes by IP
 home-net-learn                       # interactive: scan + pick from results
 ```
 
@@ -95,12 +95,16 @@ The skill grows over time without slowing your active work.
 
 ## Privacy posture
 
-All device-specific data (MACs, hostnames, SSH users) lives in
-`DEVICES.md` as **plaintext** in this **private** repo. If you ever flip
-this repo public, move sensitive entries to `DEVICES.local.md`
-(gitignored) first.
+`DEVICES.md` ships as **example/template data only** — clearly-synthetic
+devices on the example `192.168.1.0/24` LAN. As you use the skill, it
+fills with your own device-specific data (MACs, hostnames, SSH users) as
+**plaintext**. If you fork this repo, keep your real inventory out of a
+public remote: move sensitive entries to `DEVICES.local.md` (add it to
+`.gitignore`) and keep only the example template tracked.
 
-The `.gitignore` already excludes `DEVICES.local.md` for that pattern.
+Never commit secrets (passwords, API tokens, private keys) to any
+reference file — route them through the bitwarden-cli skill and store
+only a pointer in `DEVICES.md`.
 
 ## License
 

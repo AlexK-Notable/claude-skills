@@ -1,6 +1,6 @@
 ---
 name: home-assistant
-description: Operate the user's self-hosted Home Assistant (HA in Docker on the Nova, 192.168.1.229:8123). Use when working on Home Assistant — automations, scripts, dashboards, the voice assistant / Assist pipeline, exposed entities, integrations, HACS, Govee lights, the Z-Print/Moonraker printer, Glances sensors — or editing HA config (.storage JSON, automations.yaml, configuration.yaml, scripts.yaml). Provides safe-mutation discipline (back up + validate before editing; when HA must be stopped), a secret-safe inventory snapshot (ha-inventory), append-only gotcha capture (ha-note), and references for the storage schema, the Assist voice pipeline, and what is changeable by file/API vs only the HA web UI.
+description: Operate a self-hosted Home Assistant (HA in Docker, reachable over SSH). Use when working on Home Assistant — automations, scripts, dashboards, the voice assistant / Assist pipeline, exposed entities, integrations, HACS, smart lights, a 3D-printer (Klipper/Moonraker) integration, Glances sensors — or editing HA config (.storage JSON, automations.yaml, configuration.yaml, scripts.yaml). Provides safe-mutation discipline (back up + validate before editing; when HA must be stopped), a secret-safe inventory snapshot (ha-inventory), append-only gotcha capture (ha-note), and references for the storage schema, the Assist voice pipeline, and what is changeable by file/API vs only the HA web UI.
 ---
 
 # home-assistant
@@ -12,18 +12,19 @@ skill is the discipline + tooling to act safely and to remember what we learn.
 
 ## The system in one breath
 
-HA runs as a Docker container (`homeassistant`, `--network host`) on the **Nova**
-(`192.168.1.229:8123`), config at `/home/komi/homeassistant/config`. Reachable
-from KOMI over SSH with passwordless sudo. Voice stack: SenseVoice STT (NPU) +
-openWakeWord on the Nova, Piper TTS on the Pi. Full topology, access patterns,
-and the HA version live in **[references/TOPOLOGY.md](references/TOPOLOGY.md)**.
+HA runs as a Docker container (`homeassistant`, `--network host`) on the **HA host**
+(an SBC or mini-PC, e.g. `http://homeassistant.local:8123` /
+`http://192.168.1.10:8123`), config at `/home/user/homeassistant/config`. Reachable
+from your workstation over SSH with passwordless sudo. Example voice stack: a Wyoming
+STT server + openWakeWord on the HA host, Piper TTS on a Pi. Fill in the real hosts,
+access patterns, and the HA version in **[references/TOPOLOGY.md](references/TOPOLOGY.md)**.
 
 ## Before you touch anything: orient, don't trust stale state
 
 1. **Read the inventory for orientation**, not for ground truth:
    [references/INVENTORY.generated.md](references/INVENTORY.generated.md) lists
    installed integrations, HACS, areas, devices, the controllable entity surface,
-   and automations. It is a **snapshot** — the user edits HA in the web UI
+   and automations. It is a **snapshot** — HA gets edited in the web UI
    constantly, and those edits are invisible until regenerated.
 2. **Before any *mutating* action, verify it's current:**
    ```bash
@@ -70,9 +71,9 @@ What are you changing?
 - **Never print or commit secrets.** `.storage/core.config_entries` and integration
   storage contain tokens/passwords; `ha-inventory` is built to never emit them, but if
   you read those files by hand, do not echo `data`/`options`. Secrets → bitwarden (`bws`).
-- **Physical-device actions** (printer power `switch.printer_power`, anything that
-  moves/heats) — confirm intent before acting; there's a template-switch guard on the
-  printer that refuses "off" mid-print.
+- **Physical-device actions** (a printer's power switch, anything that
+  moves/heats) — confirm intent before acting. A good pattern is a template-switch
+  guard that refuses "off" mid-print.
 
 ## Voice / Assist
 
@@ -113,11 +114,10 @@ stop-learning).
 
 ## Where HA knowledge lives (routing rule — avoid memory sprawl)
 
-The user runs several memory systems. Keep them separate:
+If you run several memory/notes systems, keep them separate:
 - **HA operational gotchas + the installed inventory → THIS skill's files, and nowhere else.**
-- "What was I doing last session" → `.remember/`.
-- Conceptual/architectural HA write-ups worth linking → z-notes.
-- Code-structure facts → anamnesis.
+- "What was I doing last session" → wherever you keep session notes.
+- Conceptual/architectural HA write-ups worth linking → your notes system.
 
 If it's an HA operational lesson, it goes here — don't also stash it elsewhere.
 

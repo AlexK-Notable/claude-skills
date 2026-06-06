@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
-    { name = "Alex K", email = "alexkechichian1@gmail.com" },
+    { name = "Your Name", email = "you@example.com" },
 ]
 keywords = ["claude", "claude-code", "scheduler", "systemd", "cron", "automation"]
 dependencies = [

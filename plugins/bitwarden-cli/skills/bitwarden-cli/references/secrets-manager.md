@@ -75,7 +75,7 @@ For a service that should boot with secrets, **don't** export the token globally
 # ~/.config/systemd/user/<svc>.service  (drop-in or unit)
 [Service]
 EnvironmentFile=%h/.config/bws/token.env       # provides BWS_ACCESS_TOKEN
-ExecStart=/home/komi/bin/bws run --project-id <PROJECT_ID> -- /path/to/real/program
+ExecStart=/home/user/bin/bws run --project-id <PROJECT_ID> -- /path/to/real/program
 ```
 
 Stronger: systemd **credentials** keep the token out of the process environment block (so it won't show in `/proc/<pid>/environ` of children):
@@ -84,7 +84,7 @@ Stronger: systemd **credentials** keep the token out of the process environment 
 [Service]
 LoadCredential=bws-token:%h/.config/bws/token.env
 ExecStart=/usr/bin/env BWS_ACCESS_TOKEN="$(cat ${CREDENTIALS_DIRECTORY}/bws-token)" \
-          /home/komi/bin/bws run --project-id <PROJECT_ID> -- /path/to/real/program
+          /home/user/bin/bws run --project-id <PROJECT_ID> -- /path/to/real/program
 ```
 
 ### C — recovery copy in the `bw` vault
@@ -116,7 +116,7 @@ All commands need `BWS_ACCESS_TOKEN` in the environment (or `-t`). Add `-o env|t
 **Secret creation hygiene** (the value is positional → history):
 ```bash
 read -rs 'val?Paste value: '
-bws secret create ANTHROPIC_API_KEY "$val" 18f14ed9-8ba5-4cc6-bbd4-b45b01534270 --note "Claude API, HA conversation agent"
+bws secret create ANTHROPIC_API_KEY "$val" <your-project-id> --note "Claude API, HA conversation agent"
 unset val
 ```
 Secret **keys** become environment-variable names under `bws run`, so name them like env vars: `UPPER_SNAKE_CASE`, valid identifier characters only.
@@ -166,7 +166,7 @@ Then run `bwsu` once per shell and plain `bws …` commands work for the session
 `bws run` fetches the accessible secrets, sets them as environment variables, and execs your command — the plaintext never touches disk.
 
 ```bash
-bws run --project-id 18f14ed9-8ba5-4cc6-bbd4-b45b01534270 -- printenv OPENAI_API_KEY
+bws run --project-id <your-project-id> -- printenv OPENAI_API_KEY
 bws run --project-id <id> -- python my_agent.py
 ```
 
@@ -198,8 +198,8 @@ Wrap HA's launch in `bws run` so the keys exist only inside the HA process:
 ```ini
 [Service]
 EnvironmentFile=%h/.config/bws/token.env
-ExecStart=/home/komi/bin/bws run --project-id 18f14ed9-8ba5-4cc6-bbd4-b45b01534270 -- \
-          /srv/homeassistant/bin/hass -c /home/komi/.homeassistant
+ExecStart=/home/user/bin/bws run --project-id <your-project-id> -- \
+          /srv/homeassistant/bin/hass -c /home/user/.homeassistant
 ```
 HA's `!env_var OPENAI_API_KEY` then resolves. Rotating a key in Secrets Manager + restarting the unit is the whole update path — nothing on disk to edit.
 
@@ -247,7 +247,7 @@ Snapshot (verified 2026-05-31 — re-derive with `bws project list` if in doubt)
 |---|---|
 | Binary | `~/bin/bws` (v2.1.0) |
 | Token file | `~/.config/bws/token.env` (mode 600, `BWS_ACCESS_TOKEN=…`) |
-| Projects | `home-assistant` = `18f14ed9-8ba5-4cc6-bbd4-b45b01534270`<br>`system` = `42bc5902-a0d6-43f4-b832-b460000651e5` (misc/general env-injectable keys, created 2026-06-05) |
+| Projects | `home-assistant` = `<your-project-id>`<br>`system` = `<your-project-id>` (misc/general env-injectable keys) |
 | Machine account | this desktop (read/write on `home-assistant`) |
 | `bws config` | default (`~/.config/bws/config`); server is Bitwarden cloud — no overrides set |
 | Driving use case | LLM API keys (OpenAI/Anthropic/…) for Home Assistant |

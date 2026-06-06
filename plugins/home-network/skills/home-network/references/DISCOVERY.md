@@ -1,8 +1,8 @@
 # DISCOVERY.md
 
 Deep dive on LAN device discovery. The patterns here come from real hunts
-on a 192.168.1.0/24 network behind an AT&T residential gateway. Most
-generalize; AT&T-specific quirks are called out inline.
+on a `192.168.1.0/24` network behind a typical ISP residential gateway.
+Most generalize; ISP-gateway-specific quirks are called out inline.
 
 ## Table of contents
 
@@ -22,8 +22,8 @@ generalize; AT&T-specific quirks are called out inline.
 - Most Linux distros with `ufw enable` (drops ICMP echo on incoming chain)
 - Windows 10/11 (Public profile blocks ICMP)
 - macOS (configurable, often off)
-- IoT devices, smart TVs, Echo, Matter hubs (some default to silent drop)
-- Many SBC distros (bredOS, postmarketOS) that ship with strict defaults
+- IoT devices, smart TVs, smart speakers, Matter hubs (some default to silent drop)
+- Many SBC distros (Armbian-style builds, postmarketOS) that ship with strict defaults
 
 Evidence: a full `/24` ICMP sweep on a populated home network commonly
 returns ~10-15 alive when 25-30 hosts are actually present. The misses
@@ -65,8 +65,8 @@ avahi-browse -arpt | awk -F';' '$1=="=" && $3=="IPv4" {print $4" @ "$8":"$9}'
 ### Resolve a specific name
 
 ```bash
-avahi-resolve -4 -n bredos.local    # force IPv4
-avahi-resolve -6 -n bredos.local    # force IPv6
+avahi-resolve -4 -n sbc.local    # force IPv4
+avahi-resolve -6 -n sbc.local    # force IPv6
 ```
 
 Returns one line per address, or fails with timeout if no mDNS response.
@@ -89,7 +89,7 @@ shows what you've recently touched, not who's on the network.
 `arping` sends ARP requests at will, bypassing the IP stack's caching:
 
 ```bash
-arping -c 1 -w 1 -I enp4s0 192.168.1.221
+arping -c 1 -w 1 -I eth0 192.168.1.10
 ```
 
 Flags:
@@ -104,7 +104,7 @@ standard for "is something at this IP."**
 
 ```bash
 for i in $(seq 1 254); do
-  (arping -c 1 -w 1 -I enp4s0 192.168.1.$i 2>/dev/null \
+  (arping -c 1 -w 1 -I eth0 192.168.1.$i 2>/dev/null \
     | grep -q "reply" && echo "192.168.1.$i ALIVE") &
 done; wait
 ```
@@ -131,7 +131,7 @@ For "is service X reachable," nothing beats trying to connect:
 
 ```bash
 # Pure bash, no nmap required
-timeout 2 bash -c "</dev/tcp/192.168.1.221/22" && echo "open" || echo "closed/filtered"
+timeout 2 bash -c "</dev/tcp/192.168.1.10/22" && echo "open" || echo "closed/filtered"
 ```
 
 `/dev/tcp/HOST/PORT` is a bash feature, not a real file. Available
@@ -144,7 +144,7 @@ filtered (no response).
 |--------------|--------------|
 | Linux SBC / server | 22 (ssh), 80, 443, 8080 |
 | Klipper 3D printer | 22, 80, 7125 (Moonraker), 7136 (Mobileraker) |
-| Router admin | 80, 443, 8080, 22 (some), 5060 (SIP — AT&T quirk) |
+| Router admin | 80, 443, 8080, 22 (some), 5060 (SIP — common on ISP gateways) |
 | Apple device | 22, 5000 (AirPlay), 7000, 49152-65535 (mDNS dynamic) |
 | Windows | 135, 139, 445, 3389 |
 | Printer (physical) | 80, 443, 515 (LPD), 631 (IPP), 9100 (raw) |
@@ -177,32 +177,32 @@ Order: cheapest signals first, most expensive last.
 `scan-lan` (this skill) does steps 1-4 automatically. Step 5 is when you
 add `--deep`.
 
-## 6. Case study: the IPv6-only SBC hunt (2026-05-24)
+## 6. Case study: the IPv6-only SBC hunt
 
-Started: "find my indiedroid nova running bredOS, IP should be in .200s."
+Started: "find my ARM SBC, IP should be in the .200s DHCP range."
 
 **What I tried first (failed):**
-- ICMP ping sweep of `.200-.254` → only the router (.254) responded.
+- ICMP ping sweep of `.200-.254` → only the router responded.
 - Read ARP cache → no entries in .200s range. Concluded "device offline."
 
 **What was actually happening:**
-- bredOS was online but ICMP-filtered (default firewall).
-- bredOS had no IPv4 address yet — DHCPv4 client had failed silently.
-  Only had IPv6 SLAAC addresses (`2600:1700:4811:4e70:...`).
-- `getent hosts bredos` returned IPv6 addresses *from the AT&T router's
-  DNS* — these were stale leases from a previous session.
+- The SBC was online but ICMP-filtered (default firewall).
+- The SBC had no IPv4 address yet — its DHCPv4 client had failed silently.
+  It only had IPv6 SLAAC addresses (a global `2001:db8::/32`-style prefix).
+- `getent hosts sbc` returned IPv6 addresses *from the router's DNS* —
+  these were stale leases from a previous session.
 - The IPv6 addresses were unreachable because the host had since
   rebooted and re-randomized its SLAAC identifier.
 
-**The "Aha!" came from:** running `avahi-resolve -4 -n bredos.local` and
+**The "Aha!" came from:** running `avahi-resolve -4 -n sbc.local` and
 getting **a hostname timeout** — meaning no live mDNS IPv4 advertisement
 existed. Combined with three unreachable IPv6 addresses, that pointed
-to "the AT&T router DNS is lying."
+to "the router's DNS is lying."
 
-**Resolution:** User physically went to the device, connected to Wi-Fi.
+**Resolution:** physically went to the device, connected it to Wi-Fi.
 After reconnection:
-- `avahi-resolve -4 -n bredos.local` → `192.168.1.221` ✓
-- `arping 192.168.1.221` → REACHABLE ✓
+- `avahi-resolve -4 -n sbc.local` → `192.168.1.10` ✓
+- `arping 192.168.1.10` → REACHABLE ✓
 - TCP/22 open ✓
 - ICMP still silent (firewall) — but we knew not to trust ICMP by then.
 
@@ -210,16 +210,20 @@ After reconnection:
 - Rule 1 in [SKILL.md](../SKILL.md): ICMP is not authoritative.
 - Rule 2 in [SKILL.md](../SKILL.md): DNS is not mDNS is not ARP.
 - The `scan-lan` script uses mDNS + ARP + TCP, deliberately not ICMP.
-- AT&T-specific note in [DEVICES.md](DEVICES.md) about `attlocal.net`
-  stale DNS.
+- See [DEVICES.md](DEVICES.md) for the device-inventory format and the
+  note about stale ISP-gateway DNS.
 
-## AT&T residential gateway quirks
+## ISP residential gateway quirks
 
-- DHCPv4 leases are advertised under `<hostname>.attlocal.net` (not
-  `.local` or `.lan`). Resolves via system DNS, not mDNS.
-- DHCPv6 + SLAAC prefix is delegated as `2600:1700:xxxx:xxxx::/64`.
-  Globally routable — security implications if you don't firewall v6.
-- mDNS works across the LAN (Wi-Fi ↔ Ethernet) on default config.
+Many ISP-provided gateways share these behaviors (the exact suffix and
+prefix differ by provider):
+
+- DHCPv4 leases are often advertised under `<hostname>.<provider>.net`
+  (not `.local` or `.lan`). Resolves via system DNS, not mDNS.
+- A DHCPv6 + SLAAC prefix is delegated as a `/64` out of the provider's
+  globally-routable block. Globally routable — security implications if
+  you don't firewall v6.
+- mDNS usually works across the LAN (Wi-Fi ↔ Ethernet) on default config.
   Some "Advanced Networking" features can break it.
 - DNS leases persist long after a device leaves — don't trust resolved
   IPs without an aliveness check.

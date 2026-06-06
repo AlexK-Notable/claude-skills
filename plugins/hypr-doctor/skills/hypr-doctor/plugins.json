@@ -1,43 +1,44 @@
 {
   "$schema_note": "Local-build Hyprland plugin manifest. Edit this file when you add or retire a plugin. Both ~/bin/hypr-doctor (via jq) and Claude (via Read) consume this as the source of truth.",
+  "$example_note": "The plugins[] entries below are EXAMPLE entries — replace them with your own Hyprland plugins. They show the two common build systems (meson and make) and the full field set. Delete them and add objects describing your own local-build plugins; see references/plugin-manifest.md for the schema.",
   "plugins": [
     {
-      "name": "hyprtasking",
+      "name": "example-meson-plugin",
       "enabled": true,
-      "loaded_name": "Hyprtasking",
-      "repo_dir": "/home/komi/repos/hypr-things/hyprtasking",
-      "branch": "komi/workspace-fixes-v55",
-      "remote_push_to": "komi",
+      "loaded_name": "ExampleMesonPlugin",
+      "repo_dir": "/home/user/repos/example-meson-plugin",
+      "branch": "main",
+      "remote_push_to": "origin",
       "build_system": "meson",
       "build_cmd": "rm -rf build && meson setup build --buildtype=release && ninja -C build",
-      "so_path": "/home/komi/repos/hypr-things/hyprtasking/build/libhyprtasking.so",
-      "loader_directive_file": "/home/komi/.config/hypr/hyprland.conf",
-      "loader_directive_pattern": "hyprctl plugin load .*libhyprtasking\\.so",
-      "notes": "Local fork carrying workspace-layout / multi-monitor / lifecycle / drop-target fixes. Sync upstream via `git cherry-pick origin/main`, never rebase (LAYERS feature divergence)."
+      "so_path": "/home/user/repos/example-meson-plugin/build/libexample.so",
+      "loader_directive_file": "/home/user/.config/hypr/hyprland.conf",
+      "loader_directive_pattern": "hyprctl plugin load .*libexample\\.so",
+      "notes": "Example entry — replace with your own Hyprland plugin. Use this template for a meson-built plugin you maintain as a local fork. If you carry local patches, sync upstream via `git cherry-pick origin/main` rather than rebasing to avoid divergence on long-lived feature branches."
     },
     {
-      "name": "dynamic-cursors",
+      "name": "example-make-plugin",
       "enabled": false,
-      "loaded_name": "dynamic-cursors",
-      "disabled_reason": "Not yet compatible with Hyprland 0.55.x. Re-enable when upstream raybbian/dynamic-cursors PR #139 (or successor) lands and the hyprpm.toml pin matrix lists a 0.55.x-compatible commit.",
-      "repo_dir": "/home/komi/repos/dynamic-cursors",
+      "loaded_name": "example-make-plugin",
+      "disabled_reason": "Example of a temporarily-disabled entry: set enabled=false and document why (e.g. not yet compatible with the current Hyprland version; re-enable when upstream lands a compatible commit).",
+      "repo_dir": "/home/user/repos/example-make-plugin",
       "branch": null,
       "remote_push_to": null,
       "build_system": "make",
       "build_cmd": "make clean && rm -rf out && make all",
-      "so_path": "/home/komi/repos/dynamic-cursors/out/dynamic-cursors.so",
-      "loader_directive_file": "/home/komi/.config/hypr/hyprland.conf",
-      "loader_directive_pattern": "hyprctl plugin load .*dynamic-cursors\\.so",
-      "notes": "Pin to a hyprpm.toml-matrix commit matching the running Hyprland version. Read `git show origin/main:hyprpm.toml` to find the right commit, not the working tree (could be detached)."
+      "so_path": "/home/user/repos/example-make-plugin/out/example-make-plugin.so",
+      "loader_directive_file": "/home/user/.config/hypr/hyprland.conf",
+      "loader_directive_pattern": "hyprctl plugin load .*example-make-plugin\\.so",
+      "notes": "Example entry — replace with your own Hyprland plugin. Use this template for a make-built plugin. If the plugin pins to a hyprpm.toml commit matrix, read `git show origin/main:hyprpm.toml` to find the commit matching your running Hyprland version rather than trusting the working tree."
     }
   ],
   "watched_venvs": [
-    "/home/komi/repos/claude-dirs/ccx"
+    "/home/user/repos/example-project"
   ],
-  "$watched_venvs_note": "Project dirs containing a .venv whose interpreter health hypr-doctor checks. Catches the 'python got bumped / repo moved → venv orphaned' class (e.g. ccx broke this way on 2026-05-30 when its repo moved to claude-dirs). Each entry is a project dir; the check runs <dir>/.venv/bin/python --version and, on failure, prints the recreate recipe.",
+  "$watched_venvs_note": "Project dirs (example shown — replace with your own) containing a .venv whose interpreter health hypr-doctor checks. Catches the 'python got bumped / repo moved → venv orphaned' class. Each entry is a project dir; the check runs <dir>/.venv/bin/python --version and, on failure, prints the recreate recipe. Leave empty to skip the check.",
   "suppressions": {
     "$note": "Acknowledged drift that should stay SILENT in the SessionStart hook (it still appears in full `audit`, marked acknowledged, and does not count toward the issue total). Self-expiring: the ack matches only the exact recorded version pair, so any package bump revives the warning. Set the current pair with `hypr-doctor ack-skew`.",
-    "pyqt_skew_ack": "6.11.0 vs 6.11.1"
+    "pyqt_skew_ack": ""
   },
   "qt_python_bindings": {
     "$note": "Packages that must stay version-locked to qt6-base. When qt6-base bumps and these don't, anything Python+Qt will fail at runtime with 'no Qt platform plugin can be initialized'.",

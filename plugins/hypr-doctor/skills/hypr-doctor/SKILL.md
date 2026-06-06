@@ -1,11 +1,11 @@
 ---
 name: hypr-doctor
-description: Use after `pacman -Syu` (or any system update on this Arch/CachyOS Hyprland desktop) to triage and repair recurring post-update breakage. Covers Hyprland plugin ABI mismatch (Hyprtasking, dynamic-cursors — both local-build, rebuilt manually), Qt6 ↔ python-pyqt6/pyside6 binding skew (PyQt6 lag breaks Variety, arch-update-tray, and other Python+Qt apps with "no Qt platform plugin can be initialized" SIGABRTs), failed systemd user units (today's swaync double-launch was an example; each is shown with an exit-code triage hint), broken `~/bin` shims / dangling symlinks and orphaned Python venvs (the "a repo moved and a wrapper or venv now points at a dead path" class), xdg-desktop-portal regressions, and rebuild-detector hints for AUR packages. Triggers on terms like "post-update", "what broke", "another update broke my config", "rebuild plugins", "Hyprland plugin failed to load", "hypr doctor", "plugin ABI", "Mismatched headers", "Qt platform plugin", "system update broke", "command not found after update", "broken venv", "dangling symlink", "service keeps failing", or any session-start drift warning from `~/bin/hypr-doctor abi-drift`. The skill has TWO MODES — audit (read-only, the safe default) and rebuild (applies fixes). Always run audit first and present findings to the user before invoking rebuild. The manifest at `plugins.json` is the source of truth for which plugins to manage; edit it when adding/retiring local-build plugins.
+description: Use after `pacman -Syu` (or any system update on an Arch/CachyOS Hyprland desktop) to triage and repair recurring post-update breakage. Covers Hyprland plugin ABI mismatch (local-build plugins listed in `plugins.json`, rebuilt manually), Qt6 ↔ python-pyqt6/pyside6 binding skew (PyQt6 lag breaks Python+Qt apps with "no Qt platform plugin can be initialized" SIGABRTs), failed systemd user units (e.g. a double-launch race; each is shown with an exit-code triage hint), broken `~/bin` shims / dangling symlinks and orphaned Python venvs (the "a repo moved and a wrapper or venv now points at a dead path" class), xdg-desktop-portal regressions, and rebuild-detector hints for AUR packages. Triggers on terms like "post-update", "what broke", "another update broke my config", "rebuild plugins", "Hyprland plugin failed to load", "hypr doctor", "plugin ABI", "Mismatched headers", "Qt platform plugin", "system update broke", "command not found after update", "broken venv", "dangling symlink", "service keeps failing", or any session-start drift warning from `~/bin/hypr-doctor abi-drift`. The skill has TWO MODES — audit (read-only, the safe default) and rebuild (applies fixes). Always run audit first and present findings to the user before invoking rebuild. The manifest at `plugins.json` is the source of truth for which plugins to manage; edit it when adding/retiring local-build plugins.
 ---
 
 # hypr-doctor
 
-Post-update health check + repair tool for this Arch/CachyOS Hyprland stack.
+Post-update health check + repair tool for an Arch/CachyOS Hyprland stack.
 
 The skill teaches **strategy** — when to audit, when to rebuild, how to interpret
 the report, what to do when the script can't fix something itself.
@@ -80,7 +80,7 @@ is flagged. (`checkrebuild` rescans every installed ELF, so a full audit takes
 
 ```bash
 hypr-doctor rebuild                       # all drifted plugins
-hypr-doctor plugin-rebuild hyprtasking    # named plugin only
+hypr-doctor plugin-rebuild <name>         # named plugin only (name from plugins.json)
 ```
 
 Rebuild does: read manifest, `cd $repo_dir && eval $build_cmd`, then
@@ -108,12 +108,12 @@ it via `jq`; you read it via the Read tool. Schema:
 {
   "plugins": [
     {
-      "name": "hyprtasking",                    // short id used in CLI
+      "name": "example-meson-plugin",           // short id used in CLI
       "enabled": true,                          // false → skipped entirely
-      "loaded_name": "Hyprtasking",             // name in `hyprctl plugin list`; verifies a load took
+      "loaded_name": "ExampleMesonPlugin",      // name in `hyprctl plugin list`; verifies a load took
       "repo_dir": "/abs/path/to/clone",
-      "branch": "komi/workspace-fixes-v55",     // informational
-      "remote_push_to": "komi",                 // informational
+      "branch": "main",                         // informational
+      "remote_push_to": "origin",               // informational
       "build_system": "meson",                  // informational ("make"/"meson"/"cargo"/…)
       "build_cmd": "<full shell pipeline>",     // run with `cd $repo_dir && eval $build_cmd`
       "so_path": "/abs/path/to/built.so",       // used for mtime check & hyprctl load
@@ -155,10 +155,10 @@ it via `jq`; you read it via the Read tool. Schema:
   silent if healthy; surfaces a "⚠ hypr-doctor: post-update drift detected"
   line as session context if not. When you see that line, run `audit`
   immediately and report.
-- **chezmoi**: if a fix involves editing a `~/.config/...` file (e.g., the
-  swaync double-launch repair), follow the chezmoi safety doctrine — edit
-  source, diff, apply — rather than touching the destination directly.
-  hypr-doctor itself never edits configs.
+- **chezmoi**: if a fix involves editing a `~/.config/...` file (e.g.,
+  removing a duplicate autostart line behind a double-launch race), follow the
+  chezmoi safety doctrine — edit source, diff, apply — rather than touching the
+  destination directly. hypr-doctor itself never edits configs.
 
 ## Failure modes of the tool itself
 
@@ -168,7 +168,7 @@ it via `jq`; you read it via the Read tool. Schema:
 - **`pacman` log truncated** (after `pacman -Scc` or logrotate) → "recent
   updates" section may be sparse. Not a failure — the other checks still
   run.
-- **`jq` missing** → fatal, but unlikely on this system (jq is in `base`).
+- **`jq` missing** → fatal, but unlikely on Arch (jq is in `base`).
 - **Plugin build fails** → script reports `✗ <name>: build FAILED` with the
   last 15 log lines and a pointer to the full log under
   `~/.cache/hypr-doctor/`; continues to next plugin. User must investigate

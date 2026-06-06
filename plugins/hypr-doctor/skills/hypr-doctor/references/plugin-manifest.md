@@ -12,7 +12,7 @@ Claude (via Read) consume it directly.
     {
       "name": "string",              // short id, used in `hypr-doctor plugin-rebuild <name>`
       "enabled": true|false,         // false → fully skipped (audit and rebuild both)
-      "loaded_name": "…",            // name hyprctl reports in `plugin list` (e.g. "Hyprtasking"); used to verify a load actually took. Falls back to capitalized .name if omitted
+      "loaded_name": "…",            // name hyprctl reports in `plugin list` (e.g. "ExampleMesonPlugin"); used to verify a load actually took. Falls back to capitalized .name if omitted
       "disabled_reason": "…",        // shown by audit when enabled=false (optional)
       "repo_dir": "/abs/path",       // git clone location
       "branch": "…" | null,          // informational; not enforced by the script
@@ -74,19 +74,19 @@ Then add an object to `plugins[]`:
 {
   "name": "myplugin",
   "enabled": true,
-  "repo_dir": "/home/komi/repos/myplugin",
+  "repo_dir": "/home/user/repos/myplugin",
   "branch": "main",
   "remote_push_to": null,
   "build_system": "meson",
   "build_cmd": "rm -rf build && meson setup build --buildtype=release && ninja -C build",
-  "so_path": "/home/komi/repos/myplugin/build/libmyplugin.so",
-  "loader_directive_file": "/home/komi/.config/hypr/hyprland.conf",
+  "so_path": "/home/user/repos/myplugin/build/libmyplugin.so",
+  "loader_directive_file": "/home/user/.config/hypr/hyprland.conf",
   "loader_directive_pattern": "hyprctl plugin load .*libmyplugin\\.so",
   "notes": "Whatever future-you needs to remember about this plugin."
 }
 ```
 
-Then add a corresponding `exec-once = hyprctl plugin load /home/komi/repos/myplugin/build/libmyplugin.so` in the relevant hyprland.conf section
+Then add a corresponding `exec-once = hyprctl plugin load /home/user/repos/myplugin/build/libmyplugin.so` in the relevant hyprland.conf section
 (or in `~/.config/hypr/config/autostart.conf`).
 
 ## Retiring a plugin (temporarily)
@@ -95,7 +95,8 @@ Set `enabled: false` and add a `disabled_reason`. This is the right move
 when:
 
 - The plugin is temporarily incompatible with the current Hyprland version
-  (e.g., `dynamic-cursors` while waiting for upstream PR).
+  (e.g., a plugin that's broken on the current release while waiting for an
+  upstream PR).
 - You've migrated to `hyprpm` for that plugin and no longer manage the
   build locally.
 - You want to skip it for a while without deleting the entry.
@@ -124,7 +125,7 @@ new Python binding for Qt enters the system, add it here.
 - **`build_cmd` runs the wrong shell** — it's `eval`'d under bash, so use
   bash-compatible syntax. No fish-isms. Pipes and `&&` are fine.
 - **Path uses `~/`** — the manifest fields aren't tilde-expanded by `jq`.
-  Use absolute paths everywhere (`/home/komi/…`).
+  Use absolute paths everywhere (`/home/user/…`).
 - **`so_path` points to a debug build** — `hypr-doctor rebuild` always
   builds release. If `so_path` points to `build/debug/...` it'll get
   stale every release build. Match the path in `build_cmd`.

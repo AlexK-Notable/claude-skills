@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# claude-skills-sync — keep the claude-skills remote current. Loop-safe.
-# Commits + pushes only when there are real (non-.git) changes; rebases before
-# pushing for multi-machine safety; stops + notifies on conflict (never auto-resolves).
+# claude-skills-sync — keep YOUR OWN fork's claude-skills remote current. Loop-safe.
+# Optional convenience (see install.sh / CLAUDE.md "Autosync"): commits + pushes only
+# when there are real (non-.git) changes; rebases before pushing for multi-machine
+# safety; stops + notifies on conflict (never auto-resolves).
+# Assumes the repo lives at ~/repos/claude-skills (REPO is derived below — customize freely).
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

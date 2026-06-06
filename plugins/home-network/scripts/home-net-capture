@@ -39,9 +39,9 @@ INPUT FORMAT:
     # Findings: Pi moved subnets
 
     User asked why ssh pi was failing. Discovered:
-    - 192.168.1.165 no longer has the Pi's MAC (88:a2:9e:02:55:a3)
-    - Pi is now at 192.168.1.172 (DHCP gave it a new lease)
-    - Hostname `komi-2.local` still resolves but to the new IP via mDNS
+    - 192.168.1.30 no longer has the Pi's MAC (aa:bb:cc:00:00:30)
+    - Pi is now at 192.168.1.45 (DHCP gave it a new lease)
+    - Hostname `pi.local` still resolves but to the new IP via mDNS
     - No other changes — same MAC, same services (22, 445)
 
   Anything the agent should know goes here. It will figure out which
@@ -77,10 +77,9 @@ locate_skill_dir() {
     "$self"
     "${CLAUDE_PLUGIN_ROOT:-/nonexistent}"
     "$HOME/repos/claude-skills/plugins/home-network"
-    "$HOME/repos/home-network-skill/plugins/home-network"
-    "$HOME/.claude/plugins/cache/komi-home-toolkit/plugins/home-network"
-    "$HOME/.claude/plugins/marketplaces/home-network-skill/plugins/home-network"
-    "$HOME/.local/share/claude/plugins/komi-home-toolkit/plugins/home-network"
+    "$HOME/.claude/plugins/cache/claude-skills/plugins/home-network"
+    "$HOME/.claude/plugins/marketplaces/claude-skills/plugins/home-network"
+    "$HOME/.local/share/claude/plugins/claude-skills/plugins/home-network"
   )
   for c in "${candidates[@]}"; do
     [[ -d "$c/skills/home-network/references" ]] && { echo "$c"; return 0; }

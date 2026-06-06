@@ -11,21 +11,21 @@ media, press a `button`, select an option. These are **service calls**, reversib
 no files touched.
 
 - How: call the HA service (via the conversation agent, or REST `POST /api/services/<domain>/<service>` with a token, or a UI action).
-- Examples here: `light.turn_on` (the Govee bedroom bulbs), `script.nightlight`,
-  `switch.printer_power` (guarded), `media_player.*` (Spotify), `number.z_print_*`.
+- Examples: `light.turn_on` (a smart bulb), `script.nightlight`,
+  a guarded `switch.*` (e.g. printer power), `media_player.*`, a `number.*`.
 - **No file editing for state changes — ever.**
 
 ## Lane 2 — YAML config (edit file → check_config → reload). Medium risk.
 
-Files under `/home/komi/homeassistant/config/`:
+Files under `/home/user/homeassistant/config/` (your `HA_CONFIG`):
 
 | File | Holds | Reload without restart? |
 |---|---|---|
-| `automations.yaml` | UI/YAML automations (incl. our sentence-trigger voice cmds) | `automation.reload` |
+| `automations.yaml` | UI/YAML automations (incl. sentence-trigger voice cmds) | `automation.reload` |
 | `scripts.yaml` | scripts (e.g. `nightlight`) | `script.reload` |
-| `configuration.yaml` | `template:`, `switch:` (WoL), `lovelace:` dashboards, includes | partial; some need restart |
-| `dashboards/*.yaml` | YAML-mode dashboards (system-health, printer) | UI refresh |
-| `blueprints/…` | automation blueprints (the Glances alert blueprint) | `automation.reload` |
+| `configuration.yaml` | `template:`, `switch:` (e.g. WoL), `lovelace:` dashboards, includes | partial; some need restart |
+| `dashboards/*.yaml` | YAML-mode dashboards | UI refresh |
+| `blueprints/…` | automation blueprints | `automation.reload` |
 
 **Always** `check_config` (exit 0) before reloading. These are editable by me directly.
 

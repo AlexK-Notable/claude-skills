@@ -48,7 +48,7 @@ cron-claude tui                 # interactive (needs `uv sync --extra tui`)
 
 ## Reference
 
-- Repo: `~/repos/claude-skills/plugins/cron-claude/` (`AlexK-Notable/claude-skills`, private)
+- Repo: `~/repos/claude-skills/plugins/cron-claude/` (`your-username/claude-skills`)
 - Prompts directory: `~/repos/claude-skills/plugins/cron-claude/prompts/`
 - Underlying unit files: `~/.config/systemd/user/cron-claude-<name>.{service,timer}`
 - Raw logs: `journalctl --user-unit cron-claude-<name>.service` (also via `cron-claude logs`)

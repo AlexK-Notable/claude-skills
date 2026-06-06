@@ -29,7 +29,7 @@ Step 2: Is the host actually on this network?
 ├── Try mDNS: `avahi-resolve -n <host>.local` — answer?
 │   ├── YES (with IP) → use THAT IP, your IP was wrong.
 │   └── NO  → host is offline / on different network / no responder.
-└── Try router's DHCP lease page (http://192.168.1.254/).
+└── Try router's DHCP lease page (e.g. http://192.168.1.1/).
 
 Step 3: Host is up. Why can't you reach it?
 ├── ICMP filtered? (`ping` fails but `arping` works) → totally fine, IGNORE ICMP.
@@ -42,11 +42,10 @@ Step 3: Host is up. Why can't you reach it?
 
 ### Unprivileged "is the host present at L2 anywhere?" (when `arping` needs root)
 
-`arping` needs `CAP_NET_RAW`/root; on a locked-down box (e.g. this
-CachyOS workstation, where sudo is barred by policy and the cap isn't
-set) it just prints `socket: Operation not permitted`. Unprivileged
-substitute that works across BOTH IP families and survives DHCP lease
-rotation — because you search by MAC, not IP:
+`arping` needs `CAP_NET_RAW`/root; on a locked-down box (where sudo is
+unavailable and the cap isn't set) it just prints `socket: Operation not
+permitted`. Unprivileged substitute that works across BOTH IP families
+and survives DHCP lease rotation — because you search by MAC, not IP:
 
 ```bash
 # IPv4: fan out pings to force ARP even when ICMP echo is filtered, then read the cache
@@ -72,8 +71,8 @@ Three distinct conclusions:
   than a per-interface driver failure.
 
 Searching by MAC instead of IP is what makes this robust to lease
-rotation. See DEVICES.md §"indiedroid nova (bredOS)" for a real case
-(nova OFFLINE 2026-05-27).
+rotation. (A multi-homed SBC that goes dark on *all* interfaces at once
+is a good worked example — see the SBC entry in DEVICES.md.)
 
 ## 2. "SSH connection refused / timeout"
 
@@ -132,14 +131,15 @@ This usually means **stale DNS**.
 # Get the resolution from each layer separately:
 getent hosts foo                      # System DNS (your /etc/resolv.conf chain)
 avahi-resolve -n foo.local            # mDNS
-dig +short foo @192.168.1.254         # Direct query to the router
-dig +short foo @8.8.8.8               # Public DNS (to confirm it's not a public name)
+dig +short foo @192.168.1.1           # Direct query to the router
+dig +short foo @1.1.1.1               # Public DNS (to confirm it's not a public name)
 ```
 
 If `getent hosts` and `avahi-resolve` disagree:
 - Trust `avahi-resolve` for hosts that should be on the LAN.
 - The router DNS may be holding a stale lease from a previous session.
-- AT&T gateways are particularly prone to this — leases persist for hours.
+- ISP residential gateways are particularly prone to this — leases can
+  persist for hours.
 
 If `getent hosts` returns an IPv6 address and you can't reach it:
 - Check your own IPv6 connectivity: `ping -6 -c2 google.com`
@@ -167,7 +167,7 @@ unreachable" — looks like the target is down, but it's actually you.
 The host may be advertising stale SLAAC addresses (router DNS cached
 them). Try the link-local instead:
 ```bash
-ping -6 -I enp4s0 fe80::xxxx:xxxx:xxxx:xxxx%enp4s0
+ping -6 -I eth0 fe80::xxxx:xxxx:xxxx:xxxx%eth0
 ```
 
 Or just use IPv4 — most LAN services don't care.
@@ -230,8 +230,8 @@ mDNS works on UDP/5353 multicast. Things that break it:
 Realtek RTL8821CS is a Wi-Fi+Bluetooth combo chip attached via SDIO bus,
 sharing SDIO + an internal UART. Boot-time races are common; the kernel
 module (`rtw88_8821cs`) often needs to be loaded **late** rather than
-during the normal hotplug path. Distros like bredOS commonly ship with
-the module either disabled or loaded with a delay.
+during the normal hotplug path. Some SBC distros ship with the module
+either disabled or loaded with a delay.
 
 If you've already handled the boot case (e.g., a systemd unit that
 `modprobe`s after `multi-user.target` with a 1 s settle), suspend/resume
@@ -262,8 +262,8 @@ Amlogic SBCs frequently hit this).
 ### Alternative: mask sleep targets for always-on devices
 
 If the host is a server-class SBC plugged into wall power 24/7 with no
-battery (Pi, nova, CB2, etc.), the simpler fix is to prevent sleep from
-ever happening:
+battery (a Pi, an SBC, a Klipper controller, etc.), the simpler fix is to
+prevent sleep from ever happening:
 
 ```bash
 sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
@@ -329,9 +329,9 @@ Wi-Fi failover, router reboot). Hard-coding `HostName 192.168.1.X` in
 **Use the mDNS name as `HostName`**:
 
 ```sshconfig
-Host nova
-  HostName bredos.local
-  User bred
+Host sbc
+  HostName sbc.local
+  User user
   IdentityFile ~/.ssh/id_ed25519
   StrictHostKeyChecking accept-new
 ```
@@ -350,7 +350,7 @@ Caveats:
   returns whichever interface answers first. Functionally fine if both
   IPs reach the same sshd.
 - Same pattern applies to per-host SSH MCP config (e.g.,
-  `~/.config/ssh-mcp/servers.json` — use `bredos.local` not `192.168.1.221`).
+  `~/.config/ssh-mcp/servers.json` — use `sbc.local` not `192.168.1.10`).
 - If the target host's mDNS is broken (see §10), this pattern fails open
   — fall back to a pinned IP until you fix avahi on the target.
 
@@ -411,7 +411,8 @@ Rule 1 / Rule 2, a broken mDNS responder doesn't mean the host is
 offline — fall back to ARP (`ip neigh show <IP>`) or the pinned IP via
 SSH while diagnosing.
 
-See also DEVICES.md §"indiedroid nova (bredOS)" for a real case (post-reflash 2026-05-25).
+See also the SBC entry in DEVICES.md, which notes when device-side mDNS
+is broken and you must pin SSH to a wired IP.
 
 ## 11. "Corrupt OS install vs board failure on an SBC" (SD swap-test)
 
@@ -459,8 +460,8 @@ systemd-networkd's `MACAddressPolicy=persistent` (`99-default.link`)
 derives it deterministically from `/etc/machine-id`, so the same rootfs
 regenerates the same MAC every boot — but reflashing to other storage
 (new machine-id) yields a *new* MAC, so any DHCP reservation keyed to it
-must be updated. Verified on nova: ethernet MAC identical across a
-reboot, reservation held.
+must be updated. (Confirmed in practice on an RK3588 SBC: the ethernet
+MAC stayed identical across a reboot and the reservation held.)
 
-See DEVICES.md §"indiedroid nova (bredOS)" for a real case (2026-05-28:
-proved nova's board good after a bredOS-eMMC boot failure).
+See the SBC entry in DEVICES.md for the device-inventory format this
+swap-test feeds into.

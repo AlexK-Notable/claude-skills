@@ -22,7 +22,7 @@ wol — send Wake-on-LAN magic packet
 
 USAGE:
   wol AA:BB:CC:DD:EE:FF       # by raw MAC
-  wol nova                     # by alias (looked up in DEVICES.md)
+  wol sbc                      # by alias (looked up in DEVICES.md)
   wol --list                   # list known aliases
   wol -b 192.168.1.255 MAC    # explicit broadcast address (default: 255.255.255.255)
 
@@ -45,7 +45,7 @@ locate_devices() {
   # try the installed skill location
   for candidate in \
     "$HOME/.claude/skills/home-network/references/DEVICES.md" \
-    "$HOME/repos/home-network-skill/skills/home-network/references/DEVICES.md"; do
+    "$HOME/repos/claude-skills/plugins/home-network/skills/home-network/references/DEVICES.md"; do
     [[ -r "$candidate" ]] && { echo "$candidate"; return 0; }
   done
   return 1

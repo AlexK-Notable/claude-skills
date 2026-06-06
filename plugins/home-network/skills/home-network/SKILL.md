@@ -1,6 +1,6 @@
 ---
 name: home-network
-description: Use when working with the home LAN — discovering devices, troubleshooting connectivity, configuring ufw firewall rules, opening/closing ports, looking up IPs/hostnames/MAC addresses, scanning subnets, probing services with mDNS/avahi/arping/nmap/dig, working with router DHCP leases, debugging "can't reach" or "host unreachable" symptoms, managing wake-on-LAN, or referencing specific known devices (indiedroid nova running bredOS, raspberry pi, 3D printer / klipper / bigtreetech CB2, AT&T residential gateway, MacBook/iPad/iPhone, Matter/Thread IoT, Amazon Echo, Sunshine streaming host). The skill is SELF-UPDATING: it includes home-net-learn for device-specific discovery and home-net-capture for general findings — both spawn background `claude -p` agents that verify and merge new knowledge into the skill's reference docs without blocking your shell. At the end of any meaningful /home-network task, follow the Knowledge Capture Protocol section to keep the skill growing with use.
+description: Use when working with the home LAN — discovering devices, troubleshooting connectivity, configuring ufw firewall rules, opening/closing ports, looking up IPs/hostnames/MAC addresses, scanning subnets, probing services with mDNS/avahi/arping/nmap/dig, working with router DHCP leases, debugging "can't reach" or "host unreachable" symptoms, managing wake-on-LAN, or referencing known devices (an ARM single-board computer / SBC, a Raspberry Pi, a 3D printer / Klipper / Moonraker controller, your router/gateway, laptops/tablets/phones, Matter/Thread IoT, smart speakers, a game-streaming host). The skill is SELF-UPDATING: it includes home-net-learn for device-specific discovery and home-net-capture for general findings — both spawn background `claude -p` agents that verify and merge new knowledge into the skill's reference docs without blocking your shell. At the end of any meaningful /home-network task, follow the Knowledge Capture Protocol section to keep the skill growing with use.
 ---
 
 # home-network
@@ -123,21 +123,21 @@ Avoids ICMP because of Rule 1.
 ### Resolve a name reliably
 
 ```bash
-find-host bredos            # tries DNS → mDNS → ARP cache → reverse lookup
-find-host 192.168.1.221     # tries reverse DNS → mDNS PTR → ARP
+find-host sbc               # tries DNS → mDNS → ARP cache → reverse lookup
+find-host 192.168.1.10      # tries reverse DNS → mDNS PTR → ARP
 ```
 
 ### Probe service availability
 
 ```bash
-port-check 192.168.1.221 22 80 443 8080
-port-check klipper 80 7125 7136    # Klipper / Moonraker / Mobileraker
+port-check 192.168.1.10 22 80 443 8080
+port-check printer 80 7125 7136    # Klipper / Moonraker / Mobileraker
 ```
 
 ### Wake a sleeping machine
 
 ```bash
-wol nova                    # uses alias from DEVICES.md
+wol sbc                     # uses alias from DEVICES.md
 wol AA:BB:CC:DD:EE:FF       # raw MAC
 ```
 
@@ -170,12 +170,12 @@ If yes to ANY: capture. If no to all: skip — don't manufacture findings.
 
 ### Storing credentials in Bitwarden
 
-Anything secret — host passwords, API tokens, SSH private keys, vault recovery codes — goes into Bitwarden, **never into `DEVICES.md` or any reference file in this repo**. The repo is private but still gets cloned across machines; secrets in a versioned doc are permanent leaks waiting to happen.
+Anything secret — host passwords, API tokens, SSH private keys, vault recovery codes — goes into Bitwarden, **never into `DEVICES.md` or any reference file in this repo**. The repo gets cloned across machines (and your fork may be public); secrets in a versioned doc are permanent leaks waiting to happen.
 
 **Two Bitwarden tools are available — pick by *who reads the secret back*:**
 
 - **`bw` (password vault)** — the default for host passwords, SSH keys, and recovery codes that *you* retrieve later, interactively, with the master password. This is what the self-destructing-handoff recipe below uses, and what the `bwu` / `bw-ssh` / `bw-get-key` zsh helpers pull from (handy for the "can't reach a host over SSH" case — `bwu` then `bw-ssh '<item>' user@host`). Right for almost everything a network admin stores by hand.
-- **`bws` (Secrets Manager)** — for secrets a *machine* consumes unattended: a daemon on a LAN host (nova, a Pi, the CB2 / Klipper box) that needs an API key or SSH key injected at boot with no human present. Store it as a secret in a `bws` project and inject via `bws run`. Reach for this only when there's no interactive unlock in the loop — it's a separate product with token-based (not master-password) auth.
+- **`bws` (Secrets Manager)** — for secrets a *machine* consumes unattended: a daemon on a LAN host (an SBC, a Pi, the Klipper controller) that needs an API key or SSH key injected at boot with no human present. Store it as a secret in a `bws` project and inject via `bws run`. Reach for this only when there's no interactive unlock in the loop — it's a separate product with token-based (not master-password) auth.
 
 Both are documented in the [bitwarden-cli skill](../../bitwarden-cli/SKILL.md), which routes between them; `bws`-specific operations live in its `references/secrets-manager.md`.
 
@@ -187,7 +187,7 @@ For the common case (a credential you'll retrieve by hand), the pattern is the [
 4. Tell the user the wrapper path — they fire it one-shot in their unlocked shell
 5. Metadata-only output prints; both files self-destruct
 
-What goes into `DEVICES.md` instead: a *pointer* — "Password stored in Bitwarden as `nova SSH password (bred user)`. Key auth is the primary access method (`~/.ssh/id_ed25519`)." That tells future-you where to retrieve it without leaking the value.
+What goes into `DEVICES.md` instead: a *pointer* — "Password stored in Bitwarden as `sbc SSH password (user)`. Key auth is the primary access method (`~/.ssh/id_ed25519`)." That tells future-you where to retrieve it without leaking the value.
 
 ### How to capture
 
@@ -265,7 +265,7 @@ the skill's device inventory grows with use, without blocking your shell.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ User runs:  home-net-learn nova                              │
+│ User runs:  home-net-learn sbc                               │
 └──────────────────────────────────────────────────────────────┘
                             │
                             ▼  (synchronous, < 5s)
@@ -288,7 +288,7 @@ the skill's device inventory grows with use, without blocking your shell.
 └──────────────────────────────────────────────────────────────┘
 ```
 
-**Why agentic background?** The user's stated goal: don't slow main
+**Why agentic background?** The goal is to not slow your main
 workflow. The verification work (cross-checking, OUI lookup, role
 inference) takes ~30-90s — too long to block on, but boring enough that
 an LLM can do it well without supervision.
@@ -302,9 +302,10 @@ leave a review file with the discrepancies highlighted.
 Load on demand:
 
 - [DISCOVERY.md](references/DISCOVERY.md) — Deep dive on mDNS/ARP/TCP
-  probing patterns, including the lesson from the 2026-05-24 bredOS hunt.
-- [DEVICES.md](references/DEVICES.md) — The personal device inventory:
-  known hostnames, IPs, MACs, roles, SSH users, special notes.
+  probing patterns, including a worked case study of hunting an
+  IPv6-only SBC.
+- [DEVICES.md](references/DEVICES.md) — The device inventory (ships as an
+  example/template): hostnames, IPs, MACs, roles, SSH users, notes.
 - [FIREWALL.md](references/FIREWALL.md) — ufw recipes, rule conventions,
   the LAN-scoped vs WAN-exposed decision.
 - [TROUBLESHOOTING.md](references/TROUBLESHOOTING.md) — "host unreachable"
@@ -324,14 +325,15 @@ Load on demand:
 - ❌ Opening a port WAN-side without thinking — default to LAN-scoped
   unless you genuinely need off-LAN access. See FIREWALL.md.
 - ❌ Putting passwords, API tokens, or private keys in `DEVICES.md` (or
-  any reference file). Repo is private but still gets cloned across
-  machines — versioned secrets are permanent leaks. Route credentials
+  any reference file). The repo gets cloned across machines and your fork
+  may be public — versioned secrets are permanent leaks. Route credentials
   to Bitwarden via the bitwarden-cli skill's self-destructing handoff
   recipe; put a *pointer* in DEVICES.md, not the value.
 
 ## Where this skill came from
 
-Built 2026-05-24 after a session-long hunt for an indiedroid nova that
-turned out to be IPv6-only-then-offline-then-back-on-Wi-Fi. The lessons
-about ICMP unreliability, DNS-vs-mDNS, and self-verifying your IPv6
-state all came from that hunt. See git log for evolution.
+Built out of a session-long hunt for an ARM SBC that turned out to be
+IPv6-only, then offline, then back on Wi-Fi. The lessons about ICMP
+unreliability, DNS-vs-mDNS, and self-verifying your own IPv6 state all
+came from that hunt — see [DISCOVERY.md §6](references/DISCOVERY.md) for
+the worked case study.

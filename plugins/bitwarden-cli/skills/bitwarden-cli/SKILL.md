@@ -1,6 +1,6 @@
 ---
 name: bitwarden-cli
-description: Covers BOTH Bitwarden CLIs — they are DIFFERENT products, disambiguate first. (1) `bw`, the password-vault CLI — master-password unlock to a BW_SESSION, storing/retrieving credentials, secure notes for backups (age keys, API tokens, recovery codes, fingerprints), scripted vault lookups, auth errors (vault is locked, invalid_grant). (2) `bws`, the Secrets Manager CLI — machine-account access token (BWS_ACCESS_TOKEN, no master password), projects + secrets, creating/reading secrets, and runtime injection via `bws run` (e.g. feeding LLM API keys into Home Assistant). Triggers on bitwarden, bw, bws, secrets manager, secure note, password vault, BW_SESSION, BWS_ACCESS_TOKEN, machine account, bws run/project/secret, "store/back up to bitwarden", rotate credential, or alexkechichian1@gmail.com in a vault context. Route bw vs bws before following any recipe.
+description: Covers BOTH Bitwarden CLIs — they are DIFFERENT products, disambiguate first. (1) `bw`, the password-vault CLI — master-password unlock to a BW_SESSION, storing/retrieving credentials, secure notes for backups (age keys, API tokens, recovery codes, fingerprints), scripted vault lookups, auth errors (vault is locked, invalid_grant). (2) `bws`, the Secrets Manager CLI — machine-account access token (BWS_ACCESS_TOKEN, no master password), projects + secrets, creating/reading secrets, and runtime injection via `bws run` (e.g. feeding LLM API keys into Home Assistant). Triggers on bitwarden, bw, bws, secrets manager, secure note, password vault, BW_SESSION, BWS_ACCESS_TOKEN, machine account, bws run/project/secret, "store/back up to bitwarden", rotate credential, or your Bitwarden login email in a vault context. Route bw vs bws before following any recipe.
 ---
 
 # Bitwarden CLI
@@ -20,8 +20,8 @@ Bitwarden ships **two separate CLIs**. They share a brand and almost nothing els
 
 Both CLIs are installed here:
 
-- **`bw`** (password vault, v2026.x via Arch) — logged in as `alexkechichian1@gmail.com`. Primary use: **storing secure notes** (backups, recovery instructions, key material, fingerprints); secondary: reading credentials, scripted lookups.
-- **`bws`** 2.1.0 (Secrets Manager, binary `~/bin/bws`) — configured 2026-05-31. Token at `~/.config/bws/token.env` (mode 600). Project `home-assistant` = `18f14ed9-8ba5-4cc6-bbd4-b45b01534270`. Driving use case: **LLM API keys for Home Assistant**.
+- **`bw`** (password vault, v2026.x via Arch) — logged in as `you@example.com`. Primary use: **storing secure notes** (backups, recovery instructions, key material, fingerprints); secondary: reading credentials, scripted lookups.
+- **`bws`** 2.1.0 (Secrets Manager, binary `~/bin/bws`) — configured once. Token at `~/.config/bws/token.env` (mode 600). Example project `home-assistant` = `<your-project-id>`. Driving use case: **LLM API keys for Home Assistant**.
 
 Everything from here to the Secrets Manager section is the **`bw` vault**. For `bws`, jump to [Secrets Manager — the `bws` CLI](#secrets-manager--the-bws-cli).
 
@@ -348,7 +348,7 @@ Default output is JSON; `-o` accepts `json`, `yaml`, `env`, `table`, `tsv`, `non
 - **`bws secret create` takes the value as a positional arg → it lands in shell history.** Easiest safe path is the wrapper **`~/bin/bws-secret-add KEY [PROJECT_ID]`** (reads the value hidden, auto-loads the token, auto-resolves the project, strips plaintext from output — see `references/secrets-manager.md`). The underlying manual pattern, if you need it:
   ```bash
   read -rs 'val?Paste value: '
-  bws secret create OPENAI_API_KEY "$val" 18f14ed9-8ba5-4cc6-bbd4-b45b01534270
+  bws secret create OPENAI_API_KEY "$val" <your-project-id>
   unset val
   ```
   (History keeps the literal `"$val"`, never the expansion.)

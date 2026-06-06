@@ -37,7 +37,7 @@ Item type `5`. Nested object: `sshKey`.
 ```json
 {
   "type": 5,
-  "name": "id_ed25519 — komi-hypr",
+  "name": "id_ed25519 — workstation",
   "notes": "Optional notes / context",
   "folderId": null,
   "organizationId": null,
@@ -192,7 +192,7 @@ export BW_SESSION="$(bw unlock --raw)" && \
 On the new machine, after `bw login && bw unlock`:
 
 ```bash
-ITEM_NAME="id_ed25519 — komi-hypr"
+ITEM_NAME="id_ed25519 — workstation"
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
 
 export BW_SESSION="$(bw unlock --raw)"
@@ -236,8 +236,8 @@ The user has three `bw`-vault SSH helpers defined (in the plain-function region,
 
 ```bash
 bwu
-bw-ssh 'K1C Printer SSH' root@192.168.1.158
-bw-get-key 'nova SSH key' ~/.ssh/nova_ed25519
+bw-ssh 'Printer SSH' root@192.168.1.20
+bw-get-key 'SBC SSH key' ~/.ssh/sbc_ed25519
 ```
 
 **Heads-up on the field they read:** both functions extract `jq -r '.login.password // .notes'` — they expect the key in a **login item's password field or its notes**, *not* the structured SSH Key item type (`type: 5`, `.sshKey.privateKey`). So they work with keys stored as login/secure-note items, but won't find keys stored as proper SSH Key items. For `type: 5` items, read `.sshKey.privateKey` instead (or extend the functions to fall back to it). If you're storing new keys, `type: 5` is the better store — just teach the helper about it.

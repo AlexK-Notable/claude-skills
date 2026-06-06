@@ -72,9 +72,9 @@ Use **type 1 (hidden)** for things like API keys, fingerprints, or short tokens 
 ```json
 {
   "type": 1,
-  "name": "GitHub — alexkechichian1",
+  "name": "GitHub — your-username",
   "login": {
-    "username": "alexkechichian1@gmail.com",
+    "username": "you@example.com",
     "password": "...",
     "totp": "otpauth://totp/...",
     "uris": [
@@ -127,7 +127,7 @@ The most common type for "store this info" requests.
   "type": 3,
   "name": "Chase Visa — primary",
   "card": {
-    "cardholderName": "Alex Kechichian",
+    "cardholderName": "Your Name",
     "brand": "Visa",
     "number": "4111111111111111",
     "expMonth": "12",
@@ -149,9 +149,9 @@ The most common type for "store this info" requests.
   "name": "Primary identity",
   "identity": {
     "title": "Mr",
-    "firstName": "Alex",
+    "firstName": "Your",
     "middleName": null,
-    "lastName": "Kechichian",
+    "lastName": "Name",
     "address1": "...",
     "address2": null,
     "address3": null,
@@ -160,7 +160,7 @@ The most common type for "store this info" requests.
     "postalCode": "...",
     "country": "US",
     "company": null,
-    "email": "alexkechichian1@gmail.com",
+    "email": "you@example.com",
     "phone": "...",
     "ssn": null,
     "username": null,

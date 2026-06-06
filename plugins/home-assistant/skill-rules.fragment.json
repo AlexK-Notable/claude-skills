@@ -3,7 +3,7 @@
     "type": "domain",
     "enforcement": "suggest",
     "priority": "high",
-    "description": "Operate the self-hosted Home Assistant (HA in Docker on the Nova, 192.168.1.229). Safe-mutation discipline (back up + check_config before edits; .storage edits need HA stopped), a secret-safe inventory snapshot (ha-inventory), and append-only gotcha capture (ha-note). Covers automations, scripts, dashboards, the Assist voice pipeline, exposed entities, HACS, Govee lights, the Z-Print/Moonraker printer, and Glances sensors.",
+    "description": "Operate a self-hosted Home Assistant (HA in Docker on the host, e.g. 192.168.1.10). Safe-mutation discipline (back up + check_config before edits; .storage edits need HA stopped), a secret-safe inventory snapshot (ha-inventory), and append-only gotcha capture (ha-note). Covers automations, scripts, dashboards, the Assist voice pipeline, exposed entities, HACS, smart lights, a 3D-printer (Klipper/Moonraker) integration, and Glances sensors.",
     "promptTriggers": {
       "keywords": [
         "home assistant",
@@ -34,21 +34,20 @@
         "govee",
         "govee2mqtt",
         "moonraker",
-        "z-print",
+        "klipper",
         "glances",
-        "nabu",
-        "ok nabu",
+        "wake word",
         "exposed entities",
         "blueprint"
       ],
       "intentPatterns": [
-        "(home ?assistant|hass|nabu)",
+        "(home ?assistant|hass)",
         "(create|add|edit|fix|write|set ?up).*?(automation|script|scene|dashboard|blueprint)",
         "(expose|exposed).*?(entit|script|device).*?(assist|voice|conversation)",
         "(voice|assist).*?(command|pipeline|agent|intent|sentence)",
         "(edit|change|read|parse).*?\\.storage",
         "(turn (on|off)|set|dim|toggle).*?(light|switch|lamp|bulb|scene)",
-        "(govee|moonraker|z-?print|glances|spotify).*?(light|sensor|printer|entit|integration)",
+        "(govee|moonraker|klipper|glances|spotify).*?(light|sensor|printer|entit|integration)",
         "(install|add|configure).*?(integration|HACS|hacs)",
         "(check_config|reload|restart).*?(home ?assistant|hass|automation)",
         "ha-(inventory|note)"

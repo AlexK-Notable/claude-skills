@@ -3,14 +3,14 @@
   "version": "1.0.0",
   "description": "Post-`pacman -Syu` triage and repair for Arch/CachyOS Hyprland — plugin ABI mismatch, Qt6 ↔ PyQt6 skew, failed systemd user units, broken ~/bin shims and orphaned venvs, xdg-desktop-portal regressions. Audit (read-only) + rebuild modes.",
   "author": {
-    "name": "Alex Kechichian",
-    "email": "alexkechichian1@gmail.com",
-    "url": "https://github.com/AlexK-Notable"
+    "name": "Your Name",
+    "email": "you@example.com",
+    "url": "https://github.com/your-username"
   },
-  "homepage": "https://github.com/AlexK-Notable/claude-skills",
+  "homepage": "https://github.com/your-username/claude-skills",
   "repository": {
     "type": "git",
-    "url": "https://github.com/AlexK-Notable/claude-skills.git"
+    "url": "https://github.com/your-username/claude-skills.git"
   },
   "license": "MIT",
   "keywords": ["hyprland", "arch", "cachyos", "post-update", "abi", "systemd", "diagnostics", "repair"]

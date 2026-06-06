@@ -38,14 +38,14 @@ View everything: `chezmoi data | jq '.'`
 ## Built-in variables
 
 ```
-{{ .chezmoi.hostname }}        e.g., "komi-pc"
+{{ .chezmoi.hostname }}        e.g., "workstation"
 {{ .chezmoi.fqdnHostname }}    Fully qualified hostname
 {{ .chezmoi.os }}              "linux" / "darwin" / "windows"
 {{ .chezmoi.arch }}            "amd64" / "arm64"
-{{ .chezmoi.username }}        "komi"
-{{ .chezmoi.homeDir }}         "/home/komi"
-{{ .chezmoi.sourceDir }}       "/home/komi/.local/share/chezmoi"
-{{ .chezmoi.cacheDir }}        "/home/komi/.cache/chezmoi"
+{{ .chezmoi.username }}        "user"
+{{ .chezmoi.homeDir }}         "/home/user"
+{{ .chezmoi.sourceDir }}       "/home/user/.local/share/chezmoi"
+{{ .chezmoi.cacheDir }}        "/home/user/.cache/chezmoi"
 {{ .chezmoi.osRelease.id }}    Linux distro id (e.g., "cachyos", "arch")
 {{ .chezmoi.osRelease.idLike }} Distro family (e.g., "arch")
 {{ .chezmoi.kernel }}          Kernel info struct
@@ -58,11 +58,11 @@ View everything: `chezmoi data | jq '.'`
 ```
 # dot_gitconfig.tmpl
 [user]
-    name = Alex K
+    name = Your Name
 {{- if eq .chezmoi.hostname "work-laptop" }}
-    email = alex@company.com
+    email = you@company.com
 {{- else }}
-    email = alexkechichian1@gmail.com
+    email = you@example.com
 {{- end }}
 ```
 
@@ -101,7 +101,7 @@ source "$HOME/.cargo/env"
 
 In `.chezmoidata.toml`:
 ```toml
-[machines.komi-pc]
+[machines.workstation]
     role = "personal"
     monitor_count = 3
 ```

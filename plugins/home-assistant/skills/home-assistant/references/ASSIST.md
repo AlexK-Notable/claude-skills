@@ -3,10 +3,10 @@
 ## Shape of it
 
 ```
-"ok nabu" (openWakeWord, Nova:10400)
-   → STT SenseVoice fp16 on the NPU (Nova:10300, Wyoming)
+wake word (openWakeWord, HA host :10400)
+   → STT (a Wyoming server on the HA host :10300)
    → conversation agent (local Assist intents first, then conversation.claude_conversation)
-   → TTS Piper (Pi:10200)
+   → TTS (Piper, on a Pi :10200)
 ```
 
 Two Anthropic subentries exist — **don't confuse them**:

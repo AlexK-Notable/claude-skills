@@ -5,8 +5,9 @@ Hard-won, reconfirmed lessons worth keeping. Raw captures land in
 Each entry: what bit us, why, the fix, and when it applies. `unverified` entries
 (if any) must be re-checked before acting on them.
 
-> Seeded 2026-06-02 from the initial HA buildout (HA 2026.5.4). These are
-> verified — we lived them.
+> **Example lessons.** These are general, real HA gotchas worth keeping as a starting
+> point; the version (`HA 2026.5.4`) is whatever was current when each was observed.
+> Add and promote your own via `ha-note` — see SKILL.md.
 
 ---
 
@@ -27,8 +28,8 @@ Each entry: what bit us, why, the fix, and when it applies. `unverified` entries
 
 ### `device_class: temperature` renders °F under a US unit system
 - **Status:** verified · **Applies when:** country=US (Imperial), any °C source sensor
-- **Cause:** HA auto-converts temperature entities to the system unit; US → Imperial → °F. So a Pi reporting 50 °C showed "122".
-- **Fix:** per-entity override in `core.entity_registry` → `options.sensor.unit_of_measurement: "°C"` (we set ~51 Glances sensors). Make dashboard gauge labels match, and make alert thresholds compare the same unit (we'd been comparing °C numbers to °F values).
+- **Cause:** HA auto-converts temperature entities to the system unit; US → Imperial → °F. So a source reporting 50 °C displays "122".
+- **Fix:** per-entity override in `core.entity_registry` → `options.sensor.unit_of_measurement: "°C"` (apply to each affected sensor). Make dashboard gauge labels match, and make alert thresholds compare the same unit (it's easy to end up comparing °C numbers to °F values).
 
 ## Integrations
 
@@ -71,23 +72,23 @@ Each entry: what bit us, why, the fix, and when it applies. `unverified` entries
 - **Cause:** AL derives the entity_id from the (doubled) friendly name.
 - **Fix:** the real ids are `switch.adaptive_lighting_{name}_adaptive_lighting_{adapt_color|adapt_brightness|sleep_mode}_{name}` and the **master** is `switch.{name}_adaptive_lighting_{name}` — NOT the README's `switch.adaptive_lighting_{type}_{name}`. Look them up via `/api/states` (filter `adaptive_lighting`) before wiring automations.
 
-### Bedroom AL coexistence design — don't "fix" it
-- **Status:** verified · **Applies when:** touching the bedroom lighting
+### AL + stepped-automation coexistence — split responsibilities, don't "fix" it
+- **Status:** verified · **Applies when:** AL and custom brightness automations share a light group
 - **Cause:** AL re-adapts on an interval and would fight manual color/brightness.
-- **Fix:** AL owns **color temp only** (`adapt_brightness` switch OFF, `take_over_control: false` so brightness steps don't pause color). Brightness + the night red are owned by **stepped** automations (`bedroom_morning_ramp`, `bedroom_evening_wind_down`); `adapt_color` is toggled OFF at sundown / ON at sunrise−15 (daily, via `bedroom_al_color_resume`). If AL starts fighting the ramps, check `adapt_brightness` and `take_over_control` first.
+- **Fix:** let AL own **color temp only** (`adapt_brightness` switch OFF, `take_over_control: false` so brightness steps don't pause color). Own brightness (and any night-red window) with **stepped** automations; toggle `adapt_color` OFF during a fixed-color window and back ON afterward. If AL starts fighting the ramps, check `adapt_brightness` and `take_over_control` first.
 
-## Hardware (Nova / RK3588)
+## Host hardware (SBC notes — generalize to your own host)
 
-### Onboard Bluetooth (RTL8821CS) BLE won't power on — dead end
-- **Status:** verified · **Applies when:** Nova onboard radio, current BSP kernel
-- **Cause:** the radio is **RTL8821CS** (not AIC8800 — `aic8800_bsp` is a red herring, refcount 0). BT via UART (`/dev/ttyS9`, `rtk_hciattach`). `hci0` comes UP, but `bluetoothctl power on` → `org.bluez.Error.Failed`, kernel `Opcode 0x0c7a failed: -56` (EBADRQC) — firmware-level LE power-on failure.
-- **Fix:** none at the firmware level. We **dropped onboard BT**; HA left dongle-ready (container has `--cap-add NET_ADMIN --cap-add NET_RAW -v /run/dbus:/run/dbus:ro`). To fully silence HA's `habluetooth` errors you must also disable `bluetooth-rtl8821cs.service` + `killall rtk_hciattach` (remove hci0) + remove the bluetooth config entry — disabling the entry alone isn't enough (habluetooth auto-manages any present adapter).
-- **Note:** the `bluetooth-rtl8821cs.service` is `Type=oneshot` backgrounding `rtk_hciattach`; default `KillMode=control-group` reaped it → fixed with a `KillMode=process` drop-in. (Mooted by dropping BT, but documents the systemd quirk.)
+### Flaky onboard Bluetooth on cheap SBC combo radios — prefer a USB dongle
+- **Status:** verified · **Applies when:** an SBC whose onboard BT/Wi-Fi combo radio is unreliable
+- **Cause:** some SBC combo radios never reach a working BLE power-on at the firmware level (the adapter appears but `bluetoothctl power on` fails).
+- **Fix:** drop the onboard radio and use a known-good USB Bluetooth dongle; pass the host D-Bus/caps into the HA container (`--cap-add NET_ADMIN --cap-add NET_RAW -v /run/dbus:/run/dbus:ro`). To fully silence HA's `habluetooth` errors you must **remove the adapter entirely** (stop the attach service, remove `hci0`) **and** remove the bluetooth config entry — disabling the entry alone isn't enough (habluetooth auto-manages any present adapter).
+- **Systemd note (transferable):** a `Type=oneshot` service that backgrounds a daemon gets reaped by the default `KillMode=control-group`; use a `KillMode=process` drop-in.
 
-### Wi-Fi (rtw88) deep-power-save instability
-- **Status:** verified · **Applies when:** Nova onboard Wi-Fi (RTL8821CS combo)
-- **Cause:** deep LPS causes instability.
-- **Fix:** `/etc/modprobe.d/rtw88.conf` → `options rtw88_core disable_lps_deep=1` (applies on reboot).
+### Wi-Fi deep-power-save can cause drops (some drivers)
+- **Status:** verified · **Applies when:** onboard Wi-Fi using a driver with aggressive low-power save (e.g. `rtw88`)
+- **Cause:** deep LPS causes connection instability.
+- **Fix:** disable deep power save via a modprobe option (driver-specific, e.g. `/etc/modprobe.d/rtw88.conf` → `options rtw88_core disable_lps_deep=1`), or move the host to wired ethernet.
 
 ## Inventory tooling (this skill)
 

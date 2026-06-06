@@ -17,9 +17,9 @@ usage() {
 find-host — multi-protocol host resolver
 
 USAGE:
-  find-host bredos          # name → IP (DNS → mDNS → ARP → reverse)
-  find-host 192.168.1.221   # IP → name (PTR → mDNS → ARP cache)
-  find-host bredos --first  # stop at first successful method
+  find-host sbc             # name → IP (DNS → mDNS → ARP → reverse)
+  find-host 192.168.1.10    # IP → name (PTR → mDNS → ARP cache)
+  find-host sbc --first     # stop at first successful method
 
 Tries each method and shows what each one returned. Useful for diagnosing
 "DNS says X but mDNS says Y" mismatches.

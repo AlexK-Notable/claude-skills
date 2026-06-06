@@ -28,8 +28,8 @@ Usage:
   ha-inventory --diff          # like --check but print a human summary of changes
 
 Config (env overrides, normally set by the skill's config.sh):
-  HA_SSH        ssh target for the HA host           (default komi@192.168.1.229)
-  HA_CONFIG     HA config dir on that host           (default /home/komi/homeassistant/config)
+  HA_SSH        ssh target for the HA host           (default user@192.168.1.10)
+  HA_CONFIG     HA config dir on that host           (default /home/user/homeassistant/config)
   HA_CONTAINER  docker container name for version     (default homeassistant)
 """
 import os
@@ -56,8 +56,8 @@ def _load_config():
 
 _load_config()
 
-HA_SSH = os.environ.get("HA_SSH", "komi@192.168.1.229")
-HA_CONFIG = os.environ.get("HA_CONFIG", "/home/komi/homeassistant/config")
+HA_SSH = os.environ.get("HA_SSH", "user@192.168.1.10")
+HA_CONFIG = os.environ.get("HA_CONFIG", "/home/user/homeassistant/config")
 HA_CONTAINER = os.environ.get("HA_CONTAINER", "homeassistant")
 STALE_AFTER_DAYS = int(os.environ.get("HA_STALE_AFTER_DAYS", "7"))
 

@@ -134,4 +134,4 @@ fi
 
 echo
 echo "${C_OK}${C_BOLD}install complete${C_RESET}"
-echo "${C_DIM}try: scan-lan --quick    or    find-host bredos    or    home-net-doctor${C_RESET}"
+echo "${C_DIM}try: scan-lan --quick    or    find-host sbc    or    home-net-doctor${C_RESET}"

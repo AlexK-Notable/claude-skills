@@ -1,12 +1,12 @@
 {
   "name": "claude-skills",
   "owner": {
-    "name": "Alex Kechichian",
-    "email": "alexkechichian1@gmail.com",
-    "url": "https://github.com/AlexK-Notable"
+    "name": "Your Name",
+    "email": "you@example.com",
+    "url": "https://github.com/your-username"
   },
   "metadata": {
-    "description": "Personal Claude Code skills — daily-driver tooling for desktop maintenance, dotfiles, home LAN, secrets, and post-update repair. A live, directory-source marketplace.",
+    "description": "A personal Claude Code skills monorepo you can fork and adapt — daily-driver tooling for desktop maintenance, dotfiles, home LAN, secrets, and post-update repair. A live, directory-source marketplace.",
     "version": "1.0.0"
   },
   "plugins": [

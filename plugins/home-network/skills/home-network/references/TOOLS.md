@@ -56,10 +56,9 @@ to work transparently.
 
 **Gotcha**: needs RAW sockets. Either run as root, or
 `sudo setcap cap_net_raw+eip $(which arping)` once to make it
-unprivileged forever. On this CachyOS box neither is in effect (and sudo
-is barred by policy), so a plain `arping` prints `socket: Operation not
-permitted`. When that happens, use the unprivileged ping-sweep +
-`ip neigh` substitute in
+unprivileged forever. If neither is in effect (or sudo is unavailable),
+a plain `arping` prints `socket: Operation not permitted`. When that
+happens, use the unprivileged ping-sweep + `ip neigh` substitute in
 [TROUBLESHOOTING.md §1](TROUBLESHOOTING.md#1-cant-reach-host) — it proves
 L2 presence by MAC without RAW sockets.
 
@@ -95,8 +94,8 @@ still display a "non-root" warning — ignore it after setcap.
 ```bash
 nmap -sn 192.168.1.0/24          # who's up?
 nmap -PR -sn 192.168.1.0/24      # ARP-based (LAN only, most reliable)
-nmap -F -sV 192.168.1.221        # fast port + version scan one host
-nmap -A 192.168.1.221            # everything (slow)
+nmap -F -sV 192.168.1.10         # fast port + version scan one host
+nmap -A 192.168.1.10             # everything (slow)
 ```
 
 ---
@@ -211,7 +210,7 @@ log-and-drop). Otherwise stick with ufw.
 
 **Common usage**:
 - `sudo tcpdump -i any -nn port 53` — DNS traffic
-- `sudo tcpdump -i enp4s0 -nn 'arp'` — ARP traffic only
+- `sudo tcpdump -i eth0 -nn 'arp'` — ARP traffic only
 - `sudo tcpdump -i any -nn 'port 5353'` — mDNS traffic
 - `sudo tcpdump -w capture.pcap` — write to file, open in wireshark later
 
@@ -224,7 +223,7 @@ log-and-drop). Otherwise stick with ufw.
 - Debian/Ubuntu: `apt install termshark`
 - macOS: `brew install termshark`
 
-**Usage**: `sudo termshark -i enp4s0` — full Wireshark-like TUI.
+**Usage**: `sudo termshark -i eth0` — full Wireshark-like TUI.
 
 ---
 
@@ -261,10 +260,10 @@ See [TROUBLESHOOTING.md §5](TROUBLESHOOTING.md#5-wake-on-lan-doesnt-work).
 - `nc -u HOST PORT` — UDP instead of TCP
 
 **Gotcha**: flag semantics differ between flavors. If `-z` doesn't work,
-you have a flavor that needs `--probe`. **On this CachyOS box `nc` is
-absent entirely** — only `ncat` (shipped with the `nmap` package) is
-installed. Use `ncat -zv HOST PORT`, or the dependency-free `/dev/tcp`
-bash builtin below.
+you have a flavor that needs `--probe`. On some systems `nc` is absent
+entirely and only `ncat` (shipped with the `nmap` package) is installed
+— use `ncat -zv HOST PORT`, or the dependency-free `/dev/tcp` bash
+builtin below.
 
 ### `/dev/tcp` (bash builtin)
 
@@ -290,7 +289,8 @@ a bash redirection special. Won't work in `sh` if `sh` is dash.
 
 **Usage**:
 - `whois 8.8.8.8` — IP owner
-- `whois -h whois.iana.org "60:fb:00"` — MAC OUI lookup (vendor)
+- `whois -h whois.iana.org "b8:27:eb"` — MAC OUI lookup (vendor; this
+  example prefix belongs to Raspberry Pi)
 
 **Alternative for OUI**: the `home-net-learn` script uses the
 IEEE OUI registry over HTTPS — no `whois` required.
@@ -302,8 +302,8 @@ IEEE OUI registry over HTTPS — no `whois` required.
 ### @fangjunjie/ssh-mcp-server
 
 **Purpose**: Expose SSH access to one or more LAN hosts as MCP tools so
-Claude can run remote commands on `cb2`, `pi`, `nova`, etc. through the
-SSH MCP server rather than via local `ssh` calls.
+Claude can run remote commands on `printer`, `pi`, `sbc`, etc. through
+the SSH MCP server rather than via local `ssh` calls.
 
 **Install**: `npx -y @fangjunjie/ssh-mcp-server` (run on demand by the
 MCP host — no global install needed). No public README on npm and no
@@ -319,20 +319,20 @@ public GitHub at time of writing; flags below come from the binary's
 
 **Multi-host mode** (preferred):
 ```
---config-file /home/komi/.config/ssh-mcp/servers.json
+--config-file /home/user/.config/ssh-mcp/servers.json
 ```
-where the file is either an object or an array. Object form (used here):
+where the file is either an object or an array. Object form (example):
 ```json
 {
-  "cb2":  {"host": "192.168.1.188",  "port": 22, "username": "biqu", "privateKey": "/home/komi/.ssh/id_ed25519"},
-  "pi":   {"host": "192.168.1.165",  "port": 22, "username": "komi", "privateKey": "/home/komi/.ssh/id_ed25519"},
-  "nova": {"host": "bredos.local",   "port": 22, "username": "bred", "privateKey": "/home/komi/.ssh/id_ed25519"}
+  "printer": {"host": "printer.local", "port": 22, "username": "user", "privateKey": "/home/user/.ssh/id_ed25519"},
+  "pi":      {"host": "pi.local",      "port": 22, "username": "user", "privateKey": "/home/user/.ssh/id_ed25519"},
+  "sbc":     {"host": "sbc.local",     "port": 22, "username": "user", "privateKey": "/home/user/.ssh/id_ed25519"}
 }
 ```
 
 **Prefer mDNS names over IPs** for `host:` when the target is DHCP-leased
-(SBCs, laptops). `bredos.local` survives lease rotation and ethernet ↔
-Wi-Fi failover transparently; a hard-coded `192.168.1.221` does not.
+(SBCs, laptops). `sbc.local` survives lease rotation and ethernet ↔
+Wi-Fi failover transparently; a hard-coded `192.168.1.10` does not.
 See [TROUBLESHOOTING.md §9](TROUBLESHOOTING.md#9-ssh-to-a-dhcpd-host-that-keeps-changing-ip-mdns-hostname)
 for the SSH-config equivalent of the same pattern.
 
@@ -346,11 +346,10 @@ for the SSH-config equivalent of the same pattern.
   regexes. **Global**, not per-server (one allow/deny list spans all
   hosts).
 
-**Where it's wired up on this machine**: `~/.claude.json` under
-`mcpServers.ssh`. Multi-host config lives at
-`~/.config/ssh-mcp/servers.json`. Migration from single-host: old
-inline config gets backed up as `~/.claude.json.bak-<timestamp>` before
-the rewrite.
+**Where to wire it up**: `~/.claude.json` under `mcpServers.ssh`.
+Multi-host config lives at `~/.config/ssh-mcp/servers.json`. If migrating
+from single-host, back up the old inline config (e.g. as
+`~/.claude.json.bak-<timestamp>`) before the rewrite.
 
 **Gotcha**: per-server keys are honored, but a single bad entry in the
 JSON config doesn't fail loudly — it just silently fails to expose

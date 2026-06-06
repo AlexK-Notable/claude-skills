@@ -24,8 +24,8 @@ usage() {
 home-net-learn — agentic device-discovery + inventory grower
 
 USAGE:
-  home-net-learn nova                  # probe by hostname
-  home-net-learn 192.168.1.221         # probe by IP
+  home-net-learn sbc.local             # probe by hostname
+  home-net-learn 192.168.1.10          # probe by IP
   home-net-learn                       # interactive: scan-lan + pick
   home-net-learn --no-agent NAME       # foreground probe only, skip claude -p
   home-net-learn --skill-dir DIR       # override skill repo location
@@ -60,10 +60,9 @@ locate_skill_dir() {
     "$self"
     "${CLAUDE_PLUGIN_ROOT:-/nonexistent}"
     "$HOME/repos/claude-skills/plugins/home-network"
-    "$HOME/repos/home-network-skill/plugins/home-network"
-    "$HOME/.claude/plugins/cache/komi-home-toolkit/plugins/home-network"
-    "$HOME/.claude/plugins/marketplaces/home-network-skill/plugins/home-network"
-    "$HOME/.local/share/claude/plugins/komi-home-toolkit/plugins/home-network"
+    "$HOME/.claude/plugins/cache/claude-skills/plugins/home-network"
+    "$HOME/.claude/plugins/marketplaces/claude-skills/plugins/home-network"
+    "$HOME/.local/share/claude/plugins/claude-skills/plugins/home-network"
   )
   for c in "${candidates[@]}"; do
     [[ -d "$c/skills/home-network/references" ]] && { echo "$c"; return 0; }

@@ -1,7 +1,7 @@
 # FIREWALL.md
 
-UFW (Uncomplicated Firewall) recipes and conventions. Mirror-extends the
-"Networking & Firewall" section in `~/.config/CLAUDE.md`.
+UFW (Uncomplicated Firewall) recipes and conventions for the host this
+skill runs on.
 
 ## Posture
 
@@ -10,13 +10,12 @@ Default: deny (incoming), allow (outgoing), deny (routed)
 ```
 
 **Do not disable UFW.** The default-deny stance is load-bearing for every
-service that's been opened — Sunshine, Weylus, mDNS, future Home
-Assistant. Disabling UFW removes that protection silently.
+service you open — a game-streaming host, mDNS, a Home Assistant web UI,
+etc. Disabling UFW removes that protection silently.
 
 ## Rule conventions
 
-Every rule on this machine follows these patterns. Match them when
-adding new ones.
+Use these patterns for every rule, and match them when adding new ones.
 
 1. **Every rule has a comment.** Set via `--comment 'description'`.
 2. **TCP and UDP are explicit.** Separate rules per protocol — not the
@@ -54,8 +53,8 @@ deliberate.
 ### Allow from one specific host
 
 ```bash
-sudo ufw allow from 192.168.1.221 to any port 80 proto tcp \
-  comment 'bredos dev tunnel'
+sudo ufw allow from 192.168.1.10 to any port 80 proto tcp \
+  comment 'sbc dev tunnel'
 ```
 
 ### Allow a port range
@@ -108,20 +107,21 @@ that's a firewalled-but-running service — usually fine, often the goal.
 
 If UFW allows a port nothing listens on, the rule is a no-op. Delete it.
 
-## Currently open ports on this machine
+## Example open-ports table
 
-(See `~/.config/CLAUDE.md` "Currently Open Ports" table — authoritative
-source. Snapshot for reference:)
+Track what you've opened in a table like this so audits are easy. The
+rows below are **examples** — a game-streaming host (Sunshine) plus mDNS.
+Replace with your own services:
 
 | Port(s) | Proto | Source | Purpose |
 |---------|-------|--------|---------|
-| 47984 | tcp | Anywhere | Sunshine HTTPS |
-| 47989 | tcp | Anywhere | Sunshine HTTP |
-| 47990 | tcp | Anywhere | Sunshine Web UI |
-| 48010 | tcp/udp | Anywhere | Sunshine RTSP |
-| 47998:48000 | udp | Anywhere | Sunshine Video/Audio |
-| 48002 | udp | Anywhere | Sunshine Control |
-| 1701 | tcp | 192.168.1.0/24 | Weylus web UI |
+| 47984 | tcp | Anywhere | Sunshine HTTPS *(example)* |
+| 47989 | tcp | Anywhere | Sunshine HTTP *(example)* |
+| 47990 | tcp | Anywhere | Sunshine Web UI *(example)* |
+| 48010 | tcp/udp | Anywhere | Sunshine RTSP *(example)* |
+| 47998:48000 | udp | Anywhere | Sunshine Video/Audio *(example)* |
+| 48002 | udp | Anywhere | Sunshine Control *(example)* |
+| 1701 | tcp | 192.168.1.0/24 | a LAN-scoped web UI *(example)* |
 | 5353 | udp | Anywhere | mDNS (Avahi) |
 
 ## Reset workflow (nuclear)

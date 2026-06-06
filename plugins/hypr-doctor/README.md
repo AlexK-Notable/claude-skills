@@ -8,7 +8,8 @@ systemd user units, xdg-desktop-portal regressions, AUR rebuild hints.
 This repo holds the source files. They live symlinked into their canonical
 locations under `~/.claude/` and `~/bin/` so the tools just work; the repo
 provides versioning, portability across machines, and a place to track
-changes.
+changes. Fork it and point the manifest, clone URL, and paths at your own
+setup — see the bootstrap section below.
 
 ## Layout
 
@@ -29,7 +30,7 @@ up under `~/.claude/skills/hypr-doctor/`.
 ```bash
 hypr-doctor                              # audit, read-only (default)
 hypr-doctor rebuild                      # apply fixes: rebuild drifted plugins + reload
-hypr-doctor plugin-rebuild hyprtasking   # rebuild one plugin
+hypr-doctor plugin-rebuild <plugin>      # rebuild one plugin (name from plugins.json)
 hypr-doctor abi-drift                    # terse output for the SessionStart hook
 hypr-doctor ack-skew                     # silence the hook about the current PyQt6↔Qt6 skew
 ```
@@ -47,7 +48,7 @@ hypr-doctor ships as a plugin inside the **claude-skills** monorepo — bootstra
 the whole repo rather than this plugin alone:
 
 ```bash
-git clone git@github.com:AlexK-Notable/claude-skills.git ~/repos/claude-skills
+git clone git@github.com:your-username/claude-skills.git ~/repos/claude-skills
 cd ~/repos/claude-skills
 ./install.sh   # symlinks the skill dir, ~/bin/hypr-doctor, and the drift hook
 ```
@@ -108,4 +109,4 @@ build commands).
 
 ## License
 
-Private repo. No license — internal/personal use.
+MIT — see the repository root.

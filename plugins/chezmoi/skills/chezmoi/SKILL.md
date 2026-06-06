@@ -1,13 +1,13 @@
 ---
 name: chezmoi
-description: Use when managing dotfiles with chezmoi — adding files, applying source state, editing managed configs, syncing across machines, templating machine-specific configs, encrypting secrets, or running chezmoi commands (init, add, apply, diff, edit, re-add, update, managed, unmanaged, forget, status, verify, cd, git). Triggers on mentions of dotfiles, ~/.local/share/chezmoi, .chezmoiignore, .chezmoiexternal.toml, chezmoi.toml, source/target/destination state, age encryption for configs, or the AlexK-Notable/dotfiles repo.
+description: Use when managing dotfiles with chezmoi — adding files, applying source state, editing managed configs, syncing across machines, templating machine-specific configs, encrypting secrets, or running chezmoi commands (init, add, apply, diff, edit, re-add, update, managed, unmanaged, forget, status, verify, cd, git). Triggers on mentions of dotfiles, ~/.local/share/chezmoi, .chezmoiignore, .chezmoiexternal.toml, chezmoi.toml, source/target/destination state, age encryption for configs, or a personal dotfiles repo.
 ---
 
 # Chezmoi
 
 Source-state dotfile manager with templating, encryption, and cross-platform support.
 
-The user's source repo lives at `~/.local/share/chezmoi/` (remote: `git@github.com:AlexK-Notable/dotfiles.git`, branch: **`master`**) and tracks ~140 files, mostly under `~/.config/`. Tooling: `chezmoi v2.70.x`.
+Your source repo lives at `~/.local/share/chezmoi/` (remote: `git@github.com:your-username/dotfiles.git`, branch: **`master`**) and typically tracks your files under `~/.config/`. Tooling: `chezmoi v2.70.x`.
 
 ## Mental Model
 
@@ -81,7 +81,7 @@ chezmoi update                    # actually do it
 ## New Machine Bootstrap
 
 ```bash
-chezmoi init --apply git@github.com:AlexK-Notable/dotfiles.git
+chezmoi init --apply git@github.com:your-username/dotfiles.git
 ```
 
 This clones the source repo to `~/.local/share/chezmoi/`, renders templates against this machine's `hostname`/`os`/`arch`, runs any `run_once_*` scripts, and writes destination files. Idempotent — safe to re-run.

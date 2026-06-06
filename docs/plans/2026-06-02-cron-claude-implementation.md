@@ -10,7 +10,7 @@
 
 **Spec:** `docs/specs/2026-06-02-cron-claude-implementation-design.md`
 
-**Working directory for all commands:** `/home/komi/repos/claude-skills/plugins/cron-claude` (referred to below as `$CC`). Tests run with `uv run pytest`.
+**Working directory for all commands:** `~/repos/claude-skills/plugins/cron-claude` (referred to below as `$CC`). Tests run with `uv run pytest`.
 
 ---
 
@@ -21,24 +21,24 @@
 
 - [ ] **Step 1: Sync the uv environment (dev + tui extras)**
 
-Run: `cd /home/komi/repos/claude-skills/plugins/cron-claude && uv sync --extra tui`
+Run: `cd ~/repos/claude-skills/plugins/cron-claude && uv sync --extra tui`
 Expected: creates `.venv/`, installs typer/rich/textual/pytest/ruff, and installs `cron-claude` editable. Ends with a summary listing installed packages.
 
 - [ ] **Step 2: Confirm the existing smoke tests pass**
 
-Run: `cd /home/komi/repos/claude-skills/plugins/cron-claude && uv run pytest -q`
+Run: `cd ~/repos/claude-skills/plugins/cron-claude && uv run pytest -q`
 Expected: `3 passed` (the existing `tests/test_smoke.py`).
 
 - [ ] **Step 3: Ensure `.venv/` is gitignored**
 
 Read `$CC/.gitignore`. If it does not already contain a line `.venv/`, append it. Confirm with:
-Run: `grep -qxF '.venv/' /home/komi/repos/claude-skills/plugins/cron-claude/.gitignore && echo ok`
+Run: `grep -qxF '.venv/' ~/repos/claude-skills/plugins/cron-claude/.gitignore && echo ok`
 Expected: `ok`
 
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /home/komi/repos/claude-skills
+cd ~/repos/claude-skills
 git add plugins/cron-claude/.gitignore plugins/cron-claude/uv.lock
 git commit -m "chore(cron-claude): sync env, gitignore .venv"
 ```
@@ -126,7 +126,7 @@ Expected: `3 passed`.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /home/komi/repos/claude-skills
+cd ~/repos/claude-skills
 git add plugins/cron-claude/src/cron_claude/errors.py plugins/cron-claude/tests/test_errors.py
 git commit -m "feat(cron-claude): error hierarchy"
 ```
@@ -402,7 +402,7 @@ Expected: `9 passed`.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /home/komi/repos/claude-skills
+cd ~/repos/claude-skills
 git add plugins/cron-claude/src/cron_claude/runners/ plugins/cron-claude/tests/test_runners.py
 git commit -m "feat(cron-claude): runners — script + claude ExecStart rendering"
 ```
@@ -666,7 +666,7 @@ Expected: `4 passed`.
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /home/komi/repos/claude-skills
+cd ~/repos/claude-skills
 git add plugins/cron-claude/src/cron_claude/systemd/ plugins/cron-claude/tests/test_timers.py
 git commit -m "feat(cron-claude): systemd unit write/parse/list + TimerSpec round-trip"
 ```
@@ -831,7 +831,7 @@ Expected: `5 passed`.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /home/komi/repos/claude-skills
+cd ~/repos/claude-skills
 git add plugins/cron-claude/src/cron_claude/systemd/control.py plugins/cron-claude/tests/test_control.py
 git commit -m "feat(cron-claude): systemctl/journalctl wrapper + calendar validation"
 ```
@@ -1189,7 +1189,7 @@ Expected: `6 passed` (cli) + `3 passed` (smoke).
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /home/komi/repos/claude-skills
+cd ~/repos/claude-skills
 git add plugins/cron-claude/src/cron_claude/cli.py plugins/cron-claude/tests/test_cli.py
 git commit -m "feat(cron-claude): implement all CLI command bodies"
 ```
@@ -1335,7 +1335,7 @@ Expected: `1 passed`.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /home/komi/repos/claude-skills
+cd ~/repos/claude-skills
 git add plugins/cron-claude/src/cron_claude/tui/app.py plugins/cron-claude/tests/test_tui.py plugins/cron-claude/pyproject.toml plugins/cron-claude/uv.lock
 git commit -m "feat(cron-claude): functional Textual TUI"
 ```
@@ -1346,7 +1346,7 @@ git commit -m "feat(cron-claude): functional Textual TUI"
 
 **Files:**
 - Create: `$CC/bin/cron-claude` (executable shim)
-- Modify: `/home/komi/repos/claude-skills/install.sh` (add uv-sync step for Python plugins)
+- Modify: `~/repos/claude-skills/install.sh` (add uv-sync step for Python plugins)
 
 - [ ] **Step 1: Create the shim**
 
@@ -1368,14 +1368,14 @@ exec "$venv_bin" "$@"
 - [ ] **Step 2: Make it executable + smoke-test it**
 
 ```bash
-chmod +x /home/komi/repos/claude-skills/plugins/cron-claude/bin/cron-claude
-/home/komi/repos/claude-skills/plugins/cron-claude/bin/cron-claude --version
+chmod +x ~/repos/claude-skills/plugins/cron-claude/bin/cron-claude
+~/repos/claude-skills/plugins/cron-claude/bin/cron-claude --version
 ```
 Expected: prints `cron-claude 0.0.1` (resolves through the shim to the venv entry point).
 
 - [ ] **Step 3: Add the uv-sync step to install.sh**
 
-In `/home/komi/repos/claude-skills/install.sh`, immediately **before** the `== per-plugin hooks` section, insert:
+In `~/repos/claude-skills/install.sh`, immediately **before** the `== per-plugin hooks` section, insert:
 ```bash
 say "== python plugins (uv sync) =="
 if command -v uv >/dev/null; then
@@ -1392,12 +1392,12 @@ fi
 - [ ] **Step 4: Verify install.sh dry-run discovers the plugin + the shim deploys**
 
 ```bash
-cd /home/komi/repos/claude-skills && bash -n install.sh && ./install.sh --dry-run 2>&1 | grep -A2 'python plugins'
+cd ~/repos/claude-skills && bash -n install.sh && ./install.sh --dry-run 2>&1 | grep -A2 'python plugins'
 ```
 Expected: shows `uv sync  ~/repos/claude-skills/plugins/cron-claude` under the new section.
 
 ```bash
-cd /home/komi/repos/claude-skills && ./install.sh 2>&1 | grep -E 'cron-claude'
+cd ~/repos/claude-skills && ./install.sh 2>&1 | grep -E 'cron-claude'
 ls -l ~/bin/cron-claude && ~/bin/cron-claude --version
 ```
 Expected: `~/bin/cron-claude` is a symlink into the plugin's `bin/`, and `--version` prints `cron-claude 0.0.1`.
@@ -1405,7 +1405,7 @@ Expected: `~/bin/cron-claude` is a symlink into the plugin's `bin/`, and `--vers
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /home/komi/repos/claude-skills
+cd ~/repos/claude-skills
 git add plugins/cron-claude/bin/cron-claude install.sh
 git commit -m "feat(cron-claude): self-locating bin shim + install.sh uv-sync step"
 ```
@@ -1472,7 +1472,7 @@ Register the `integration` marker: in `$CC/pyproject.toml` under `[tool.pytest.i
 - [ ] **Step 2: Run the full suite (integration included locally)**
 
 Run: `cd $CC && uv run pytest -q`
-Expected: all tests pass — unit tests + the integration test (this dev box has systemd --user). Confirm the timer is gone afterward:
+Expected: all tests pass — unit tests + the integration test (run on a dev box with systemd --user available). Confirm the timer is gone afterward:
 Run: `systemctl --user list-unit-files 'cron-claude-pytest-smoke*'`
 Expected: `0 unit files` (cleaned up by the test's `finally`).
 
@@ -1501,14 +1501,14 @@ In `$CC/skills/cron-claude/SKILL.md`, line 8, change `A Python CLI installed at 
 - [ ] **Step 5: Final full-suite + lint + commit**
 
 ```bash
-cd /home/komi/repos/claude-skills/plugins/cron-claude
+cd ~/repos/claude-skills/plugins/cron-claude
 uv run pytest -q
 uv run ruff check src tests
 ```
 Expected: all tests pass; ruff reports no errors (fix any it flags).
 
 ```bash
-cd /home/komi/repos/claude-skills
+cd ~/repos/claude-skills
 git add plugins/cron-claude/tests/test_integration_systemd.py plugins/cron-claude/pyproject.toml plugins/cron-claude/README.md plugins/cron-claude/skills/cron-claude/SKILL.md plugins/cron-claude/uv.lock
 git commit -m "test(cron-claude): real-systemd integration test + docs: mark working"
 ```

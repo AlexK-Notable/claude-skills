@@ -6,7 +6,11 @@
 #   - ~/bin/<script>           -> plugins/<name>/{scripts,bin}/<exe> (shell CLIs)
 #   - merges plugins/*/skill-rules.fragment.json -> ~/.claude/skills/skill-rules.json
 #   - bundles the activation hook into ~/.claude/hooks (live symlink)
-#   - installs + enables the systemd --user autosync watcher
+#   - installs + enables the systemd --user autosync watcher (OPTIONAL — see below)
+#
+# The repo is assumed to live at ~/repos/claude-skills, but that path is yours to
+# customize (REPO is derived from this script's own location, so a move just works for
+# the symlinks; the systemd unit hardcodes %h/repos/claude-skills — edit it if you relocate).
 #
 # Usage: ./install.sh [--dry-run]
 set -euo pipefail
@@ -85,7 +89,11 @@ while IFS= read -r hk; do
 done < <(find "$REPO"/plugins/*/hooks -maxdepth 1 -type f -name '*.sh' 2>/dev/null || true)
 say "  (register each per-plugin hook in $SETTINGS with its event — see the plugin's README/SKILL)"
 
-say "== autosync (systemd --user inotify watcher) =="
+say "== autosync (systemd --user inotify watcher) — OPTIONAL =="
+# Autosync is a convenience that commits + pushes to YOUR OWN fork's remote on change.
+# It is OPTIONAL: comment out the enable line below (or `systemctl --user disable
+# claude-skills-autosync.service`) if you'd rather commit/push by hand. Customize the
+# repo path/remote to taste.
 command -v inotifywait >/dev/null || say "  NOTE: install 'inotify-tools' for the watcher to run"
 link "$REPO/systemd/claude-skills-autosync.service" "$UNIT_DIR/claude-skills-autosync.service"
 run "systemctl --user daemon-reload"

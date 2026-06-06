@@ -7,8 +7,8 @@
 # in the scripts is HA-specific by value.
 
 # --- how to reach Home Assistant (Channel A introspection) ---
-export HA_SSH="komi@192.168.1.229"               # ssh target for the HA host (Nova)
-export HA_CONFIG="/home/komi/homeassistant/config"
+export HA_SSH="user@192.168.1.10"                # example — your HA host (user@host or user@homeassistant.local)
+export HA_CONFIG="/home/user/homeassistant/config"
 export HA_CONTAINER="homeassistant"              # docker container name (version probe)
 export HA_STALE_AFTER_DAYS="7"
 

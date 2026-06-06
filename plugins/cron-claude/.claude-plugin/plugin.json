@@ -3,14 +3,14 @@
   "version": "1.0.0",
   "description": "Schedule, manage, and inspect recurring `claude -p` jobs as systemd user timers — create/list/remove scheduled prompts, run on-demand, and view logs.",
   "author": {
-    "name": "Alex Kechichian",
-    "email": "alexkechichian1@gmail.com",
-    "url": "https://github.com/AlexK-Notable"
+    "name": "Your Name",
+    "email": "you@example.com",
+    "url": "https://github.com/your-username"
   },
-  "homepage": "https://github.com/AlexK-Notable/claude-skills",
+  "homepage": "https://github.com/your-username/claude-skills",
   "repository": {
     "type": "git",
-    "url": "https://github.com/AlexK-Notable/claude-skills.git"
+    "url": "https://github.com/your-username/claude-skills.git"
   },
   "license": "MIT",
   "keywords": ["cron", "systemd", "timer", "scheduling", "automation", "claude"]
