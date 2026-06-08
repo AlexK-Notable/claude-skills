@@ -28,6 +28,16 @@ for corrections.
 
 ### indiedroid nova (bredOS)
 
+**⚠ Status 2026-06-08: DUAL-HOMED again — wired Ethernet is BACK and is now the PREFERRED route. Live-verified over SSH from KOMI 2026-06-08.** The Nova picked up a **wired Ethernet** lease and is now dual-homed: eth `enP4p65s0` **`192.168.1.232`** (metric 100 — preferred default route) + Wi-Fi `wlan0` **`192.168.1.229`** (metric 600 — fallback), *both* UP and both carrying a default route via `.254`. The `.229 → .232` "IP change" was simply the eth NIC coming back online (different interface = different MAC = different DHCP lease), **not** lease instability. Hostname `indiedroid-nova`, kernel `6.1.115-vendor-rk35xx` — same OS as the 2026-05-31 block below, **but now running from eMMC** (`/dev/mmcblk0p1`; `mmcblk0boot0`/`boot1` present ⇒ eMMC, not SD) — migrated off the microSD. **This supersedes the "single-homed Wi-Fi `.229`, running from SD, eMMC removed" state in the 2026-05-31 block below.**
+  - **Ethernet identity (live-verified from KOMI 2026-06-08):**
+    - `enP4p65s0` = Realtek RTL8111/8168 PCIe Gigabit NIC, driver **`r8168`** (8.051.02-NAPI), bus `platform-fe190000.pcie-pci-0004:41:00.0`.
+    - IPv4 **`192.168.1.232`** (DHCP, metric 100 — preferred). Eth MAC **`66:02:35:01:cc:21`** (locally-administered).
+    - **Eth MAC is STABLE / deterministic across reboots** — set by u-boot (device-tree `local-mac-address`, deterministically derived from the RK3588 SoC) and applied ~2 s into boot, *before* userspace networkd (dmesg shows the interface coming up with `66:..` at ~5.5 s). It is **NOT** the r8168 driver's random fallback: the chip has no programmed MAC (`dmesg`: `Invalid ether addr 00:00:..` → `Random ether addr 2a:8e:88:79:95:fd`), and that random `2a:..` is exactly what **`ethtool -P` misreports as the "Permanent address"** — a trap (see [TROUBLESHOOTING.md §12](TROUBLESHOOTING.md#12-is-an-sbcs-mac-stable-or-randomized-per-boot)). systemd-networkd's `99-default.link` is `MACAddressPolicy=persistent` (NOT `random`), so networkd keeps the firmware-set MAC. Empirically `66:02:35:01:cc:21` has held unchanged across the SD→eMMC migration reboots and the relocation power-cycle.
+    - **Recommended:** add a DHCP reservation on the AT&T gateway binding `66:02:35:01:cc:21` → `192.168.1.232` for a hard guarantee (the eth lease is currently un-reserved).
+  - **Wi-Fi `wlan0` still UP**, IPv4 `192.168.1.229` (metric 600 — fallback), MAC `60:fb:00:37:57:56` (real Realtek hardware MAC, OUI 60:FB:00 Shenzhen Bilian — unchanged across every reflash). Because both interfaces sit on the same L2 segment, a host-side ARP probe for `.229` may answer with the *eth* MAC `66:..` rather than the Wi-Fi MAC (Linux weak-host-model — see [TROUBLESHOOTING.md §1](TROUBLESHOOTING.md#1-cant-reach-host)); read the per-interface MAC on the device itself to disambiguate.
+  - **Home Assistant `:8123` is reachable on BOTH `192.168.1.232:8123` and `192.168.1.229:8123`** (Docker host-network binds all interfaces) — both verified OPEN live from KOMI 2026-06-08. Prefer `.232` (wired) going forward.
+  - SSH: `ssh komi@192.168.1.232` works (key auth, `id_ed25519`). The `nova`/`zbred` alias in `~/.ssh/config` on KOMI still points at `.229` (Wi-Fi) — that keeps working while wlan0 is up, but consider repointing it to `.232` for the wired path. mDNS still does not resolve on this vendor flash, so IP-pinning remains necessary.
+
 **⚠ Status 2026-05-31: REFLASHED to Armbian vendor 6.1.115 SD — now Wi-Fi `.229`, hostname `indiedroid-nova`, NPU FUNCTIONAL. Live-verified from KOMI 2026-05-31 (ICMP ~5ms, ARP lladdr matches the Wi-Fi MAC, `.228` dead, SSH banner Debian 13).** Migrated off the mainline-6.18 Armbian-on-SD (the `.228`/eMMC-removed state below) onto a freshly flashed **Armbian vendor 6.1.115** microSD — chosen for the in-tree RKNPU driver. The Armbian first-run wizard **overwrote the entire prebake**: hostname reset to `indiedroid-nova` (was baked `nova`), and the deployed SSH key, NOPASSWD sudo, and ethernet-MAC pin were ALL wiped by first-run (re-applied by hand afterward). This **supersedes the `.228` ethernet identity** documented in the 2026-05-28 block below.
   - **Current verified network identity (Armbian vendor 6.1.115 SD; live-confirmed from KOMI 2026-05-31):**
     - Hostname `indiedroid-nova` (set by the Armbian first-run wizard; was `nova`).
@@ -229,8 +239,8 @@ when you want a verified entry.**
 
 | Field | Value |
 |-------|-------|
-| Host | Nova `192.168.1.229:8123` (Docker, host network) |
-| Web UI | `:8123` — verified OPEN live from KOMI 2026-05-31 |
+| Host | Nova — wired **`192.168.1.232:8123`** (preferred) + Wi-Fi `192.168.1.229:8123` fallback; Docker host-network binds both interfaces (dual-homed since 2026-06-08) |
+| Web UI | `:8123` — verified OPEN live on **BOTH** `.232` and `.229` from KOMI 2026-06-08 (was `.229`-only 2026-05-31) |
 | Voice (Wyoming) | STT on the Nova `:10300` (SenseVoice/NPU, mDNS `_wyoming._tcp` as `sensevoice-rknn`); openWakeWord on the Nova `:10400`; **Piper TTS on the Pi 5 `192.168.1.165:10200`** — all three verified OPEN live 2026-05-31 |
 | Integrations | Zigbee via ZHA (SONOFF MG24 dongle on the Nova — see the nova block); Govee LAN light (`govee_light_local`) |
 | mDNS | expected `homeassistant.local` |
