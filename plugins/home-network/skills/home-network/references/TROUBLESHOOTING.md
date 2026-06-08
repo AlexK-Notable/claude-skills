@@ -476,3 +476,53 @@ reboot, reservation held.
 
 See DEVICES.md §"indiedroid nova (bredOS)" for a real case (2026-05-28:
 proved nova's board good after a bredOS-eMMC boot failure).
+
+## 12. "Is an SBC's MAC stable, or randomized per boot?"
+
+When an SBC's IP changes, the real question underneath is usually: *is its
+MAC stable (so a DHCP reservation will hold) or does it randomize every
+boot (so a reservation is futile)?* Up to **three different MACs** can be
+in play at once — don't trust any single tool:
+
+- **`ethtool -P <iface>` "Permanent address" can be a LIE.** On a NIC with
+  no MAC burned into EEPROM (common on cheap Realtek `r8168`/`r8125`
+  parts), the driver invents a random MAC at probe time and `ethtool -P`
+  reports *that* as "Permanent". It is neither permanent nor the address
+  the interface actually uses. Tell-tale in `dmesg`:
+  ```
+  r8168 ... Invalid ether addr 00:00:00:00:00:00
+  r8168 ... Random ether addr 2a:8e:88:79:95:fd   ← driver's random fallback = ethtool's bogus "Permanent"
+  enP4p65s0: ... 66:02:35:01:cc:21, IRQ 134        ← the REAL active MAC, set a moment later
+  ```
+- **Compare `ethtool -P` against the active MAC**
+  (`cat /sys/class/net/<iface>/address`). If they DIFFER, the "permanent"
+  one is the driver's fallback and something *else* is setting the active
+  MAC — find out what before drawing any conclusion.
+- **On Rockchip (RK3588) and similar SoCs, u-boot sets a deterministic MAC**
+  via the device-tree `local-mac-address` property, derived from the SoC's
+  on-chip ID. The kernel applies it *after* the driver's random fallback
+  but *before* userspace networkd — so in `dmesg` you see the random MAC
+  first, then the interface coming up a second or two later with a
+  *different*, **locally-administered** MAC (LA bit set → first octet ends
+  in `2/6/A/E`, e.g. `66:..`). That LA-bit MAC appearing pre-userspace is
+  the stable per-board value; it is the same every boot.
+- **Rule out per-boot randomization by systemd-networkd:** check the
+  `.link` files for `MACAddressPolicy`. `persistent` (or `none`) keeps the
+  firmware/kernel MAC; only `random` would change it every boot.
+  ```bash
+  grep -rH MACAddressPolicy /etc/systemd/network/ /usr/lib/systemd/network/
+  ```
+  (NetworkManager equivalent: `wifi.cloned-mac-address` /
+  `ethernet.cloned-mac-address` = `stable`/`permanent` vs `random`.)
+- **Final confirmation is empirical:** cross-check the active MAC against a
+  known prior boot's value. If it survived a reboot (or a storage
+  migration, or a relocation power-cycle), it's stable enough to pin a DHCP
+  reservation to.
+
+So "the IP changed" + "ethtool's permanent MAC ≠ the active MAC" does NOT
+mean the MAC is unstable — verify the active MAC's *provenance*
+(u-boot/firmware vs kernel-random vs networkd-random) before concluding.
+Verified on nova 2026-06-08: active eth MAC `66:02:35:01:cc:21`
+(u-boot/SoC-derived, LA bit, held stable across an SD→eMMC migration) vs
+r8168's bogus "permanent" `2a:8e:88:79:95:fd`. See DEVICES.md §"indiedroid
+nova (bredOS)" for the full case.
