@@ -125,3 +125,19 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Fix:** Verify it's a host reboot not a manual-edit error: 'od -An -c <corrupt>' shows all \0, and dmesg shows a kernel boot at the corruption timestamp while the container has ExitCode=0 RestartCount=0. Click Submit on the repair notification (HA already recovered), delete the all-zeros .corrupt file. Confirm the OTHER .storage JSON (core.config_entries, *_registry) still parse via json.load. To reduce recurrence: clean reboots + consider remounting data=ordered.
 - **Repro / verify:** `Unclean reboot while HA is running on data=writeback ext4 -> next boot: ERROR helpers.storage 'Unrecoverable error decoding storage core.restore_state ... unexpected character: line 1 column 1 (char 0)'.`
 - **Tags:** storage, reboot, ext4
+
+### 2026-06-08 — Adaptive Lighting reverting a light on a ~interval timer to ~1% = its sleep_mode switch is ON (with adapt_brightness ON); AL forces sleep_brightness+sleep_color_temp and, with take_over_control:false, ignores manual changes
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** AL applies sleep_brightness (default 1%) + 1000K every 'interval' seconds while sleep_mode is on; nothing in YAML/automations manages sleep_mode so a stray toggle stays stuck
+- **Fix:** turn off switch.<instance>_adaptive_lighting_sleep_mode_<name> (and adapt_brightness if AL should be colour-only); the AL MAIN switch's brightness_pct attribute shows AL's computed target — the fastest diagnostic
+- **Repro / verify:** `set the light to 100%; if it snaps back every ~interval s and switch...sleep_mode_<name>=on, that's it`
+- **Tags:** adaptive_lighting
+
+### 2026-06-08 — Re-enabling a disabled integration (pyscript here) needs core.config_entries edited with HA STOPPED — a disabled_by:user entry stays disabled across restarts
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** config entries persist disabled_by; a plain restart will not re-enable, and a live .storage edit is clobbered on shutdown
+- **Fix:** stop HA, set the entry's disabled_by to null in .storage/core.config_entries, validate JSON, start HA
+- **Repro / verify:** `entry shows disabled_by=user in core.config_entries; integration absent until disabled_by cleared`
+- **Tags:** storage
