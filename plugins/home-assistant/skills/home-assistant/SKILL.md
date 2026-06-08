@@ -1,6 +1,6 @@
 ---
 name: home-assistant
-description: Operate the user's self-hosted Home Assistant (HA in Docker on the Nova, 192.168.1.229:8123). Use when working on Home Assistant — automations, scripts, dashboards, the voice assistant / Assist pipeline, exposed entities, integrations, HACS, Govee lights, the Z-Print/Moonraker printer, Glances sensors — or editing HA config (.storage JSON, automations.yaml, configuration.yaml, scripts.yaml). Provides safe-mutation discipline (back up + validate before editing; when HA must be stopped), a secret-safe inventory snapshot (ha-inventory), append-only gotcha capture (ha-note), and references for the storage schema, the Assist voice pipeline, and what is changeable by file/API vs only the HA web UI.
+description: Operate the user's self-hosted Home Assistant (HA in Docker on the Nova, 192.168.1.232:8123). Use when working on Home Assistant — automations, scripts, dashboards, the voice assistant / Assist pipeline, exposed entities, integrations, HACS, Govee lights, the Z-Print/Moonraker printer, Glances sensors — or editing HA config (.storage JSON, automations.yaml, configuration.yaml, scripts.yaml). Provides safe-mutation discipline (back up + validate before editing; when HA must be stopped), a secret-safe inventory snapshot (ha-inventory), append-only gotcha capture (ha-note), and references for the storage schema, the Assist voice pipeline, and what is changeable by file/API vs only the HA web UI.
 ---
 
 # home-assistant
@@ -13,7 +13,7 @@ skill is the discipline + tooling to act safely and to remember what we learn.
 ## The system in one breath
 
 HA runs as a Docker container (`homeassistant`, `--network host`) on the **Nova**
-(`192.168.1.229:8123`), config at `/home/komi/homeassistant/config`. Reachable
+(`192.168.1.232:8123`), config at `/home/komi/homeassistant/config`. Reachable
 from KOMI over SSH with passwordless sudo. Voice stack: SenseVoice STT (NPU) +
 openWakeWord on the Nova, Piper TTS on the Pi. Full topology, access patterns,
 and the HA version live in **[references/TOPOLOGY.md](references/TOPOLOGY.md)**.

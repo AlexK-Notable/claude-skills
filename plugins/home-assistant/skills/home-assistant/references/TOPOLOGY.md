@@ -4,11 +4,11 @@
 
 | Host | Address | Role |
 |---|---|---|
-| **Nova** (Indiedroid, RK3588S) | `192.168.1.229` | HA container; SenseVoice STT (NPU, :10300); openWakeWord (:10400); govee2mqtt; Mosquitto |
+| **Nova** (Indiedroid, RK3588S) | `192.168.1.232` | HA container; SenseVoice STT (NPU, :10300); openWakeWord (:10400); govee2mqtt; Mosquitto |
 | **Pi 5** | `192.168.1.165` | Piper TTS (:10200); Glances |
 | **KOMI** (x86 desktop) | local | where Claude Code runs; SSHes to the others |
 
-SSH from KOMI: `ssh komi@192.168.1.229` (key auth). The Nova + Pi have **passwordless
+SSH from KOMI: `ssh komi@192.168.1.232` (key auth). The Nova + Pi have **passwordless
 sudo** (`sudo -n` works over SSH). KOMI does **not** — never run sudo on KOMI via a
 tool (see the global sudo policy; it locks the account).
 
@@ -16,7 +16,7 @@ tool (see the global sudo policy; it locks the account).
 
 - **Runtime:** Docker container `homeassistant` (`ghcr.io/home-assistant/home-assistant:stable`), `--network host`.
 - **Config dir (on Nova):** `/home/komi/homeassistant/config` (root-owned; read via `sudo -n`).
-- **URL:** `http://192.168.1.229:8123` (LAN only).
+- **URL:** `http://192.168.1.232:8123` (LAN only).
 - **Owner account:** username `komi`. Password in **bws** as `HA_OWNER_PASSWORD` (project `home-assistant`).
 - **Version:** read live — `ha-inventory` stamps it in the snapshot front-matter
   (`ha_version`). As of last write it was **2026.5.4**. HA churns monthly; never
@@ -24,12 +24,12 @@ tool (see the global sudo policy; it locks the account).
 
 ### Service management (from KOMI)
 ```bash
-ssh komi@192.168.1.229 'sudo -n docker logs --tail 50 homeassistant'
-ssh komi@192.168.1.229 'sudo -n docker restart homeassistant'
+ssh komi@192.168.1.232 'sudo -n docker logs --tail 50 homeassistant'
+ssh komi@192.168.1.232 'sudo -n docker restart homeassistant'
 # validate config BEFORE a restart/reload after any YAML edit:
-ssh komi@192.168.1.229 'sudo -n docker exec homeassistant python -m homeassistant --script check_config -c /config'
+ssh komi@192.168.1.232 'sudo -n docker exec homeassistant python -m homeassistant --script check_config -c /config'
 # HA users (e.g. password reset):
-ssh komi@192.168.1.229 'sudo -n docker exec homeassistant python -m homeassistant --script auth --config /config list'
+ssh komi@192.168.1.232 'sudo -n docker exec homeassistant python -m homeassistant --script auth --config /config list'
 ```
 
 > `docker start` does **not** re-read `--env-file`. To change a container's env
@@ -67,7 +67,7 @@ var — never echo it:
 
 ```bash
 T=$(bws secret get 74edad23-6bd2-4617-a1d8-b45d016db173 | jq -r .value)
-H="http://192.168.1.229:8123/api"; A="Authorization: Bearer $T"
+H="http://192.168.1.232:8123/api"; A="Authorization: Bearer $T"
 
 # read one entity's live state / list all entity ids
 curl -s -H "$A" "$H/states/light.bedroom_lights" | jq '{state, attributes}'
@@ -82,7 +82,7 @@ curl -s -H "$A" -H 'Content-Type: application/json' -X POST "$H/template" \
      -d '{"template":"{{ today_at(\"07:45\").timestamp() }}"}'
 
 # config sanity (also runnable on the host): exit 0 before any reload/restart
-ssh komi@192.168.1.229 'sudo -n docker exec homeassistant python -m homeassistant --script check_config -c /config'
+ssh komi@192.168.1.232 'sudo -n docker exec homeassistant python -m homeassistant --script check_config -c /config'
 ```
 
 `/api/template` is the high-value one: it lets you prove a brightness/rgb/condition

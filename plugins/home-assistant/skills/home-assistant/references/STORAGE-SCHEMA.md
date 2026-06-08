@@ -8,7 +8,7 @@ Treat editing here as surgery.
 ## The mandatory procedure (every `.storage` edit)
 
 ```bash
-H="ssh komi@192.168.1.229 sudo -n"
+H="ssh komi@192.168.1.232 sudo -n"
 F=/home/komi/homeassistant/config/.storage/<file>
 
 # 1. STOP HA  (so your edit isn't clobbered on its next save)
