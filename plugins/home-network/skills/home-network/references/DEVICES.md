@@ -244,7 +244,7 @@ when you want a verified entry.**
 | Voice (Wyoming) | STT on the Nova `:10300` (SenseVoice/NPU, mDNS `_wyoming._tcp` as `sensevoice-rknn`); openWakeWord on the Nova `:10400`; **Piper TTS on the Pi 5 `192.168.1.165:10200`** — all three verified OPEN live 2026-05-31 |
 | Integrations | Zigbee via ZHA (SONOFF MG24 dongle on the Nova — see the nova block); Govee LAN light (`govee_light_local`) |
 | mDNS | expected `homeassistant.local` |
-| Notes | Was the "incoming / not yet deployed" placeholder before 2026-05-31. Run `home-net-learn 192.168.1.229` for a fuller verified entry. |
+| Notes | Was the "incoming / not yet deployed" placeholder before 2026-05-31. Run `home-net-learn 192.168.1.232` for a fuller verified entry. |
 
 ---
 

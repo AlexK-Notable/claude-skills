@@ -15,6 +15,7 @@ Decision trees for common LAN problems.
 9. "SSH to a DHCP'd host that keeps changing IP" (mDNS HostName pattern)
 10. "avahi-daemon shows active but mDNS doesn't resolve"
 11. "Corrupt OS install vs board failure on an SBC" (SD swap-test)
+12. "Is an SBC's MAC stable, or randomized per boot?"
 
 ---
 
