@@ -76,6 +76,17 @@ Searching by MAC instead of IP is what makes this robust to lease
 rotation. See DEVICES.md §"indiedroid nova (bredOS)" for a real case
 (nova OFFLINE 2026-05-27).
 
+**Caveat on dual-homed hosts (one box, two interfaces on the same LAN):**
+a host with both ethernet and Wi-Fi up on the same segment may answer an
+ARP probe for *either* IP with whichever interface's MAC the kernel picks
+first (Linux's default "weak host model" — `arp_ignore=0`). So probing the
+Wi-Fi IP can come back with the *ethernet* MAC, making the two IPs look
+like they share one MAC. That's normal, not a spoof. To learn which MAC
+truly belongs to which interface, read it on the host itself
+(`ip -brief addr show`, or `cat /sys/class/net/<iface>/address`). Real
+case: nova's `.229` (Wi-Fi, `60:fb:..`) ARP-resolved to its eth MAC `66:..`
+from KOMI 2026-06-08 because the eth interface answered first.
+
 ## 2. "SSH connection refused / timeout"
 
 ```
