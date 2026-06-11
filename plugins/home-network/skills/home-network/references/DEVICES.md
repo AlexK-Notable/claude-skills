@@ -227,11 +227,12 @@ when you want a verified entry.**
 
 | IP | MAC | Probable identity |
 |----|-----|-------------------|
-| 192.168.1.141 | d4:ad:fc:42:89:d0 | **LIFX bulb** (OUI D4:AD:FC = Shenzhen Intellirocks / LIFX) |
-| 192.168.1.142 | d4:ad:fc:18:fb:38 | LIFX bulb |
-| 192.168.1.143 | d4:ad:fc:43:15:92 | LIFX bulb |
-| 192.168.1.145 | *(MAC unverified — re-scan needed; original audit recorded the same MAC as .143, a copy-paste error)* | LIFX bulb |
-| 192.168.1.146 | d4:ad:fc:41:19:68 | LIFX bulb |
+| 192.168.1.142 | d4:ad:fc:42:89:d0 | **Govee bulb** (OUI D4:AD:FC = Shenzhen Intellirocks Tech = Govee's manufacturer; earlier audits misattributed this OUI to LIFX). Was at .141 before lease rotation. |
+| 192.168.1.143 | d4:ad:fc:18:fb:38 | Govee bulb (was at .142) |
+| 192.168.1.145 | d4:ad:fc:43:15:92 | Govee bulb (was at .143; resolves the 2026-06-10 "MAC unverified" flag — the old duplicate wasn't a copy-paste error, the DHCP leases had rotated) |
+| 192.168.1.146 | d4:ad:fc:41:19:68 | Govee bulb (lease unchanged) |
+
+> Bulb IP↔MAC mapping verified 2026-06-11 via `arp-scan --localnet` (vendor-decoded). These are DHCP clients whose leases rotate — **the MAC is the stable key, not the IP**. Re-verify with `scan-lan` before relying on an IP.
 | 192.168.1.144 | 0e:c5:4e:38:25:fc *(randomized)* | Android device — advertises mDNS `Android_LBTMCTRB.local` (name seen 2026-05-27; MAC unchanged from 2026-05-24 audit) |
 | 192.168.1.148 | 1c:69:20:85:e0:90 | ESP32-based IoT (OUI: Espressif) |
 | 192.168.1.180 | 3c:dc:75:0e:ce:38 | ESP32-based IoT |

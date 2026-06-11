@@ -120,8 +120,12 @@ scan-lan 10.0.0.0/24        # specific subnet
 scan-lan --quick            # ARP cache + mDNS browse, no active probes
 ```
 
-Combines mDNS browse + ARP probe + TCP fanout on the top 5 ports.
-Avoids ICMP because of Rule 1.
+Combines mDNS browse + an active sweep + TCP fanout on the top 5 ports.
+The active sweep picks the best installed tool: `arp-scan` (whole /24 in
+<1s, IP+MAC+vendor) → `fping` (ICMP sweep) → `arping` (per-host) →
+TCP cache-warming. Degrades automatically when a tool loses its
+`cap_net_raw` (pacman upgrades wipe file caps — `home-net-doctor` flags
+this). Plain ICMP is never the only signal, per Rule 1.
 
 ### Resolve a name reliably
 

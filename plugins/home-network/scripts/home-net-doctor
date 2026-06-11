@@ -19,9 +19,12 @@ fi
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
-# arping is only USABLE with cap_net_raw (or as root) — mere presence
-# isn't enough. Check getcap first (no side effects), fall back to a
-# trial run (rc>=2 means the raw socket couldn't open).
+# Raw-socket tools (arping, fping, arp-scan) are only USABLE with
+# cap_net_raw (or as root) — mere presence isn't enough. Check getcap
+# first (no side effects), fall back to a cheap trial run.
+# NOTE: pacman wipes file capabilities on package upgrade — a tool that
+# worked yesterday can silently lose its cap after -Syu; these checks
+# catch that.
 arping_functional() {
   local path
   path=$(command -v arping) || return 1
@@ -33,6 +36,23 @@ arping_functional() {
   iface=$(ip -4 route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}')
   arping -c 1 -w 1 ${iface:+-I "$iface"} 127.0.0.1 >/dev/null 2>&1 || rc=$?
   (( rc < 2 ))
+}
+
+fping_functional() {
+  have fping || return 1
+  [[ ${EUID:-$(id -u)} -eq 0 ]] && return 0
+  fping -c 1 -t 300 127.0.0.1 >/dev/null 2>&1
+}
+
+arp_scan_functional() {
+  local path
+  path=$(command -v arp-scan) || return 1
+  [[ ${EUID:-$(id -u)} -eq 0 ]] && return 0
+  # arp-scan ships with cap_net_raw=p and raises it itself
+  if have getcap && getcap "$path" 2>/dev/null | grep -q cap_net_raw; then
+    return 0
+  fi
+  arp-scan --localnet --retry=1 --timeout=100 >/dev/null 2>&1
 }
 
 # --- detect distro and pick package manager ---
@@ -62,6 +82,8 @@ TOOLS=(
   "avahi-browse|recommended|mDNS service discovery|avahi nss-mdns|avahi-utils libnss-mdns|avahi-tools nss-mdns|avahi-tools|(built-in: dns-sd)"
   "avahi-resolve|recommended|mDNS name resolution|avahi nss-mdns|avahi-utils libnss-mdns|avahi-tools nss-mdns|avahi-tools|(built-in: dns-sd)"
   "arping|recommended|ARP probing|iputils|iputils-arping|iputils|arping|arping"
+  "arp-scan|recommended|one-shot subnet ARP sweep (scan-lan first choice)|arp-scan|arp-scan|arp-scan|arp-scan|arp-scan"
+  "fping|recommended|parallel ICMP sweep (scan-lan second choice)|fping|fping|fping|fping|fping"
   "ip|required|interface/route/neigh management|iproute2|iproute2|iproute|iproute2|(built-in)"
   "ss|required|socket statistics|iproute2|iproute2|iproute|iproute2|(built-in)"
   "dig|recommended|DNS queries|bind|dnsutils|bind-utils|bind-tools|bind"
@@ -132,12 +154,18 @@ json_entries=()
 for entry in "${TOOLS[@]}"; do
   IFS='|' read -r name sev purpose _arch _deb _fed _alp _mac <<< "$entry"
   pkg=$(pkg_for "$entry")
-  if [[ "$name" == "arping" ]] && have arping && ! arping_functional; then
+  cap_unusable=""
+  case "$name" in
+    arping)   have arping   && ! arping_functional   && cap_unusable=1 ;;
+    fping)    have fping    && ! fping_functional    && cap_unusable=1 ;;
+    arp-scan) have arp-scan && ! arp_scan_functional && cap_unusable=1 ;;
+  esac
+  if [[ -n "$cap_unusable" ]]; then
     # present but can't open a raw socket — functionally missing
     missing_recommended=$((missing_recommended+1))
     status=present_unusable
-    [[ $MODE == human ]] && printf "  ${C_WARN}⚠${C_RESET} %-16s ${C_BOLD}present but unusable${C_RESET} (no cap_net_raw) — %s\n      fix: ${C_BOLD}sudo setcap cap_net_raw+eip \$(command -v arping)${C_RESET}\n" "$name" "$purpose"
-    json_entries+=("{\"name\":\"$name\",\"severity\":\"$sev\",\"status\":\"$status\",\"purpose\":\"$purpose\",\"install\":\"sudo setcap cap_net_raw+eip \$(command -v arping)\"}")
+    [[ $MODE == human ]] && printf "  ${C_WARN}⚠${C_RESET} %-16s ${C_BOLD}present but unusable${C_RESET} (no cap_net_raw) — %s\n      fix: ${C_BOLD}sudo setcap cap_net_raw+eip \$(command -v %s)${C_RESET}  ${C_DIM}(pacman upgrades wipe file caps — see TOOLS.md for a reapply hook)${C_RESET}\n" "$name" "$purpose" "$name"
+    json_entries+=("{\"name\":\"$name\",\"severity\":\"$sev\",\"status\":\"$status\",\"purpose\":\"$purpose\",\"install\":\"sudo setcap cap_net_raw+eip \$(command -v $name)\"}")
     continue
   elif [[ "$name" == "nc" ]] && ! have nc && have ncat; then
     # nc absent but ncat (nmap's netcat) covers the same role

@@ -55,13 +55,88 @@ to work transparently.
 - `-D` — duplicate address detection mode
 
 **Gotcha**: needs RAW sockets. Either run as root, or
-`sudo setcap cap_net_raw+eip $(which arping)` once to make it
-unprivileged forever. On this CachyOS box neither is in effect (and sudo
-is barred by policy), so a plain `arping` prints `socket: Operation not
-permitted`. When that happens, use the unprivileged ping-sweep +
-`ip neigh` substitute in
+`sudo setcap cap_net_raw+eip $(which arping)` once. On this CachyOS box
+the cap **is set** (since 2026-06-11) — but see the capability-persistence
+note below: a `pacman -Syu` that upgrades `iputils` silently wipes it,
+and a plain `arping` goes back to `socket: Operation not permitted`.
+`home-net-doctor` checks functionality (not just presence) and will flag
+it. If caps are missing and sudo isn't available, use the unprivileged
+ping-sweep + `ip neigh` substitute in
 [TROUBLESHOOTING.md §1](TROUBLESHOOTING.md#1-cant-reach-host) — it proves
 L2 presence by MAC without RAW sockets.
+
+### arp-scan
+
+**Purpose**: One-shot ARP sweep of an entire subnet — the fastest,
+most authoritative on-LAN discovery (256 hosts in <1s), printing
+IP / MAC / NIC-vendor per responder. `scan-lan`'s first-choice probe.
+
+**Install**: `pacman -S arp-scan` / `apt install arp-scan` / `brew install arp-scan`
+
+**Top flags**:
+- `--localnet` — sweep the subnet of the default interface
+- `--interface=IFACE` — explicit interface
+- `--retry=2` — resend probes (default 1 can miss sleepy IoT devices)
+- `--timeout=N` — per-host wait in ms
+
+**Common usage**:
+```bash
+arp-scan --localnet                          # who's on my LAN (IP+MAC+vendor)
+arp-scan --interface=enp4s0 192.168.1.0/24   # explicit iface + subnet
+```
+
+**Gotcha**: same RAW-socket requirement as arping. The Arch package ships
+with `cap_net_raw=p` (the binary raises it itself), so it works out of the
+box — until a package upgrade reinstalls the file. See capability
+persistence below.
+
+### fping
+
+**Purpose**: Parallel ICMP sweep — pings a whole subnet in ~1s with one
+process. Less authoritative than ARP on-LAN (firewalled hosts drop ICMP;
+see DISCOVERY.md) but fills the kernel ARP cache as a side effect.
+`scan-lan`'s second-choice probe.
+
+**Install**: `pacman -S fping` / `apt install fping` / `brew install fping`
+
+**Top flags**:
+- `-a` — print only alive hosts
+- `-g SUBNET` — generate target list from CIDR (e.g. `192.168.1.0/24`)
+- `-q` — quiet (no per-ping noise)
+- `-r N` — retries; `-t N` — timeout ms
+
+**Common usage**:
+```bash
+fping -a -q -g 192.168.1.0/24    # alive hosts, one per line, ~1s
+```
+
+**Exit codes**: 0 = all alive, 1 = some unreachable (normal for a sweep),
+≥2 = couldn't run (caps/args).
+
+### Capability persistence (arping / fping / arp-scan / nmap)
+
+File capabilities (`setcap`) are attributes of the *installed file* —
+**pacman wipes them every time the owning package is reinstalled or
+upgraded**. `home-net-doctor` tests each raw-socket tool functionally and
+flags "present but unusable" after this happens. To make the arping grant
+survive upgrades, install a pacman hook (root-owned, one-time setup):
+
+```ini
+# /etc/pacman.d/hooks/arping-setcap.hook
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = iputils
+
+[Action]
+Description = Restoring cap_net_raw on arping (home-network skill)
+When = PostTransaction
+Exec = /usr/sbin/setcap cap_net_raw+eip /usr/bin/arping
+```
+
+(fping and arp-scan ship their caps in the package itself, so theirs come
+back on their own; only manual grants like arping's need a hook.)
 
 ### nmap
 

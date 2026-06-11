@@ -34,7 +34,9 @@ REQUIRES:
 
 OPTIONAL (better results with):
   - avahi-browse + avahi-resolve (mDNS)
-  - arping (L2 ARP probes)
+  - arp-scan (one-shot subnet ARP sweep — best active probe)
+  - fping (parallel ICMP sweep — second choice)
+  - arping (per-host L2 ARP probes — third choice)
   - nmap (--deep)
 
 Run `home-net-doctor` to see what's installed.
@@ -133,37 +135,87 @@ arping_usable() {
   (( rc < 2 ))   # 0=reply, 1=no reply — both prove the raw socket opened
 }
 
+# harvest IP→MAC pairs for our subnet from the kernel ARP cache into SEEN/MACS
+harvest_arp_cache() { # $1 = source tag
+  local tag="$1" ip mac _x
+  while read -r ip _x _x _x mac _x; do
+    [[ "$ip" =~ ^${base//./\\.}\. ]] || continue
+    [[ "$mac" =~ ^[0-9a-f:]{17}$ ]] || continue
+    SEEN["$ip"]=1
+    MACS["$ip"]="$mac"
+    [[ -z "${SOURCES[$ip]:-}" ]] && SOURCES["$ip"]="$tag"
+  done < <(ip neigh show 2>/dev/null)
+}
+
 if [[ "$MODE" == "quick" ]]; then
-  # quick mode: skip ARP probing and TCP fanout
+  # quick mode: skip active probing and TCP fanout
   :
 else
-  # --- phase 3: ARP probe each IP (parallel) ---
-  USE_ARPING=0
-  if have arping; then
-    if arping_usable; then
-      USE_ARPING=1
+  # --- phase 3: active sweep — best available tool wins ---
+  # Preference order (see TOOLS.md "Active discovery"):
+  #   arp-scan : one process ARP-sweeps the whole /24 in <1s and prints
+  #              IP/MAC/vendor directly — authoritative on-LAN
+  #   fping    : parallel ICMP sweep (~1s); alive list + ARP cache side effect
+  #   arping   : per-host ARP probes (254 background jobs, needs cap_net_raw)
+  #   /dev/tcp : TCP cache-warming, no caps needed — last resort
+  # All raw-socket tools degrade to the next rung if caps are missing.
+  swept=""
+
+  if have arp-scan; then
+    out=""
+    if out=$(arp-scan --interface="$IFACE" --retry=2 "$SUBNET" 2>/dev/null); then
+      while IFS=$'\t' read -r ip mac vendor; do
+        [[ "$ip" =~ ^${base//./\\.}\. ]] || continue
+        [[ "$mac" =~ ^[0-9a-f:]{17}$ ]] || continue
+        SEEN["$ip"]=1
+        MACS["$ip"]="$mac"
+        # vendor string is a useful identity hint when mDNS gave us no name
+        [[ -z "${NAMES[$ip]:-}" && -n "${vendor:-}" && "$vendor" != "(Unknown)" ]] \
+          && NAMES["$ip"]="(${vendor})"
+        [[ -z "${SOURCES[$ip]:-}" ]] && SOURCES["$ip"]="arp-scan"
+      done <<< "$out"
+      swept="arp-scan"
     else
-      warn "arping present but unusable (no cap_net_raw) — using TCP cache-warming; fix: sudo setcap cap_net_raw+eip \$(command -v arping)"
+      warn "arp-scan failed (missing cap_net_raw? fix: sudo setcap cap_net_raw+eip \$(command -v arp-scan)) — falling back"
     fi
-  else
-    warn "arping not installed — using TCP cache-warming instead"
   fi
 
-  if (( USE_ARPING )); then
-    # arping populates the kernel's ARP cache as a side effect.
-    # We don't read its stdout — we re-read the ARP cache after all probes settle.
-    for i in $(seq 1 254); do
-      arping -c 1 -w 1 -I "$IFACE" "${base}.${i}" >/dev/null 2>&1 &
-    done
-    wait
-    while read -r ip _ _ _ mac _; do
-      [[ "$ip" =~ ^${base//./\\.}\. ]] || continue
-      [[ "$mac" =~ ^[0-9a-f:]{17}$ ]] || continue
-      SEEN["$ip"]=1
-      MACS["$ip"]="$mac"
-      [[ -z "${SOURCES[$ip]:-}" ]] && SOURCES["$ip"]="arp-probe"
-    done < <(ip neigh show 2>/dev/null)
-  else
+  if [[ -z "$swept" ]] && have fping; then
+    # fping exits 0 (all alive) or 1 (some unreachable — normal for a sweep);
+    # >=2 means it couldn't run. -a prints alive IPs; ARP cache fills as a
+    # side effect, harvested for MACs below.
+    rc=0
+    out=$(fping -a -q -g "$SUBNET" -r 1 -t 300 2>/dev/null) || rc=$?
+    if (( rc <= 1 )); then
+      while read -r ip; do
+        [[ "$ip" =~ ^${base//./\\.}\. ]] || continue
+        SEEN["$ip"]=1
+        [[ -z "${SOURCES[$ip]:-}" ]] && SOURCES["$ip"]="fping"
+      done <<< "$out"
+      harvest_arp_cache "fping"
+      swept="fping"
+    else
+      warn "fping failed (rc=$rc, missing cap_net_raw?) — falling back"
+    fi
+  fi
+
+  if [[ -z "$swept" ]] && have arping; then
+    if arping_usable; then
+      # arping populates the kernel's ARP cache as a side effect.
+      # We don't read its stdout — we re-read the ARP cache after all probes settle.
+      for i in $(seq 1 254); do
+        arping -c 1 -w 1 -I "$IFACE" "${base}.${i}" >/dev/null 2>&1 &
+      done
+      wait
+      harvest_arp_cache "arp-probe"
+      swept="arping"
+    else
+      warn "arping present but unusable (no cap_net_raw) — fix: sudo setcap cap_net_raw+eip \$(command -v arping)"
+    fi
+  fi
+
+  if [[ -z "$swept" ]]; then
+    warn "no usable ARP/ICMP sweep tool — using TCP cache-warming (slowest, least complete)"
     # fallback: try /dev/tcp to a likely port to force ARP discovery.
     # $0/$1-style argument passing keeps the host out of the parsed script
     # text (no interpolation injection).
@@ -171,14 +223,7 @@ else
       ( timeout 0.5 bash -c 'exec 3<>"/dev/tcp/$0/22"' "${base}.${i}" 2>/dev/null || true ) &
     done
     wait
-    # re-read ARP cache
-    while read -r ip _ _ _ mac _; do
-      [[ "$ip" =~ ^${base//./\\.}\. ]] || continue
-      [[ "$mac" =~ ^[0-9a-f:]{17}$ ]] || continue
-      SEEN["$ip"]=1
-      MACS["$ip"]="$mac"
-      [[ -z "${SOURCES[$ip]:-}" ]] && SOURCES["$ip"]="tcp-warm"
-    done < <(ip neigh show 2>/dev/null)
+    harvest_arp_cache "tcp-warm"
   fi
 
   # --- phase 4: TCP fanout on alive hosts (parallel, capped at ~32 jobs) ---
