@@ -23,7 +23,7 @@ scan-lan — discover devices on a LAN (mDNS + ARP + TCP, no ICMP)
 USAGE:
   scan-lan                       # auto-detect subnet from default route
   scan-lan 192.168.1.0/24        # specific subnet
-  scan-lan --quick               # mDNS browse only, skip probes
+  scan-lan --quick               # ARP cache + mDNS browse, skip active probes
   scan-lan --deep                # add nmap if available
   scan-lan -i eth0               # specify interface
   scan-lan --ports 22,80,443     # custom port list for TCP fanout
@@ -123,12 +123,33 @@ else
   warn "avahi-browse not installed — skipping mDNS phase"
 fi
 
+# arping needs cap_net_raw (or root); without it every probe fails silently
+# (rc=2, "socket: Operation not permitted") and the ARP phase learns nothing.
+# Trial-run one probe to verify it's actually usable, not just present.
+arping_usable() {
+  have arping || return 1
+  local rc=0
+  arping -c 1 -w 1 -I "$IFACE" "${base}.254" >/dev/null 2>&1 || rc=$?
+  (( rc < 2 ))   # 0=reply, 1=no reply — both prove the raw socket opened
+}
+
 if [[ "$MODE" == "quick" ]]; then
   # quick mode: skip ARP probing and TCP fanout
   :
 else
   # --- phase 3: ARP probe each IP (parallel) ---
+  USE_ARPING=0
   if have arping; then
+    if arping_usable; then
+      USE_ARPING=1
+    else
+      warn "arping present but unusable (no cap_net_raw) — using TCP cache-warming; fix: sudo setcap cap_net_raw+eip \$(command -v arping)"
+    fi
+  else
+    warn "arping not installed — using TCP cache-warming instead"
+  fi
+
+  if (( USE_ARPING )); then
     # arping populates the kernel's ARP cache as a side effect.
     # We don't read its stdout — we re-read the ARP cache after all probes settle.
     for i in $(seq 1 254); do
@@ -143,11 +164,11 @@ else
       [[ -z "${SOURCES[$ip]:-}" ]] && SOURCES["$ip"]="arp-probe"
     done < <(ip neigh show 2>/dev/null)
   else
-    warn "arping not installed — using TCP cache-warming instead"
-    # fallback: try /dev/tcp to a likely port to force ARP discovery
+    # fallback: try /dev/tcp to a likely port to force ARP discovery.
+    # $0/$1-style argument passing keeps the host out of the parsed script
+    # text (no interpolation injection).
     for i in $(seq 1 254); do
-      ip="${base}.${i}"
-      (timeout 0.5 bash -c "exec 3<>/dev/tcp/$ip/22" 2>/dev/null; exec 3<&-) &
+      ( timeout 0.5 bash -c 'exec 3<>"/dev/tcp/$0/22"' "${base}.${i}" 2>/dev/null || true ) &
     done
     wait
     # re-read ARP cache
@@ -160,17 +181,27 @@ else
     done < <(ip neigh show 2>/dev/null)
   fi
 
-  # --- phase 4: TCP fanout on alive hosts ---
+  # --- phase 4: TCP fanout on alive hosts (parallel, capped at ~32 jobs) ---
   IFS=',' read -r -a port_array <<< "$PORTS"
   if (( ${#SEEN[@]} > 0 )); then
-    for ip in "${!SEEN[@]}"; do
-      open_list=""
-      for port in "${port_array[@]}"; do
-        if timeout 1 bash -c "exec 3<>/dev/tcp/$ip/$port" 2>/dev/null; then
-          open_list="$open_list$port,"
-        fi
+    declare -A TCP_FOUND
+    while read -r ip port; do
+      [[ -n "$ip" && -n "$port" ]] || continue
+      TCP_FOUND["$ip"]="${TCP_FOUND[$ip]:-}${port},"
+    done < <(
+      jobs_running=0
+      for ip in "${!SEEN[@]}"; do
+        for port in "${port_array[@]}"; do
+          { timeout 1 bash -c 'exec 3<>"/dev/tcp/$0/$1"' "$ip" "$port" 2>/dev/null \
+              && echo "$ip $port"; } &
+          jobs_running=$((jobs_running + 1))
+          if (( jobs_running >= 32 )); then wait; jobs_running=0; fi
+        done
       done
-      [[ -n "$open_list" ]] && PORTS_OPEN["$ip"]="${open_list%,}"
+      wait
+    ) || true
+    for ip in "${!TCP_FOUND[@]}"; do
+      PORTS_OPEN["$ip"]="${TCP_FOUND[$ip]%,}"
     done
   fi
 

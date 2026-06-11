@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # wol — Wake-on-LAN sender. Accepts a raw MAC or a device alias from DEVICES.md.
 #
-# Requires `wakeonlan` or `etherwake`. Bash's /dev/udp can't set SO_BROADCAST,
-# so a pure-bash fallback can't actually send a magic packet to a broadcast
-# address. We error cleanly instead of silently producing a packet that goes
-# nowhere.
+# Sender preference: `wakeonlan` if installed, else a pure-python3 UDP
+# magic-packet fallback (SO_BROADCAST — bash's /dev/udp can't set that, python
+# can). `etherwake` needs cap_net_raw/root and this tool NEVER runs sudo
+# (no controlling tty → pam failure → faillock lockout), so if etherwake is
+# the only option we print the exact sudo command for the user to run.
 
 set -euo pipefail
 
@@ -42,9 +43,13 @@ locate_devices() {
   if [[ -n "${HOME_NETWORK_SKILL_DEVICES:-}" ]] && [[ -r "$HOME_NETWORK_SKILL_DEVICES" ]]; then
     echo "$HOME_NETWORK_SKILL_DEVICES"; return 0
   fi
-  # try the installed skill location
+  # try this script's own repo first (survives moves), then installed locations
+  local self_refs
+  self_refs="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." 2>/dev/null && pwd || true)/skills/home-network/references"
   for candidate in \
+    "$self_refs/DEVICES.md" \
     "$HOME/.claude/skills/home-network/references/DEVICES.md" \
+    "$HOME/repos/claude-skills/plugins/home-network/skills/home-network/references/DEVICES.md" \
     "$HOME/repos/home-network-skill/skills/home-network/references/DEVICES.md"; do
     [[ -r "$candidate" ]] && { echo "$candidate"; return 0; }
   done
@@ -55,13 +60,14 @@ list_aliases() {
   local devfile
   devfile=$(locate_devices) || { echo "no DEVICES.md found" >&2; exit 2; }
   echo "${C_BOLD}Aliases from $devfile:${C_RESET}"
-  # Pull H3 section headers (### name) and MAC lines
+  # Pull H3 section headers (### name) and the first MAC-bearing row per
+  # section. The MAC may be wrapped in backticks/bold in the table, so we
+  # only require a row mentioning "MAC" with a MAC pattern ANYWHERE in it.
   awk '
-    /^### / { current_alias=substr($0,5); next }
-    /MAC.*\| *([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}/ {
-      match($0, /([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}/)
+    /^### / { current_alias=substr($0,5); shown=0; next }
+    !shown && /MAC/ && match($0, /([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}/) {
       mac = substr($0, RSTART, RLENGTH)
-      if (current_alias != "") printf "  %-30s %s\n", current_alias, mac
+      if (current_alias != "") { printf "  %-30s %s\n", current_alias, mac; shown=1 }
     }
   ' "$devfile"
 }
@@ -71,18 +77,34 @@ alias_to_mac() {
   local alias="$1"
   local devfile
   devfile=$(locate_devices) || return 1
-  # match case-insensitively in the alias header
+  # Match case-insensitively in the alias header. LITERAL matching only
+  # (index/word compare, never `~`) so regex metachars in the query can't
+  # break awk. Prefer a whole-word match over a substring match so a short
+  # query ("no") can't grab the wrong section when an exact word ("nova")
+  # exists elsewhere. MAC may be backtick-wrapped — require only a row
+  # mentioning "MAC" with a MAC pattern anywhere; extract with match().
   awk -v want="${alias,,}" '
-    BEGIN { in_section = 0 }
+    function has_word(h, w,   n, parts, i) {
+      n = split(h, parts, /[^a-z0-9._-]+/)
+      for (i = 1; i <= n; i++) if (parts[i] == w) return 1
+      return 0
+    }
+    BEGIN { in_section = 0; is_word = 0; word_mac = ""; sub_mac = "" }
     /^### / {
       header = tolower(substr($0, 5))
-      in_section = (header ~ want) ? 1 : 0
+      is_word = has_word(header, want)
+      in_section = (is_word || index(header, want) > 0) ? 1 : 0
       next
     }
-    in_section && /MAC.*\| *([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}/ {
-      match($0, /([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}/)
-      print substr($0, RSTART, RLENGTH)
-      exit
+    in_section && /MAC/ && match($0, /([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}/) {
+      mac = substr($0, RSTART, RLENGTH)
+      if (is_word) { if (word_mac == "") word_mac = mac }
+      else         { if (sub_mac  == "") sub_mac  = mac }
+      in_section = 0
+    }
+    END {
+      if (word_mac != "") print word_mac
+      else if (sub_mac != "") print sub_mac
     }
   ' "$devfile"
 }
@@ -128,12 +150,32 @@ fi
 if have wakeonlan; then
   echo "${C_BOLD}sending magic packet (via wakeonlan) to $MAC → $BCAST${C_RESET}"
   wakeonlan -i "$BCAST" "$MAC"
+elif have python3; then
+  # Pure-python fallback: UDP magic packet with SO_BROADCAST (which bash's
+  # /dev/udp cannot set). No raw sockets, no privileges needed.
+  echo "${C_BOLD}sending magic packet (via python3) to $MAC → $BCAST${C_RESET}"
+  python3 - "$MAC" "$BCAST" <<'PYEOF'
+import socket, sys
+mac, bcast = sys.argv[1], sys.argv[2]
+payload = bytes.fromhex("ff" * 6 + mac.replace(":", "").replace("-", "") * 16)
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+s.sendto(payload, (bcast, 9))
+s.close()
+PYEOF
 elif have etherwake; then
-  echo "${C_BOLD}sending magic packet (via etherwake) to $MAC${C_RESET}"
-  echo "${C_DIM}note: etherwake needs cap_net_raw or sudo${C_RESET}"
-  sudo etherwake "$MAC"
+  # etherwake needs cap_net_raw or root. NEVER run sudo from here — with no
+  # controlling tty the pam conversation fails and each attempt accumulates
+  # in pam_faillock, locking the account. Print the command instead.
+  WOL_IFACE=$(ip -4 route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}')
+  echo "${C_BAD}wol: only 'etherwake' is available, and it needs cap_net_raw (this tool never runs sudo)${C_RESET}" >&2
+  echo "      run this yourself in a terminal:" >&2
+  echo "        sudo etherwake -i ${WOL_IFACE:-eth0} $MAC" >&2
+  echo "      or grant the capability once:" >&2
+  echo "        sudo setcap cap_net_raw+eip \$(command -v etherwake)" >&2
+  exit 2
 else
-  echo "${C_BAD}wol: neither 'wakeonlan' nor 'etherwake' is installed${C_RESET}" >&2
+  echo "${C_BAD}wol: no usable sender ('wakeonlan', 'python3', or 'etherwake')${C_RESET}" >&2
   echo "      pure-bash WoL can't broadcast (no SO_BROADCAST in /dev/udp)" >&2
   echo "      install:" >&2
   echo "        Arch/CachyOS (AUR):  yay -S wakeonlan   # or: yay -S etherwake-git" >&2

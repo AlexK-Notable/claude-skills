@@ -256,15 +256,19 @@ See [TROUBLESHOOTING.md §5](TROUBLESHOOTING.md#5-wake-on-lan-doesnt-work).
 **Install**: preinstalled almost everywhere (different flavors: OpenBSD nc, ncat, traditional nc).
 
 **Top usage**:
-- `nc -zv HOST PORT` — test if port is open (verbose, zero-IO)
+- `nc -zv HOST PORT` — test if ONE port is open (verbose, zero-IO).
+  Note: `nc -zv HOST 22 80 443` is NOT valid multi-port syntax — nc takes
+  a single port (or a range like `22-443` on some flavors). For multiple
+  ports, use `port-check HOST 22 80 443` instead (parallel, pure bash).
 - `nc -l PORT` — listen on a port
 - `nc -u HOST PORT` — UDP instead of TCP
 
 **Gotcha**: flag semantics differ between flavors. If `-z` doesn't work,
 you have a flavor that needs `--probe`. **On this CachyOS box `nc` is
 absent entirely** — only `ncat` (shipped with the `nmap` package) is
-installed. Use `ncat -zv HOST PORT`, or the dependency-free `/dev/tcp`
-bash builtin below.
+installed. Prefer `port-check HOST PORT...` (this skill's script, no
+dependencies); `ncat -zv HOST PORT` and the `/dev/tcp` bash builtin
+below also work.
 
 ### `/dev/tcp` (bash builtin)
 
@@ -326,13 +330,19 @@ where the file is either an object or an array. Object form (used here):
 {
   "cb2":  {"host": "192.168.1.188",  "port": 22, "username": "biqu", "privateKey": "/home/komi/.ssh/id_ed25519"},
   "pi":   {"host": "192.168.1.165",  "port": 22, "username": "komi", "privateKey": "/home/komi/.ssh/id_ed25519"},
-  "nova": {"host": "bredos.local",   "port": 22, "username": "bred", "privateKey": "/home/komi/.ssh/id_ed25519"}
+  "nova": {"host": "192.168.1.232",  "port": 22, "username": "komi", "privateKey": "/home/komi/.ssh/id_ed25519"}
 }
 ```
 
+(nova's old `bredos.local` / user `bred` are both dead since the
+2026-05-25 reflash — the user is now `komi`, and mDNS does not resolve
+on the current flash, so nova is IP-pinned to its wired `192.168.1.232`.)
+
 **Prefer mDNS names over IPs** for `host:` when the target is DHCP-leased
-(SBCs, laptops). `bredos.local` survives lease rotation and ethernet ↔
-Wi-Fi failover transparently; a hard-coded `192.168.1.221` does not.
+(SBCs, laptops) *and its mDNS responder actually works*. An mDNS name
+survives lease rotation and ethernet ↔ Wi-Fi failover transparently; a
+hard-coded IP does not. nova is the counter-example: its current flash
+has no working avahi responder, so it must stay IP-pinned until that's fixed.
 See [TROUBLESHOOTING.md §9](TROUBLESHOOTING.md#9-ssh-to-a-dhcpd-host-that-keeps-changing-ip-mdns-hostname)
 for the SSH-config equivalent of the same pattern.
 

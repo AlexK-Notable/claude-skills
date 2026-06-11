@@ -41,5 +41,7 @@ Desktop.ini
 plugins/home-network/.captures/
 plugins/home-network/.home-net-queue/
 plugins/home-network/.remember/
+plugins/home-network/skills/home-network/references/DEVICES.draft.*
+plugins/home-network/skills/home-network/references/DEVICES.local.md
 plugins/cron-claude/run/
 !plugins/cron-claude/logs/.gitkeep

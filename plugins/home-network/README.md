@@ -25,21 +25,19 @@ scripts/
   wol                            Wake-on-LAN by device alias or MAC
   home-net-learn                 AGENTIC: probe a new device, draft entry,
                                  fire background verifier, merge on pass
+  home-net-capture               AGENTIC: capture freeform session findings,
+                                 background agent conservative-merges them
+                                 into the reference docs
 install.sh                       Bootstrap on any machine
 ```
 
 ## Install
 
-### Option A — Claude Code plugin (preferred)
-
-```bash
-# inside Claude Code (or via CLI)
-claude plugin install https://github.com/AlexK-Notable/home-network-skill
-```
-
-Skill auto-activates on networking-related prompts.
-
-### Option B — manual
+This plugin lives in the `claude-skills` monorepo and deploys via the
+monorepo's `install.sh` **live symlinks** (skills → `~/.claude/skills/`,
+scripts → `~/bin/`). Do **not** `claude plugin install` it on a machine
+that uses the symlink deploy — that would freeze a cache copy and
+double-load the skill (see the monorepo CLAUDE.md "Deployment model").
 
 ```bash
 git clone git@github.com:AlexK-Notable/claude-skills.git ~/repos/claude-skills
@@ -67,7 +65,7 @@ and shows install commands per distro.
 | Wake-on-LAN | `wakeonlan` or `etherwake` | `yay -S wakeonlan` (AUR) | `apt install wakeonlan` | `brew install wakeonlan` |
 
 Pure-bash fallbacks exist for the most basic operations (TCP probes via
-`/dev/tcp`, ARP cache via `/proc/net/arp`), so the skill is still useful on
+`/dev/tcp`, ARP cache via `ip neigh`), so the skill is still useful on
 a minimal install.
 
 ## Self-healing learn loop
@@ -81,14 +79,15 @@ home-net-learn                       # interactive: scan + pick from results
 ```
 
 What happens:
-1. Foreground (fast): probe the device, gather facts, write `DEVICES.draft.md`
+1. Foreground (fast): probe the device, gather facts, write a per-task
+   `DEVICES.draft.<id>.md` (unique per invocation — safe to run concurrently)
 2. Background: spawn `claude -p` agent that
    - re-verifies findings against live network
    - looks up MAC OUI
    - cross-references hostname for collisions
    - infers device role from open ports + mDNS services
-3. On pass: agent commits to `DEVICES.md` + git commits
-4. On fail: agent writes `DEVICES.draft.review.md` for you to look at
+3. On pass: agent merges into `DEVICES.md` + git commits
+4. On fail: agent writes `DEVICES.draft.<id>.review.md` for you to look at
 5. `notify-send` fires either way
 
 The skill grows over time without slowing your active work.

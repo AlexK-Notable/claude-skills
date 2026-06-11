@@ -19,6 +19,22 @@ fi
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# arping is only USABLE with cap_net_raw (or as root) — mere presence
+# isn't enough. Check getcap first (no side effects), fall back to a
+# trial run (rc>=2 means the raw socket couldn't open).
+arping_functional() {
+  local path
+  path=$(command -v arping) || return 1
+  [[ ${EUID:-$(id -u)} -eq 0 ]] && return 0
+  if have getcap && getcap "$path" 2>/dev/null | grep -q cap_net_raw; then
+    return 0
+  fi
+  local iface rc=0
+  iface=$(ip -4 route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}')
+  arping -c 1 -w 1 ${iface:+-I "$iface"} 127.0.0.1 >/dev/null 2>&1 || rc=$?
+  (( rc < 2 ))
+}
+
 # --- detect distro and pick package manager ---
 DISTRO=""
 PM_INSTALL=""
@@ -116,6 +132,21 @@ json_entries=()
 for entry in "${TOOLS[@]}"; do
   IFS='|' read -r name sev purpose _arch _deb _fed _alp _mac <<< "$entry"
   pkg=$(pkg_for "$entry")
+  if [[ "$name" == "arping" ]] && have arping && ! arping_functional; then
+    # present but can't open a raw socket — functionally missing
+    missing_recommended=$((missing_recommended+1))
+    status=present_unusable
+    [[ $MODE == human ]] && printf "  ${C_WARN}⚠${C_RESET} %-16s ${C_BOLD}present but unusable${C_RESET} (no cap_net_raw) — %s\n      fix: ${C_BOLD}sudo setcap cap_net_raw+eip \$(command -v arping)${C_RESET}\n" "$name" "$purpose"
+    json_entries+=("{\"name\":\"$name\",\"severity\":\"$sev\",\"status\":\"$status\",\"purpose\":\"$purpose\",\"install\":\"sudo setcap cap_net_raw+eip \$(command -v arping)\"}")
+    continue
+  elif [[ "$name" == "nc" ]] && ! have nc && have ncat; then
+    # nc absent but ncat (nmap's netcat) covers the same role
+    status=ok_alternative
+    present=$((present+1))
+    [[ $MODE == human ]] && printf "  ${C_OK}✓${C_RESET} %-16s ${C_DIM}%s${C_RESET} ${C_DIM}(nc absent; ncat available — use ncat -zv)${C_RESET}\n" "ncat" "$purpose"
+    json_entries+=("{\"name\":\"$name\",\"severity\":\"$sev\",\"status\":\"$status\",\"purpose\":\"$purpose (via ncat)\",\"install\":\"already satisfied by ncat\"}")
+    continue
+  fi
   if have "$name"; then
     status=ok
     present=$((present+1))

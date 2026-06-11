@@ -34,11 +34,14 @@ Step 2: Is the host actually on this network?
 
 Step 3: Host is up. Why can't you reach it?
 ├── ICMP filtered? (`ping` fails but `arping` works) → totally fine, IGNORE ICMP.
-├── Port closed? (`nc -zv <IP> <port>` → "Connection refused")
+├── Port closed? (`port-check <IP> <port>` → "closed")
 │   → service isn't listening on that port. Check on the host.
-├── Port filtered? (`nc -zv <IP> <port>` → hangs/timeout)
+├── Port filtered? (`port-check <IP> <port>` → "filtered")
 │   → firewall on the HOST is blocking you. Check `ufw status` on the host.
 └── Connection works but timeouts? → MTU or routing issue (see step 4).
+
+(`nc` is absent on this box; `ncat -zv <IP> <port>` is the installed
+alternative if you want a netcat. `port-check` needs nothing but bash.)
 ```
 
 ### Unprivileged "is the host present at L2 anywhere?" (when `arping` needs root)
@@ -96,7 +99,7 @@ ssh user@host
 | Symptom | Likely cause | Next step |
 |---------|--------------|-----------|
 | `Connection refused` | sshd not running on host | Check `systemctl status sshd` on host |
-| `Connection timed out` | Network unreachable OR firewall dropping | `nc -zv host 22` to confirm; check ufw on both sides |
+| `Connection timed out` | Network unreachable OR firewall dropping | `port-check host 22` to confirm; check ufw on both sides |
 | `No route to host` | You don't know how to reach this IP | Check `ip route get <IP>` |
 | `Permission denied (publickey)` | sshd is fine, your key isn't authorized | `ssh-copy-id user@host`, or check `~/.ssh/authorized_keys` on host |
 | `Host key verification failed` | Host's SSH key changed (reinstall? attack?) | `ssh-keygen -R host` then retry; verify fingerprint out-of-band |
@@ -338,15 +341,22 @@ SBCs and laptops on DHCP can swap IPs (lease rotation, ethernet ↔
 Wi-Fi failover, router reboot). Hard-coding `HostName 192.168.1.X` in
 `~/.ssh/config` breaks the moment that happens.
 
-**Use the mDNS name as `HostName`**:
+**Use the mDNS name as `HostName`** (when the target's mDNS responder
+works — see the nova caveat below):
 
 ```sshconfig
 Host nova
-  HostName bredos.local
-  User bred
+  HostName 192.168.1.232   # would be <name>.local if nova's mDNS worked
+  User komi
   IdentityFile ~/.ssh/id_ed25519
   StrictHostKeyChecking accept-new
 ```
+
+(nova's old `bredos.local` / user `bred` are both dead since the
+2026-05-25 reflash: the user is `komi` and mDNS does not resolve on the
+current flash, so nova is IP-pinned to its wired `192.168.1.232`. The
+mDNS-HostName pattern still applies to hosts whose responder works,
+e.g. `komi-2.local` for the Pi.)
 
 Why `accept-new`: mDNS can resolve to multiple IPs over time (e.g., the
 host's ethernet today, Wi-Fi tomorrow). Each IP is a fresh entry in

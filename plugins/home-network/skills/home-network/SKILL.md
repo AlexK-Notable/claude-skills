@@ -25,7 +25,7 @@ A failed `ping` does NOT mean the host is down.
 |--------|----------------|------|
 | ARP REACHABLE entry | L2 presence — kernel got a MAC for this IP | `ip neigh` |
 | mDNS response | Host actively answers multicast on UDP/5353 | `avahi-resolve`, `avahi-browse` |
-| TCP SYN-ACK | Specific service is listening | `nc -z`, `/dev/tcp/HOST/PORT` |
+| TCP SYN-ACK | Specific service is listening | `port-check`, `/dev/tcp/HOST/PORT` (`nc` is absent on this box; `ncat` is the installed alternative) |
 | `arping` reply | L2 ARP request answered | `arping -c1 IP` |
 | ICMP echo reply | Host is up AND not firewalled | `ping` |
 
@@ -83,14 +83,16 @@ to install. Full per-tool reference in [TOOLS.md](references/TOOLS.md).
 **"Is <host> up?"**
 1. Try mDNS resolve. If it answers, yes.
 2. `arping -c1 -w1 <IP>` from a known-good interface.
-3. TCP SYN to a likely port (`nc -zv <IP> 22 80 443`).
+3. TCP SYN to likely ports: `port-check <IP> 22 80 443` (don't reach for
+   `nc` — it's absent on this box; `ncat -zv <IP> <port>` is the installed
+   alternative, one port at a time).
 4. `ping` only as last resort.
 
 **"Can't reach <host> over SSH"**
 See [TROUBLESHOOTING.md](references/TROUBLESHOOTING.md) for the full
 decision tree. First three checks:
 1. Is the host actually up? (see above)
-2. Is port 22 open from your network? (`nc -zv host 22`)
+2. Is port 22 open from your network? (`port-check host 22`)
 3. Is *your* firewall blocking outbound? (`ufw status verbose` on this end)
 
 **"I want to open port N for service X"**
@@ -104,8 +106,9 @@ sudo ufw allow from 192.168.1.0/24 to any port N proto tcp comment 'X'
 ```bash
 home-net-learn <name-or-IP>
 ```
-Returns immediately. Background agent verifies and merges into
-[DEVICES.md](references/DEVICES.md).
+The foreground probe takes ~5-15 s (mDNS browse alone holds a 6 s window),
+then returns; the verification agent runs detached in the background
+(30-90 s) and merges into [DEVICES.md](references/DEVICES.md).
 
 ## Common Workflows
 
@@ -114,7 +117,7 @@ Returns immediately. Background agent verifies and merges into
 ```bash
 scan-lan                    # default subnet from `ip route`
 scan-lan 10.0.0.0/24        # specific subnet
-scan-lan --quick            # mDNS browse only, no probes
+scan-lan --quick            # ARP cache + mDNS browse, no active probes
 ```
 
 Combines mDNS browse + ARP probe + TCP fanout on the top 5 ports.
@@ -123,8 +126,8 @@ Avoids ICMP because of Rule 1.
 ### Resolve a name reliably
 
 ```bash
-find-host bredos            # tries DNS → mDNS → ARP cache → reverse lookup
-find-host 192.168.1.221     # tries reverse DNS → mDNS PTR → ARP
+find-host bredos            # name → IP: system DNS → mDNS → dig (direct DNS)
+find-host 192.168.1.221     # IP → name: reverse DNS → getent → ARP cache → mDNS reverse
 ```
 
 ### Probe service availability
@@ -225,7 +228,7 @@ What goes into `DEVICES.md` instead: a *pointer* — "Password stored in Bitward
    - Re-verifies claims against live network where possible
    - Conservative-merges: additions/freshness auto-apply;
      contradictions/deletions go to a `.review.md`
-   - Git commits AND pushes to origin/main on success
+   - Git commits AND pushes the current branch (master) on success
    - notify-send fires with verdict
 
 4. Continue with the user's next request. The agent works in parallel
@@ -268,12 +271,12 @@ the skill's device inventory grows with use, without blocking your shell.
 │ User runs:  home-net-learn nova                              │
 └──────────────────────────────────────────────────────────────┘
                             │
-                            ▼  (synchronous, < 5s)
+                            ▼  (synchronous, ~5-15s)
 ┌──────────────────────────────────────────────────────────────┐
-│ Probe: mDNS browse, ARP, TCP fanout, OUI lookup              │
-│ Output: DEVICES.draft.md (staging file)                      │
-│ Spawn:  claude -p "<verify prompt>" &                        │
-│ Return immediately — shell is yours again                    │
+│ Probe: mDNS browse (6s window), ARP, parallel TCP fanout     │
+│ Output: DEVICES.draft.<id>.md (per-task staging file)        │
+│ Spawn:  detached claude -p "<verify prompt>" (setsid)        │
+│ Return — shell is yours again                                │
 └──────────────────────────────────────────────────────────────┘
                             │
                             ▼  (background, agentic, 30-90s)
@@ -283,7 +286,7 @@ the skill's device inventory grows with use, without blocking your shell.
 │ Looks up MAC OUI (vendor identification)                     │
 │ Infers role from open ports + mDNS services                  │
 │ On pass:  merges draft → DEVICES.md, git commits             │
-│ On fail:  writes DEVICES.draft.review.md, leaves for user    │
+│ On fail:  writes DEVICES.draft.<id>.review.md for the user   │
 │ Always:   notify-send shows outcome                          │
 └──────────────────────────────────────────────────────────────┘
 ```

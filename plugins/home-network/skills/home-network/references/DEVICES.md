@@ -28,6 +28,18 @@ for corrections.
 
 ### indiedroid nova (bredOS)
 
+**Current state (canonical — as of 2026-06-08; narrative history below):**
+
+| Field | Value |
+|-------|-------|
+| IPv4 (preferred) | 192.168.1.232 *(wired ethernet, DHCP, metric 100)* |
+| MAC (ethernet) | 66:02:35:01:cc:21 *(stable — u-boot/SoC-derived; interface `enP4p65s0`)* |
+| IPv4 (fallback) | 192.168.1.229 *(Wi-Fi `wlan0`, MAC 60:fb:00:37:57:56, metric 600)* |
+| SSH | `ssh komi@192.168.1.232` (user `komi`, key auth via `id_ed25519`) |
+| Hostname | `indiedroid-nova` |
+| OS / kernel | Armbian vendor, Debian 13 Trixie, `6.1.115-vendor-rk35xx`, running from eMMC |
+| mDNS | does **NOT** resolve on this flash — IP-pin required |
+
 **⚠ Status 2026-06-08: DUAL-HOMED again — wired Ethernet is BACK and is now the PREFERRED route. Live-verified over SSH from KOMI 2026-06-08.** The Nova picked up a **wired Ethernet** lease and is now dual-homed: eth `enP4p65s0` **`192.168.1.232`** (metric 100 — preferred default route) + Wi-Fi `wlan0` **`192.168.1.229`** (metric 600 — fallback), *both* UP and both carrying a default route via `.254`. The `.229 → .232` "IP change" was simply the eth NIC coming back online (different interface = different MAC = different DHCP lease), **not** lease instability. Hostname `indiedroid-nova`, kernel `6.1.115-vendor-rk35xx` — same OS as the 2026-05-31 block below, **but now running from eMMC** (`/dev/mmcblk0p1`; `mmcblk0boot0`/`boot1` present ⇒ eMMC, not SD) — migrated off the microSD. **This supersedes the "single-homed Wi-Fi `.229`, running from SD, eMMC removed" state in the 2026-05-31 block below.**
   - **Ethernet identity (live-verified from KOMI 2026-06-08):**
     - `enP4p65s0` = Realtek RTL8111/8168 PCIe Gigabit NIC, driver **`r8168`** (8.051.02-NAPI), bus `platform-fe190000.pcie-pci-0004:41:00.0`.
@@ -218,7 +230,7 @@ when you want a verified entry.**
 | 192.168.1.141 | d4:ad:fc:42:89:d0 | **LIFX bulb** (OUI D4:AD:FC = Shenzhen Intellirocks / LIFX) |
 | 192.168.1.142 | d4:ad:fc:18:fb:38 | LIFX bulb |
 | 192.168.1.143 | d4:ad:fc:43:15:92 | LIFX bulb |
-| 192.168.1.145 | d4:ad:fc:43:15:92 | LIFX bulb |
+| 192.168.1.145 | *(MAC unverified — re-scan needed; original audit recorded the same MAC as .143, a copy-paste error)* | LIFX bulb |
 | 192.168.1.146 | d4:ad:fc:41:19:68 | LIFX bulb |
 | 192.168.1.144 | 0e:c5:4e:38:25:fc *(randomized)* | Android device — advertises mDNS `Android_LBTMCTRB.local` (name seen 2026-05-27; MAC unchanged from 2026-05-24 audit) |
 | 192.168.1.148 | 1c:69:20:85:e0:90 | ESP32-based IoT (OUI: Espressif) |
@@ -250,8 +262,8 @@ when you want a verified entry.**
 
 ## Departed / historical
 
-(Empty for now. The learn loop will move stale entries here if a device
-hasn't responded to verification in N days.)
+(Empty for now. Entries are moved here manually when a device is
+confirmed gone — there is no automated staleness sweep.)
 
 ---
 

@@ -213,10 +213,13 @@ VERIFICATION:
   Write, Edit, Grep, Glob, WebFetch (OUI lookups), WebSearch.
 
 GIT WORKFLOW (after any successful update):
-  cd $SKILL_DIR
-  git add skills/home-network/references/
-  git commit -m "capture: <one-line summary of changes>"
-  git push origin HEAD   # user has explicitly authorized auto-push (umbrella default branch)
+  Run the whole git phase under flock so concurrent learn/capture agents
+  and the autosync watcher can't race each other:
+
+  flock -w 300 /tmp/claude-skills-git.lock bash -c 'cd $SKILL_DIR &&
+    git add skills/home-network/references/ &&
+    git commit -m "capture: <one-line summary of changes>" &&
+    git push origin HEAD'   # user has explicitly authorized auto-push (umbrella default branch)
 
   If git push fails (network, auth, conflict), DO NOT panic — leave the
   commit local and include the failure in your verdict.
@@ -288,7 +291,13 @@ if (( FOREGROUND )); then
 else
   # Detached mode (default) — returns immediately, agent runs in the
   # background. notify-send is the only completion signal.
-  ( run_agent ) &
+  # A plain `( run_agent ) & disown` still inherits the caller's
+  # stdout/stderr and process group, so an invoking Bash tool can block
+  # 30-90s on the open pipes or kill the agent on teardown. setsid gives
+  # the worker its own session; stdio is explicitly detached/redirected.
+  export SKILL_DIR PROMPT LOG_FILE TASK_ID FOREGROUND
+  setsid bash -c "$(declare -f have run_agent); run_agent" \
+    </dev/null >>"$LOG_FILE" 2>&1 &
   AGENT_PID=$!
   disown "$AGENT_PID" 2>/dev/null || true
   echo "  ${C_OK}✓${C_RESET} dispatched capture agent (pid $AGENT_PID, log: $(basename "$LOG_FILE"))"
