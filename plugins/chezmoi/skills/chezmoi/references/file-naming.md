@@ -26,7 +26,7 @@ So `encrypted_private_dot_ssh_id_rsa` is valid; `dot_private_ssh` is not.
 
 | Prefix | Meaning | Example |
 |---|---|---|
-| `encrypted_` | Encrypted in source | `encrypted_dot_ssh/private_id_rsa` |
+| `encrypted_` | Encrypted in source | `encrypted_dot_ssh/private_id_rsa.age` |
 | `private_` | Mode 0600 (no group/world) | `private_dot_netrc` |
 | `readonly_` | Strip write perms | `readonly_dot_config_locked` |
 | `empty_` | Keep destination even if file is empty | `empty_dot_placeholder` |
@@ -46,7 +46,7 @@ So `encrypted_private_dot_ssh_id_rsa` is valid; `dot_private_ssh` is not.
 
 ## Special types
 
-These are mutually exclusive with the standard prefixes — they change *what kind of thing* the source represents.
+These change *what kind of thing* the source represents. The mutually-exclusive set is `create_` / `modify_` / `remove_` (plus `external_` for directories) — a source can be at most one of these. Note `symlink_` is **not** in this set: it is a regular file prefix (table above) and combines with `dot_` as usual (`symlink_dot_vimrc`).
 
 | Prefix | Behavior | Example |
 |---|---|---|

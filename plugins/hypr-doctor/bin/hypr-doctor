@@ -60,6 +60,22 @@ hyprctl_alive() {
 # Return the mtime (epoch seconds) of a path, or 0 if missing.
 mtime() { stat -c %Y "$1" 2>/dev/null || echo 0; }
 
+# Baseline epoch for plugin-ABI drift comparison. pacman sets installed-file
+# mtimes to the package BUILD time, not the install time — so a plugin .so
+# rebuilt last week against the PREVIOUS Hyprland can still look "newer" than
+# a freshly installed Hyprland whose binary was built before the rebuild.
+# The pacman.log upgraded/installed timestamp is the real "Hyprland changed
+# here" moment, so prefer the last such entry; fall back to the binary mtime
+# if the log has no entry (e.g. manual/non-pacman install).
+hyprland_baseline_epoch() {
+    local ts epoch
+    ts=$(awk 'match($0, /^\[([^]]+)\] \[ALPM\] (upgraded|installed) hyprland \(/, m) {t=m[1]} END {if (t) print t}' "$PACMAN_LOG" 2>/dev/null)
+    if [[ -n "$ts" ]]; then
+        epoch=$(date -d "$ts" +%s 2>/dev/null) && [[ -n "$epoch" ]] && { echo "$epoch"; return 0; }
+    fi
+    mtime "$HYPRLAND_BIN"
+}
+
 # The name hyprctl reports for plugin $i in `plugin list` (e.g. "Hyprtasking").
 # Manifest .loaded_name is authoritative; fall back to capitalized .name.
 plugin_loaded_name() {
@@ -124,14 +140,17 @@ check_recent_stack_updates() {
 }
 
 check_hypr_plugin_abi() {
-    header "Hyprland plugins (ABI vs build mtime)"
-    local hypr_mtime
+    header "Hyprland plugins (ABI vs Hyprland install time)"
+    local hypr_mtime hypr_baseline
     hypr_mtime=$(mtime "$HYPRLAND_BIN")
     if [[ "$hypr_mtime" -eq 0 ]]; then
         fail "$HYPRLAND_BIN missing — is Hyprland installed?"
         return
     fi
-    info "Hyprland binary: $(date -d "@$hypr_mtime" -Iseconds)"
+    # Compare plugin .so build times against the pacman install/upgrade time,
+    # not the binary mtime (= package build time) — see hyprland_baseline_epoch.
+    hypr_baseline=$(hyprland_baseline_epoch)
+    info "Hyprland installed/upgraded: $(date -d "@$hypr_baseline" -Iseconds)"
 
     local hypr_running
     if hyprctl_alive; then
@@ -165,8 +184,8 @@ check_hypr_plugin_abi() {
             continue
         fi
 
-        if [[ "$so_mtime" -lt "$hypr_mtime" ]]; then
-            fail "$name: .so built $(date -d "@$so_mtime" '+%Y-%m-%d') < Hyprland $(date -d "@$hypr_mtime" '+%Y-%m-%d') → ABI mismatch likely"
+        if [[ "$so_mtime" -lt "$hypr_baseline" ]]; then
+            fail "$name: .so built $(date -d "@$so_mtime" '+%Y-%m-%d') < Hyprland installed $(date -d "@$hypr_baseline" '+%Y-%m-%d') → ABI mismatch likely"
             DRIFT=$((DRIFT+1))
         elif $hypr_running; then
             # Confirm it's actually loaded right now (ground truth: plugin list)
@@ -198,12 +217,19 @@ check_qt_python_skew() {
 
     # PyQt6 is the historical culprit (often lags Qt6 minor bumps by hours-to-days)
     if [[ -n "$pyqt_ver" ]]; then
+        # Binding ABI breaks at major.minor bumps; a patch-level lag
+        # (e.g. 6.11.0 vs 6.11.1) is normally harmless → warn, don't fail.
+        local qt_mm pyqt_mm
+        qt_mm=${qt_ver%.*}; pyqt_mm=${pyqt_ver%.*}
         if [[ "$pyqt_ver" == "$qt_ver" ]]; then
             ok "python-pyqt6: $pyqt_ver matches"
         elif [[ "$pyqt_ver vs $qt_ver" == "$(manifest '.suppressions.pyqt_skew_ack // empty')" ]]; then
             # Acknowledged & unfixable-locally — visible here, silent in the hook,
             # not counted. Auto-revives if either package version changes.
+            # (Ack strings remain full-version pairs, e.g. "6.11.0 vs 6.11.1".)
             warn "python-pyqt6: $pyqt_ver ≠ qt6-base $qt_ver (acknowledged — waiting on Arch; suppressed in hook)"
+        elif [[ "$pyqt_mm" == "$qt_mm" ]]; then
+            warn "python-pyqt6: $pyqt_ver ≠ qt6-base $qt_ver (patch-level lag — usually harmless)"
         else
             fail "python-pyqt6: $pyqt_ver ≠ qt6-base $qt_ver → Python+Qt apps will SIGABRT on init"
             FAILED=$((FAILED+1))
@@ -400,6 +426,10 @@ cmd_rebuild() {
     local n; n=$(manifest '.plugins | length')
     local rebuilt=0
 
+    # Same baseline as the audit: pacman install/upgrade time, not binary
+    # mtime (= package build time) — see hyprland_baseline_epoch.
+    local hypr_baseline; hypr_baseline=$(hyprland_baseline_epoch)
+
     for ((i=0; i<n; i++)); do
         local name enabled repo build_cmd so_path
         name=$(manifest ".plugins[$i].name")
@@ -409,12 +439,11 @@ cmd_rebuild() {
         build_cmd=$(manifest ".plugins[$i].build_cmd")
         so_path=$(manifest ".plugins[$i].so_path")
 
-        local hypr_mtime so_mtime
-        hypr_mtime=$(mtime "$HYPRLAND_BIN")
+        local so_mtime
         so_mtime=$(mtime "$so_path")
 
-        # Skip if .so newer than Hyprland binary
-        if [[ "$so_mtime" -ge "$hypr_mtime" && "$so_mtime" -gt 0 ]]; then
+        # Skip if .so newer than the last Hyprland install/upgrade
+        if [[ "$so_mtime" -ge "$hypr_baseline" && "$so_mtime" -gt 0 ]]; then
             ok "$name: .so up-to-date, skipping rebuild"
             continue
         fi
@@ -471,6 +500,10 @@ cmd_abi_drift() {
     local hypr_mtime; hypr_mtime=$(mtime "$HYPRLAND_BIN")
     [[ "$hypr_mtime" -eq 0 ]] && return 0  # Hyprland not installed; silent.
 
+    # Use the pacman.log install/upgrade epoch, not the binary mtime — pacman
+    # mtimes are package BUILD times (see hyprland_baseline_epoch).
+    local hypr_baseline; hypr_baseline=$(hyprland_baseline_epoch)
+
     local n; n=$(manifest '.plugins | length' 2>/dev/null || echo 0)
     local hits=()
     for ((i=0; i<n; i++)); do
@@ -480,7 +513,7 @@ cmd_abi_drift() {
         [[ "$enabled" != "true" ]] && continue
         so_path=$(manifest ".plugins[$i].so_path")
         so_mtime=$(mtime "$so_path")
-        if [[ "$so_mtime" -lt "$hypr_mtime" ]]; then
+        if [[ "$so_mtime" -lt "$hypr_baseline" ]]; then
             hits+=("$name")
         fi
     done
@@ -491,9 +524,12 @@ cmd_abi_drift() {
     pyqt_ver=$(pacman -Q python-pyqt6 2>/dev/null | awk '{print $2}' | sed 's/-.*//')
 
     local qt_skew=""
-    if [[ -n "$qt_ver" && -n "$pyqt_ver" && "$qt_ver" != "$pyqt_ver" ]]; then
+    if [[ -n "$qt_ver" && -n "$pyqt_ver" && "${qt_ver%.*}" != "${pyqt_ver%.*}" ]]; then
+        # Only major.minor skew breaks bindings — patch-level lag is warn-level
+        # in the audit and stays silent here (the hook is for actionable drift).
         # Suppress an acknowledged skew so the hook stays silent on drift the
         # user already knows about and can't fix. Any version change revives it.
+        # (Ack matching keeps the full-version pair format, e.g. "6.11.0 vs 6.11.1".)
         if [[ "$pyqt_ver vs $qt_ver" != "$(manifest '.suppressions.pyqt_skew_ack // empty')" ]]; then
             qt_skew="python-pyqt6 ($pyqt_ver) lags qt6-base ($qt_ver)"
         fi
@@ -503,7 +539,7 @@ cmd_abi_drift() {
     if [[ "${#hits[@]}" -gt 0 || -n "$qt_skew" ]]; then
         printf "⚠ hypr-doctor: post-update drift detected\n"
         for h in "${hits[@]}"; do
-            printf "    • plugin '%s' .so older than Hyprland binary (ABI mismatch likely)\n" "$h"
+            printf "    • plugin '%s' .so older than the Hyprland install (ABI mismatch likely)\n" "$h"
         done
         [[ -n "$qt_skew" ]] && printf "    • %s — Python+Qt apps may SIGABRT on launch\n" "$qt_skew"
         printf "  Run: %shypr-doctor rebuild%s  (or %shypr-doctor audit%s for details)\n" \

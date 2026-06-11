@@ -115,6 +115,7 @@ Agents are dispatched via the `Task` tool with `subagent_type: "general-purpose"
   "session_id": "<unique-id>",
   "started_at": "<ISO-8601>",
   "target_directory": "/absolute/path",
+  "archive_dir": "/absolute/path (optional — additional allowed destination for archives and consolidation moves, e.g. ~/archives)",
   "domain": "home|project|downloads|generic",
   "protected_paths": ["<absolute paths that must not be modified>"],
   "phase": "setup",
@@ -131,7 +132,7 @@ jq '.hub_note_id = "NOTE_ID_HERE"' ~/.claude/organizer-session.json > /tmp/org-m
 
 4. Present prior work findings + session plan to user
 5. The manifest activates the PreToolUse guard hook — all Bash commands are now validated
-6. Protected paths are blocked from rm/mv operations; destructive commands outside target_directory scope are blocked
+6. Protected paths are blocked from destructive operations; destructive commands with operands outside target_directory (or the optional archive_dir) are blocked
 
 **Session ID**: Use `date +%Y%m%d-%H%M%S` for uniqueness.
 
@@ -221,12 +222,15 @@ Select domain based on target directory. If ambiguous, ask the user.
 
 During active sessions, a PreToolUse guard hook validates every Bash command:
 
-- **Absolute blocks**: `sudo`, `chmod -R 777`, `chown`, `dd`, `mkfs`, `shred`
-- **Protected paths**: `rm`/`mv`/`rmdir` blocked on paths listed in manifest
-- **Scope enforcement**: Destructive commands must target paths under `target_directory`
+- **Absolute blocks**: `sudo`, `chmod -R 777`, `chown`, `dd if=`, `mkfs`, `shred`
+- **Destructive detection**: `rm`, `rmdir`, `shred`, `unlink`, `truncate`, `mv`, `find … -delete`, `rsync … --delete*`, `git clean`, `dd … of=` — including path-prefixed (`/bin/rm`), quoted, and `bash -c '…'` forms
+- **Protected paths**: destructive operands blocked on paths listed in manifest (path-boundary matching — equal, inside, or ancestor of a protected path)
+- **Scope enforcement**: operand paths of the destructive segment of a command must be under `target_directory` or the optional `archive_dir` (so `tar … && rm` archival and consolidation moves to the archive dir work)
 - **Wildcard depth guard**: `rm -rf` with `*` blocked at depth < 2 from target root
 
 The guard is **fail-closed** — any unexpected error in the hook blocks the command rather than allowing it through. Requires `jq` to be installed.
+
+**Coverage limits**: the guard validates **Bash commands only** — content overwrites made through the Write/Edit tools are not guarded, and the destructive detection is a denylist stopgap, not an allowlist. Explicit user approval before every destructive step remains the primary safety mechanism.
 
 **Hook deployment**: the three hooks live in the plugin at
 `plugins/universal-directory-organizer/hooks/` and are symlinked into

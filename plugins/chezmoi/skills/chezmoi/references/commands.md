@@ -84,6 +84,6 @@ Prefer `chezmoi git --` over `chezmoi cd`. The subshell from `cd` reloads the us
 | `-D <dir>` | Use alternate destination dir (great for testing in `/tmp`) |
 | `-v` / `--verbose` | More detail |
 | `-n` / `--dry-run` | Don't write anything |
-| `-r` / `--refresh-externals` | Force re-fetch externals |
+| `-R, --refresh-externals [always\|auto\|never]` | Control external re-fetching (takes a value; `always` forces a re-fetch) |
 | `--include` / `--exclude` | Filter by file type (`files`, `dirs`, `scripts`, `encrypted`, etc.) |
 | `--keep-going` | Don't stop at first error |

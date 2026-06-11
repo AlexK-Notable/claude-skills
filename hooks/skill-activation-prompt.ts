@@ -33,6 +33,35 @@ interface MatchedSkill {
     config: SkillRule;
 }
 
+// Debug logging is opt-in: this hook runs on EVERY prompt, so by default any
+// internal error must produce NO output and exit 0 (never noise, never block).
+const DEBUG = process.env.SKILL_HOOK_DEBUG === '1';
+
+function debugLog(...args: unknown[]) {
+    if (DEBUG) {
+        console.error(...args);
+    }
+}
+
+function escapeRegExp(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Keyword matching: short keywords (< 5 chars, e.g. "bw", "age") match far too
+// many substrings ("bwrap", "page"), so they require word boundaries. Longer
+// keywords/phrases keep plain substring matching.
+function keywordMatches(prompt: string, keyword: string): boolean {
+    const kw = keyword.toLowerCase();
+    if (kw.length >= 5) {
+        return prompt.includes(kw);
+    }
+    try {
+        return new RegExp(`\\b${escapeRegExp(kw)}\\b`).test(prompt);
+    } catch {
+        return prompt.includes(kw);
+    }
+}
+
 async function main() {
     try {
         // Read input from stdin
@@ -76,20 +105,24 @@ async function main() {
 
             // Keyword matching
             if (triggers.keywords) {
-                const keywordMatch = triggers.keywords.some(kw =>
-                    prompt.includes(kw.toLowerCase())
-                );
+                const keywordMatch = triggers.keywords.some(kw => keywordMatches(prompt, kw));
                 if (keywordMatch) {
                     matchedSkills.push({ name: skillName, matchType: 'keyword', config });
                     continue;
                 }
             }
 
-            // Intent pattern matching
+            // Intent pattern matching — compile each pattern in its own
+            // try/catch so one malformed regex in skill-rules.json skips
+            // only itself, not the whole matching loop.
             if (triggers.intentPatterns) {
                 const intentMatch = triggers.intentPatterns.some(pattern => {
-                    const regex = new RegExp(pattern, 'i');
-                    return regex.test(prompt);
+                    try {
+                        return new RegExp(pattern, 'i').test(prompt);
+                    } catch (err) {
+                        debugLog(`skill-activation-prompt: skipping malformed intentPattern for "${skillName}": ${pattern}`, err);
+                        return false;
+                    }
                 });
                 if (intentMatch) {
                     matchedSkills.push({ name: skillName, matchType: 'intent', config });
@@ -141,12 +174,14 @@ async function main() {
 
         process.exit(0);
     } catch (err) {
-        console.error('Error in skill-activation-prompt hook:', err);
-        process.exit(1);
+        // Never fail the prompt: print nothing (unless SKILL_HOOK_DEBUG=1)
+        // and exit 0. A broken hook must be invisible, not noisy.
+        debugLog('Error in skill-activation-prompt hook:', err);
+        process.exit(0);
     }
 }
 
 main().catch(err => {
-    console.error('Uncaught error:', err);
-    process.exit(1);
+    debugLog('Uncaught error in skill-activation-prompt hook:', err);
+    process.exit(0);
 });

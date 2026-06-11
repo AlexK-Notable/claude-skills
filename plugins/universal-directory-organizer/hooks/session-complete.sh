@@ -80,8 +80,10 @@ handle_session_stop() {
             echo '}'
         } > "$archive_file" 2>/dev/null
 
-        # Validate the archive was written
-        if [[ -s "$archive_file" ]]; then
+        # Validate the archive was written AND is well-formed JSON before
+        # deleting the live session files — a non-empty but corrupt archive
+        # (e.g. malformed log line) must not cost us the manifest.
+        if [[ -s "$archive_file" ]] && jq empty "$archive_file" >/dev/null 2>&1; then
             # Clean up active session files
             rm -f "$MANIFEST"
             rm -f "$log_file"

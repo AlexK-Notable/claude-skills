@@ -65,12 +65,49 @@ fi
 NORMALIZED_CMD=$(echo "$COMMAND" | sed "s|\\\$HOME|$HOME|g; s|~/|$HOME/|g")
 
 # ---------------------------------------------------------------------------
+# DETECTION NORMALIZATION
+# For *detection only* we further normalize a copy of the command so trivially
+# disguised destructive verbs are still visible:
+#   - strip quotes:      bash -c 'rm -rf x' / 'rm' -rf x  → rm is a real token
+#   - strip env prefix:  FOO=bar rm …                     → handled by the
+#                        word-boundary regex (space before the verb)
+#   - strip verb paths:  /bin/rm, /usr/bin/find           → rm, find
+# Path extraction for scope checks also runs on this normalized text, so the
+# verb's own binary path (/bin/rm) is never mistaken for an operand.
+# ---------------------------------------------------------------------------
+WB='(^|[;&|()[:space:]])'   # token at a command-start-ish boundary
+
+normalize_for_detection() {
+    sed -E -e "s/[\"']//g" \
+           -e "s#(^|[;&|()[:space:]])/[^[:space:]]+/(rm|rmdir|shred|unlink|truncate|mv|dd|find|rsync|git)([[:space:]]|\$)#\\1\\2\\3#g" \
+        <<<"$1"
+}
+
+# Does this (already detection-normalized) command segment contain a
+# destructive verb? Denylist stopgap — broader than the old rm|mv|rmdir|shred
+# word match, but still not an allowlist.
+seg_is_destructive() {
+    local s="$1"
+    grep -qE "${WB}(rm|rmdir|shred|unlink|truncate)([[:space:]]|\$)" <<<"$s" && return 0
+    grep -qE "${WB}mv([[:space:]]|\$)" <<<"$s" && return 0
+    grep -qE "${WB}find[[:space:]].*-delete([[:space:]]|\$)" <<<"$s" && return 0
+    grep -qE "${WB}rsync[[:space:]].*--delete" <<<"$s" && return 0
+    grep -qE "${WB}git[[:space:]]+([^[:space:]]+[[:space:]]+)*clean([[:space:]]|\$)" <<<"$s" && return 0
+    grep -qE "${WB}dd[[:space:]]+(.*[[:space:]])?of=" <<<"$s" && return 0
+    return 1
+}
+
+DETECT_CMD=$(normalize_for_detection "$NORMALIZED_CMD")
+
+# ---------------------------------------------------------------------------
 # ABSOLUTE BLOCKS: Commands that are NEVER allowed during organizer sessions
 # These are blocked regardless of target_directory or protected_paths.
+# (Matched against the detection-normalized text so quoting/path tricks
+# don't slip past.)
 # ---------------------------------------------------------------------------
 
 # Block sudo — Claude Code has no tty, and failures lock pam_faillock
-if echo "$NORMALIZED_CMD" | grep -qE '(^|\s|;|&&|\|\|)sudo(\s|$)'; then
+if echo "$DETECT_CMD" | grep -qE '(^|\s|;|&&|\|\|)sudo(\s|$)'; then
     echo "organizer-guard: BLOCKED — sudo is never allowed during organizer sessions" >&2
     echo "  (Claude Code has no tty; sudo failures lock pam_faillock)" >&2
     exit 2
@@ -88,7 +125,7 @@ ABSOLUTE_BLOCKS=(
 )
 
 for pattern in "${ABSOLUTE_BLOCKS[@]}"; do
-    if echo "$NORMALIZED_CMD" | grep -qE "$pattern"; then
+    if echo "$DETECT_CMD" | grep -qE "$pattern"; then
         echo "organizer-guard: BLOCKED — command matches absolute block: $pattern" >&2
         exit 2
     fi
@@ -99,6 +136,10 @@ done
 # ---------------------------------------------------------------------------
 TARGET_DIR=$(jq -r '.target_directory // empty' "$MANIFEST")
 
+# Optional additional allowed scope: where archives/consolidation moves land
+# (e.g. ~/archives). Destructive-command operands may live here too.
+ARCHIVE_DIR=$(jq -r '.archive_dir // empty' "$MANIFEST")
+
 # Read protected paths into array
 PROTECTED_PATHS=()
 while IFS= read -r path; do
@@ -106,14 +147,28 @@ while IFS= read -r path; do
 done < <(jq -r '.protected_paths[]? // empty' "$MANIFEST")
 
 # ---------------------------------------------------------------------------
-# DETECT DESTRUCTIVE COMMANDS
-# We only apply scope/protection checks to destructive commands.
-# Read-only commands (ls, du, df, cat, find, stat, wc, etc.) are always allowed.
+# DETECT DESTRUCTIVE COMMANDS + COLLECT THEIR OPERAND PATHS
+# We only apply scope/protection checks to destructive commands, and only to
+# the operand paths of the destructive *segment* of a compound command.
+# Splitting on && ; || means a documented workflow like
+#   tar -czf ~/archives/x.tgz -C target sub && rm -rf target/sub
+# only scope-checks the rm segment — the tar destination is not an rm operand.
+# Read-only commands (ls, du, df, cat, stat, wc, etc.) are always allowed.
 # ---------------------------------------------------------------------------
 IS_DESTRUCTIVE=false
-if echo "$NORMALIZED_CMD" | grep -qE '(^|\s|;|&&|\|\|)(rm|mv|rmdir|shred)\s'; then
+DESTRUCTIVE_PATHS=()
+while IFS= read -r seg; do
+    [[ -z "${seg//[[:space:]]/}" ]] && continue
+    norm_seg=$(normalize_for_detection "$seg")
+    seg_is_destructive "$norm_seg" || continue
     IS_DESTRUCTIVE=true
-fi
+    # Drop option tokens (-x, --opt, --opt=/path) so option arguments are not
+    # treated as operands, then collect the remaining absolute paths.
+    operands=$(sed -E 's/(^|[[:space:]])-[^[:space:]]*/\1/g' <<<"$norm_seg" | grep -oE '/[^ ";|&>]+' || true)
+    while IFS= read -r p; do
+        [[ -n "$p" ]] && DESTRUCTIVE_PATHS+=("$p")
+    done <<<"$operands"
+done < <(sed 's/&&/\n/g; s/||/\n/g; s/;/\n/g' <<<"$NORMALIZED_CMD")
 
 if [[ "$IS_DESTRUCTIVE" == "false" ]]; then
     # Non-destructive command — allow
@@ -157,51 +212,61 @@ fi
 
 # ---------------------------------------------------------------------------
 # PROTECTED PATH CHECK
-# Block rm, mv, rmdir on any path in the protected_paths list.
-# Uses substring matching — if a protected path appears anywhere in the
-# command arguments, it's blocked.
+# Block destructive operands that touch a protected path. Uses path-boundary
+# semantics (equal, inside, or ancestor of a protected path) — NOT substring
+# matching, so protecting /x/keep no longer also blocks /x/keeper, while
+# deleting an ancestor of a protected path is still caught.
 # ---------------------------------------------------------------------------
-for protected in "${PROTECTED_PATHS[@]}"; do
-    [[ -z "$protected" ]] && continue
-
-    # Check if command references the protected path
-    if echo "$NORMALIZED_CMD" | grep -qF "$protected"; then
-        echo "organizer-guard: BLOCKED — command targets protected path: $protected" >&2
-        echo "  Protected paths are defined in $MANIFEST" >&2
-        exit 2
-    fi
+for raw_path in "${DESTRUCTIVE_PATHS[@]}"; do
+    resolved=$(realpath -m "$raw_path" 2>/dev/null || echo "$raw_path")
+    resolved="${resolved%/}"
+    for protected in "${PROTECTED_PATHS[@]}"; do
+        [[ -z "$protected" ]] && continue
+        prot="${protected%/}"
+        if [[ "$resolved" == "$prot" || "$resolved" == "$prot"/* || "$prot" == "$resolved"/* ]]; then
+            echo "organizer-guard: BLOCKED — command targets protected path: $protected" >&2
+            echo "  Offending operand: $resolved" >&2
+            echo "  Protected paths are defined in $MANIFEST" >&2
+            exit 2
+        fi
+    done
 done
 
 # ---------------------------------------------------------------------------
 # SCOPE CHECK
-# For destructive commands, all referenced paths must be under target_directory.
-# This prevents an organizer session from accidentally deleting files in
-# unrelated parts of the filesystem.
+# Operand paths of destructive segments must be under target_directory, the
+# optional archive_dir, or be a session file. This prevents an organizer
+# session from deleting/overwriting files in unrelated parts of the
+# filesystem while still allowing documented archive/consolidation moves.
 # ---------------------------------------------------------------------------
 if [[ -n "$TARGET_DIR" ]]; then
-    # Extract absolute paths from the command
-    # Match paths starting with / (absolute) after the rm/mv/rmdir command
-    while IFS= read -r raw_path; do
-        [[ -z "$raw_path" ]] && continue
+    target_norm="${TARGET_DIR%/}"
+    archive_norm="${ARCHIVE_DIR%/}"
 
-        # Skip flags (start with -)
-        [[ "$raw_path" == -* ]] && continue
-
+    for raw_path in "${DESTRUCTIVE_PATHS[@]}"; do
         # Resolve to canonical path (without requiring existence)
         resolved=$(realpath -m "$raw_path" 2>/dev/null || echo "$raw_path")
-
-        # Normalize: remove trailing slash for consistent comparison
         resolved="${resolved%/}"
-        target_norm="${TARGET_DIR%/}"
 
-        # Check if resolved path is under target_directory
-        if [[ "$resolved" != "$target_norm" && "$resolved" != "$target_norm"/* ]]; then
+        in_scope=false
+        if [[ "$resolved" == "$target_norm" || "$resolved" == "$target_norm"/* ]]; then
+            in_scope=true
+        elif [[ -n "$archive_norm" && ( "$resolved" == "$archive_norm" || "$resolved" == "$archive_norm"/* ) ]]; then
+            in_scope=true
+        else
+            for sf in "${SESSION_FILES[@]}"; do
+                [[ "$resolved" == "$sf" ]] && in_scope=true && break
+            done
+        fi
+
+        if [[ "$in_scope" == "false" ]]; then
             echo "organizer-guard: BLOCKED — destructive command targets path outside session scope" >&2
             echo "  Session scope: $TARGET_DIR" >&2
+            [[ -n "$archive_norm" ]] && echo "  Archive scope: $ARCHIVE_DIR" >&2
             echo "  Offending path: $resolved" >&2
             exit 2
         fi
-    done < <(echo "$NORMALIZED_CMD" | grep -oE '/[^ ";|&>]+')
+    done
 fi
 
 # ---------------------------------------------------------------------------
