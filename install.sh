@@ -29,7 +29,10 @@ link() { # $1=real src  $2=link path
   if [ -L "$dst" ] && [ "$(readlink -f "$dst" 2>/dev/null)" = "$(readlink -f "$src")" ]; then
     say "  ok    ${dst/#$HOME/\~}"; return; fi
   if [ -e "$dst" ] && [ ! -L "$dst" ]; then
-    say "  bak   ${dst/#$HOME/\~} -> .bak"; run "mv -n '$dst' '$dst.bak'"; fi
+    # timestamped backup: `mv -n` onto an existing .bak silently no-ops and the
+    # ln -sfn below would then clobber the original — never lose user files
+    bak="$dst.bak.$(date +%s)"
+    say "  bak   ${dst/#$HOME/\~} -> ${bak##*/}"; run "mv -n '$dst' '$bak'"; fi
   run "ln -sfn '$src' '$dst'"; say "  link  ${dst/#$HOME/\~} -> ${src/#$HOME/\~}"
 }
 

@@ -44,6 +44,7 @@ The user's personal skills used to be scattered across separate GitHub repos plu
 |---|---|---|
 | `bitwarden-cli` | `bw` vault + `bws` Secrets Manager workflows (secure notes, SSH keys, machine-secret injection) | `bws-secret-add` |
 | `home-network` | LAN discovery/troubleshooting + self-healing device inventory (background `claude -p` agents) | `scan-lan`, `wol`, `port-check`, `find-host`, `home-net-*` |
+| `home-assistant` | operate the self-hosted HA instance safely (safe-mutation discipline, secret-safe inventory snapshot, gotcha journal) | `ha-inventory`, `ha-note` |
 | `cron-claude` | schedule recurring `claude -p` jobs as systemd user timers | `cron-claude` (Python/uv) |
 | `hypr-doctor` | post-`pacman -Syu` triage/repair for Arch/CachyOS Hyprland | `hypr-doctor` |
 | `chezmoi` | dotfiles management (apply/diff, templating, age encryption) | — |
