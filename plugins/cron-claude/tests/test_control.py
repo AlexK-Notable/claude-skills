@@ -2,7 +2,7 @@
 calendar validator inspects OUTPUT TEXT (systemd-analyze exits 0 on bad input)."""
 import subprocess
 import types
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 
@@ -74,18 +74,31 @@ def test_last_result_empty_output(monkeypatch):
     assert c.last_result("cron-claude-x.service") == ("unknown", -1)
 
 
-def test_next_elapse_valid(monkeypatch):
-    monkeypatch.setattr(
-        subprocess, "run", _fake_run(stdout="NextElapseUSecRealtime=1799999999000000\n")
-    )
-    assert isinstance(c.next_elapse("cron-claude-x.timer"), datetime)
+def test_next_elapse_unix_form(monkeypatch):
+    # Real output of `systemctl --user show -p NextElapseUSecRealtime --timestamp=unix`
+    # on systemd 260: an @-prefixed unix-seconds timestamp.
+    fake = _fake_run(stdout="NextElapseUSecRealtime=@1781146800\n")
+    monkeypatch.setattr(subprocess, "run", fake)
+    got = c.next_elapse("cron-claude-x.timer")
+    assert isinstance(got, datetime)
+    assert got == datetime.fromtimestamp(1781146800, tz=UTC).astimezone()
+    assert "--timestamp=unix" in fake.argv
+
+
+def test_next_elapse_formatted_date_is_none(monkeypatch):
+    # Legacy/default format (no --timestamp=unix support): a formatted date.
+    # Must degrade to None, never crash.
+    fake = _fake_run(stdout="NextElapseUSecRealtime=Wed 2026-06-10 20:00:00 PDT\n")
+    monkeypatch.setattr(subprocess, "run", fake)
+    assert c.next_elapse("cron-claude-x.timer") is None
 
 
 def test_next_elapse_zero_is_none(monkeypatch):
-    monkeypatch.setattr(subprocess, "run", _fake_run(stdout="NextElapseUSecRealtime=0\n"))
+    monkeypatch.setattr(subprocess, "run", _fake_run(stdout="NextElapseUSecRealtime=@0\n"))
     assert c.next_elapse("cron-claude-x.timer") is None
 
 
 def test_next_elapse_empty_is_none(monkeypatch):
+    # No next elapse scheduled (or unknown unit): property prints empty.
     monkeypatch.setattr(subprocess, "run", _fake_run(stdout="NextElapseUSecRealtime=\n"))
     assert c.next_elapse("cron-claude-x.timer") is None

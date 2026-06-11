@@ -11,6 +11,7 @@ from cron_claude.systemd import control, timers
 
 def remove_schedule(name: str) -> None:
     """Disable + stop + delete a schedule's unit pair, then reload systemd."""
+    timers.validate_name(name)  # both UIs route removal here — block path traversal
     control.disable_now(timers.timer_unit(name))
     control.stop(timers.service_unit(name))
     timers.remove_units(name)

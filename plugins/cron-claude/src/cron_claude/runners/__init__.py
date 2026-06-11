@@ -28,7 +28,7 @@ def select_runner(
     prompt_path: Path,
     *,
     allowed_tools: tuple[str, ...] = (),
-    bare: bool = True,
+    bare: bool = False,
     output_format: str = "json",
     permission_mode: str | None = None,
     dangerously_skip: bool = False,

@@ -98,6 +98,53 @@ def test_add_rejects_traversal_name(monkeypatch, tmp_path):
     assert not list(tmp_path.glob("*evil*"))
 
 
+def test_rm_rejects_traversal_name(monkeypatch, tmp_path):
+    # rm 'x/../../victim' --force must not unlink anything outside UNITS_DIR.
+    _patch(monkeypatch, tmp_path)
+    victim = tmp_path / "cron-claude-victim.service"
+    victim.write_text("[Service]\n")
+    (tmp_path / "cron-claude-victim.timer").write_text("[Timer]\n")
+    r = runner.invoke(app, ["schedule", "rm", "sub/../victim", "--force"])
+    assert r.exit_code == 1
+    assert "letters, digits" in r.output
+    assert victim.exists()
+
+
+def test_show_rejects_traversal_name(monkeypatch, tmp_path):
+    _patch(monkeypatch, tmp_path)
+    r = runner.invoke(app, ["schedule", "show", "foo/../../evil"])
+    assert r.exit_code == 1
+    assert "letters, digits" in r.output
+
+
+def test_run_rejects_traversal_name(monkeypatch, tmp_path):
+    _patch(monkeypatch, tmp_path)
+    r = runner.invoke(app, ["run", "foo/../../evil"])
+    assert r.exit_code == 1
+    assert "letters, digits" in r.output
+
+
+def test_logs_rejects_traversal_name(monkeypatch, tmp_path):
+    _patch(monkeypatch, tmp_path)
+    r = runner.invoke(app, ["logs", "foo/../../evil"])
+    assert r.exit_code == 1
+    assert "letters, digits" in r.output
+
+
+def test_remove_schedule_operation_rejects_traversal(monkeypatch, tmp_path):
+    # The TUI calls operations.remove_schedule directly — it must validate too.
+    import pytest
+
+    import cron_claude.systemd.control as control
+    from cron_claude.errors import CronClaudeError
+    from cron_claude.operations import remove_schedule
+    _patch(monkeypatch, tmp_path)
+    for fn in ("disable_now", "stop", "daemon_reload"):
+        monkeypatch.setattr(control, fn, lambda *a, **k: None)
+    with pytest.raises(CronClaudeError, match="letters, digits"):
+        remove_schedule("sub/../victim")
+
+
 def test_show(monkeypatch, tmp_path):
     _patch(monkeypatch, tmp_path)
     prompt = tmp_path / "job.txt"
@@ -149,15 +196,27 @@ def test_logs_missing_fails(monkeypatch, tmp_path):
     assert "not found" in r.output
 
 
+def test_add_default_is_no_bare(monkeypatch, tmp_path):
+    # OAuth-friendly default: text prompts must NOT get --bare unless asked.
+    _patch(monkeypatch, tmp_path)
+    prompt = tmp_path / "job.txt"
+    prompt.write_text("summarize")
+    r = runner.invoke(
+        app, ["schedule", "add", "oauth", "--when", "daily", "--prompt", str(prompt)]
+    )
+    assert r.exit_code == 0, r.output
+    assert "--bare" not in (tmp_path / "cron-claude-oauth.service").read_text()
+
+
 def test_add_bare_and_format_flags(monkeypatch, tmp_path):
     _patch(monkeypatch, tmp_path)
     prompt = tmp_path / "job.txt"
     prompt.write_text("summarize")
     r = runner.invoke(app, [
         "schedule", "add", "fmt", "--when", "daily", "--prompt", str(prompt),
-        "--no-bare", "--output-format", "text",
+        "--bare", "--output-format", "text",
     ])
     assert r.exit_code == 0, r.output
     svc = (tmp_path / "cron-claude-fmt.service").read_text()
-    assert "--bare" not in svc
+    assert "--bare" in svc
     assert "--output-format text" in svc

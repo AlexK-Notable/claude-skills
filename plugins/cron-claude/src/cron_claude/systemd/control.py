@@ -57,14 +57,19 @@ def last_result(service: str) -> tuple[str, int]:
 
 
 def next_elapse(timer: str) -> datetime | None:
+    # --timestamp=unix makes systemctl print `@<seconds>` (verified on systemd 260;
+    # the default is a formatted date like `Wed 2026-06-10 20:00:00 PDT`).
     proc = _run(
-        ["systemctl", "--user", "show", timer, "-p", "NextElapseUSecRealtime"],
+        ["systemctl", "--user", "show", timer, "-p", "NextElapseUSecRealtime", "--timestamp=unix"],
         check=False,
     )
     raw = proc.stdout.strip().partition("=")[2]
-    if not raw.isdigit() or raw == "0":
+    secs = raw.removeprefix("@")
+    # Empty (no next elapse), "0", or any non-@-unix form (e.g. a formatted date
+    # from an older systemd that lacks --timestamp=unix) → None, never a crash.
+    if not raw.startswith("@") or not secs.isdigit() or secs == "0":
         return None
-    return datetime.fromtimestamp(int(raw) / 1_000_000, tz=UTC).astimezone()
+    return datetime.fromtimestamp(int(secs), tz=UTC).astimezone()
 
 
 def validate_calendar(spec: str) -> None:

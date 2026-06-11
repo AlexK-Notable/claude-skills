@@ -46,7 +46,9 @@ async def test_tui_action_run_logs_result(monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_tui_action_remove_drops_row(monkeypatch, tmp_path):
+async def test_tui_remove_needs_confirmation(monkeypatch, tmp_path):
+    # A single `x` must NOT remove (the CLI requires --force; the TUI requires
+    # a second confirming keypress).
     monkeypatch.setattr(timers, "UNITS_DIR", tmp_path)
     import cron_claude.systemd.control as control
     for fn in ("disable_now", "stop", "daemon_reload"):
@@ -57,6 +59,43 @@ async def test_tui_action_remove_drops_row(monkeypatch, tmp_path):
     async with app.run_test() as pilot:
         await pilot.pause()
         assert app.query_one("#schedules").row_count == 1
+        await pilot.press("x")
+        await pilot.pause()
+        assert app.query_one("#schedules").row_count == 1  # still there
+
+
+@pytest.mark.asyncio
+async def test_tui_other_action_cancels_pending_remove(monkeypatch, tmp_path):
+    monkeypatch.setattr(timers, "UNITS_DIR", tmp_path)
+    import cron_claude.systemd.control as control
+    for fn in ("disable_now", "stop", "daemon_reload"):
+        monkeypatch.setattr(control, fn, lambda *a, **k: None)
+    monkeypatch.setattr(control, "journal_text", lambda *a, **k: "log")
+    _write_demo(tmp_path)
+    from cron_claude.tui.app import CronClaudeApp
+    app = CronClaudeApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("x")  # arm
+        await pilot.press("l")  # cancels
+        await pilot.press("x")  # re-arms (does not remove)
+        await pilot.pause()
+        assert app.query_one("#schedules").row_count == 1
+
+
+@pytest.mark.asyncio
+async def test_tui_action_remove_drops_row_after_confirm(monkeypatch, tmp_path):
+    monkeypatch.setattr(timers, "UNITS_DIR", tmp_path)
+    import cron_claude.systemd.control as control
+    for fn in ("disable_now", "stop", "daemon_reload"):
+        monkeypatch.setattr(control, fn, lambda *a, **k: None)
+    _write_demo(tmp_path)
+    from cron_claude.tui.app import CronClaudeApp
+    app = CronClaudeApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert app.query_one("#schedules").row_count == 1
+        await pilot.press("x")
         await pilot.press("x")
         await pilot.pause()
         assert app.query_one("#schedules").row_count == 0

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from cron_claude.errors import CronClaudeError
 
-VALID_MODES = ("acceptEdits", "auto", "bypassPermissions", "default", "plan")
+VALID_MODES = ("acceptEdits", "auto", "bypassPermissions", "default", "dontAsk", "plan")
 VALID_FORMATS = ("text", "json", "stream-json")
 
 # Characters that would break out of the `/bin/bash -c '<inner>'` wrapper or its
@@ -32,7 +32,10 @@ def _validate_shell_safe(label: str, value: str) -> None:
 class ClaudeRunner:
     prompt_path: Path
     allowed_tools: tuple[str, ...] = ()
-    bare: bool = True
+    # bare=False by default: --bare makes claude ignore OAuth/keychain auth and
+    # require ANTHROPIC_API_KEY, which is not set in the systemd user environment
+    # on this machine (OAuth login). --bare stays available as an explicit opt-in.
+    bare: bool = False
     output_format: str = "json"
     permission_mode: str | None = None
     dangerously_skip: bool = False

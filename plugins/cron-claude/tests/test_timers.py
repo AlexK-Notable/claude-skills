@@ -65,6 +65,65 @@ def test_list_ignores_foreign_units(tmp_path, monkeypatch):
     assert list(t.list_units()) == []
 
 
+def test_service_has_onfailure_and_template_is_written(tmp_path, monkeypatch):
+    monkeypatch.setattr(t, "UNITS_DIR", tmp_path)
+    svc, _ = t.write_units(_spec())
+    assert "OnFailure=cron-claude-notify-fail@%n.service" in svc.read_text()
+    template = tmp_path / "cron-claude-notify-fail@.service"
+    assert template.exists()
+    text = template.read_text()
+    assert "notify-send" in text
+    assert "%i" in text  # instance = failed unit name
+
+
+def test_write_notify_template_is_idempotent(tmp_path, monkeypatch):
+    monkeypatch.setattr(t, "UNITS_DIR", tmp_path)
+    p1 = t.write_notify_template()
+    first = p1.read_text()
+    p2 = t.write_notify_template()
+    assert p1 == p2 and p2.read_text() == first
+
+
+def test_remove_units_keeps_shared_notify_template(tmp_path, monkeypatch):
+    # The template is shared by ALL schedules — removing one must not drop it.
+    monkeypatch.setattr(t, "UNITS_DIR", tmp_path)
+    t.write_units(_spec("a"))
+    t.write_units(_spec("b"))
+    t.remove_units("a")
+    assert (tmp_path / "cron-claude-notify-fail@.service").exists()
+
+
+def test_percent_escaped_in_rendered_units_and_roundtrips(tmp_path, monkeypatch):
+    # Unescaped % would be eaten/expanded by systemd specifier expansion.
+    monkeypatch.setattr(t, "UNITS_DIR", tmp_path)
+    spec = TimerSpec(
+        name="pct",
+        on_calendar="daily",
+        exec_start="/bin/echo 100% done",
+        prompt_path="/bin/echo",
+        runner="script",
+        description="50% description",
+    )
+    svc, tmr = t.write_units(spec)
+    svc_text = svc.read_text()
+    assert "ExecStart=/bin/echo 100%% done" in svc_text
+    assert "Description=50%% description" in svc_text
+    assert "Description=50%% description" in tmr.read_text()
+    # Our own specifiers must survive escaping of user values.
+    assert "Environment=PATH=%h/.local/bin" in svc_text
+    assert "OnFailure=cron-claude-notify-fail@%n.service" in svc_text
+    # Parsing back must un-escape (round-trip).
+    got = {s.name: s for s in t.list_units()}["pct"]
+    assert got.exec_start == "/bin/echo 100% done"
+    assert got.description == "50% description"
+
+
+def test_validate_name_rejects_traversal():
+    with pytest.raises(CronClaudeError, match="letters, digits"):
+        t.validate_name("foo/../../evil")
+    t.validate_name("ok-name_2")  # no raise
+
+
 def test_write_units_rejects_newline_in_description(tmp_path, monkeypatch):
     monkeypatch.setattr(t, "UNITS_DIR", tmp_path)
     spec = TimerSpec(

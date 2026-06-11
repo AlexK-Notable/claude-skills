@@ -27,8 +27,14 @@ mkdir -p "$HERE/logs"
 LOG="$HERE/logs/$NAME-$(date +%Y%m%d-%H%M%S).log"
 
 # `tee` so manual runs see output live; cron will just consume the stdout.
+# Capture the prompt's real exit code with `|| rc=$?` — a bare "$PROMPT" under
+# set -e would abort the group before the footer, and `$?` after a successful
+# echo would always log "exit: 0". The trailing `exit "$rc"` propagates the
+# code through the pipeline (pipefail) so cron still sees the failure.
 {
   echo "=== $NAME @ $(date -Iseconds) ==="
-  "$PROMPT"
-  echo "=== exit: $? ==="
+  rc=0
+  "$PROMPT" || rc=$?
+  echo "=== exit: $rc ==="
+  exit "$rc"
 } 2>&1 | tee "$LOG"

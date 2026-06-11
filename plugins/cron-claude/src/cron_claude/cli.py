@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from typing import Annotated
 
@@ -37,17 +36,9 @@ _STARTER_TEMPLATE = """\
 exec claude -p 'REPLACE ME: describe this scheduled job' --allowed-tools 'Bash(echo *)'
 """
 
-_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
-
-
-def _validate_name(name: str) -> None:
-    # Names become systemd unit basenames and path components — keep them strict
-    # to prevent unit-file path traversal and directive injection.
-    if not _NAME_RE.fullmatch(name):
-        raise CronClaudeError(
-            f"schedule name {name!r} must contain only letters, digits, "
-            "hyphens, and underscores"
-        )
+# Names become systemd unit basenames and path components — validation lives in
+# timers.validate_name so operations.remove_schedule (used by the TUI too) shares it.
+_validate_name = timers.validate_name
 
 
 def _fail(exc: CronClaudeError) -> typer.Exit:
@@ -110,8 +101,12 @@ def schedule_add(
     ] = False,
     bare: Annotated[
         bool,
-        typer.Option("--bare/--no-bare", help="Text prompts: pass --bare (default on)."),
-    ] = True,
+        typer.Option(
+            "--bare/--no-bare",
+            help="Text prompts: pass --bare (default off; --bare bypasses OAuth"
+            " and requires ANTHROPIC_API_KEY in the unit environment).",
+        ),
+    ] = False,
     output_format: Annotated[
         str,
         typer.Option("--output-format", help="Text prompts: --output-format (default json)."),
@@ -229,6 +224,7 @@ def schedule_rm(
 ) -> None:
     """Remove a scheduled job (disables, stops, and deletes both unit files)."""
     try:
+        _validate_name(name)
         if not timers.schedule_exists(name):
             raise ScheduleNotFound(f"schedule {name!r} not found")
         if not force and not typer.confirm(f"Remove schedule {name!r}?"):
@@ -245,6 +241,7 @@ def schedule_show(
 ) -> None:
     """Show details for a single scheduled job."""
     try:
+        _validate_name(name)
         svc, tmr = timers.unit_paths(name)
         if not timers.schedule_exists(name):
             raise ScheduleNotFound(f"schedule {name!r} not found")
@@ -269,6 +266,7 @@ def run_now(
 ) -> None:
     """Trigger a scheduled job to run immediately (blocks until it finishes)."""
     try:
+        _validate_name(name)
         if not timers.schedule_exists(name):
             raise ScheduleNotFound(f"schedule {name!r} not found")
         console.print(f"running [bold]{name}[/bold] …")
@@ -288,6 +286,7 @@ def logs(
 ) -> None:
     """View logs for a scheduled job's recent runs."""
     try:
+        _validate_name(name)
         if not timers.schedule_exists(name):
             raise ScheduleNotFound(f"schedule {name!r} not found")
     except CronClaudeError as exc:

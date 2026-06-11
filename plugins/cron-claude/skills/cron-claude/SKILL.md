@@ -22,6 +22,9 @@ cron-claude --help
 cron-claude --version
 
 cron-claude schedule add NAME --when 'OnCalendar spec' --prompt PATH [-d DESC]
+                         [--timeout SECS] [--randomized-delay SECS] [--scaffold|-s]
+                         [--allowed-tools T]... [--permission-mode M] [--output-format F]
+                         [--bare] [--dangerously-skip-permissions]
 cron-claude schedule list [--json]
 cron-claude schedule rm NAME [--force]
 cron-claude schedule show NAME
@@ -34,10 +37,12 @@ cron-claude tui                 # interactive (needs `uv sync --extra tui`)
 
 ## Conventions
 
-- **Schedule names** become systemd unit basenames and are validated to `[A-Za-z0-9_-]+` (letters, digits, hyphens, underscores — no spaces or slashes). Underlying units are written as `cron-claude-<name>.{service,timer}`.
+- **Schedule names** become systemd unit basenames and are validated to `[A-Za-z0-9_-]+` (letters, digits, hyphens, underscores — no spaces or slashes) on **every** command that takes a name (`add`, `rm`, `show`, `run`, `logs`, and TUI removal). Underlying units are written as `cron-claude-<name>.{service,timer}`.
 - **`--when`** accepts any systemd `OnCalendar=` value: `weekly`, `Sun 03:07`, `*-*-* 09:00`, `Mon..Fri 17:00`. Resolve fuzzy phrasing ("every Sunday morning") to a concrete OnCalendar spec before passing it.
 - **`--prompt`** accepts **any path**: an *executable* file (which owns its own `claude -p` invocation + allowlist, like those in `prompts/`) runs directly; a *non-executable text* file is wrapped by cron-claude in a `claude -p "$(cat …)"` call. Pass `--scaffold` to create an executable starter when the path doesn't exist yet.
-- **Text-prompt flags** (ignored for executable prompts): `--allowed-tools` (repeatable), `--permission-mode`, `--dangerously-skip-permissions`, `--no-bare`, `--output-format`. Defaults: `--bare --output-format json` with no permission mode (relying on the allowlist). `--no-bare` keeps OAuth/keychain auth.
+- **Text-prompt flags** (ignored for executable prompts): `--allowed-tools` (repeatable), `--permission-mode`, `--dangerously-skip-permissions`, `--bare`, `--output-format`. Defaults: `--output-format json`, **no `--bare`**, no permission mode (relying on the allowlist). `--bare` is opt-in only: it makes `claude` ignore OAuth/keychain auth and require `ANTHROPIC_API_KEY` in the unit environment — which is not set on this machine (OAuth login), so bare jobs would fail auth.
+- **Other `add` flags**: `--timeout SECS` (TimeoutStartSec), `--randomized-delay SECS` (RandomizedDelaySec), `--scaffold`/`-s` (create an executable starter at `--prompt` if missing).
+- **Failure notifications**: every generated service carries `OnFailure=cron-claude-notify-fail@%n.service`, and a shared template unit `cron-claude-notify-fail@.service` is installed (idempotently) whenever a schedule is added. A failed run pops a `notify-send` desktop alert pointing at `journalctl`. The shared template is **never auto-removed** when schedules are deleted — other schedules may still reference it; delete it by hand only if no cron-claude units remain.
 - **`--json`** is supported on listing/inspection commands when you'll parse the result.
 
 ## When *not* to use this skill

@@ -44,6 +44,8 @@ def test_scriptrunner_rejects_non_executable(tmp_path):
 
 
 def test_clauderunner_renders_expected_command(tmp_path):
+    # Default is NO --bare: --bare bypasses OAuth/keychain auth and would require
+    # ANTHROPIC_API_KEY in the systemd unit environment (not set on this machine).
     p = tmp_path / "job.txt"
     p.write_text("do the thing")
     runner = ClaudeRunner(prompt_path=p, allowed_tools=("Bash(git *)", "Edit"))
@@ -51,16 +53,23 @@ def test_clauderunner_renders_expected_command(tmp_path):
     abs_p = str(p.resolve())
     assert out == (
         "/bin/bash -c "
-        f"'claude -p \"$(cat \"{abs_p}\")\" --bare --output-format json "
+        f"'claude -p \"$(cat \"{abs_p}\")\" --output-format json "
         "--allowed-tools \"Bash(git *) Edit\"'"
     )
+
+
+def test_clauderunner_bare_is_opt_in(tmp_path):
+    p = tmp_path / "job.txt"
+    p.write_text("x")
+    assert "--bare" not in ClaudeRunner(prompt_path=p).to_exec_start()
+    assert "--bare" in ClaudeRunner(prompt_path=p, bare=True).to_exec_start()
 
 
 def test_clauderunner_optional_flags(tmp_path):
     p = tmp_path / "job.txt"
     p.write_text("x")
     runner = ClaudeRunner(
-        prompt_path=p, bare=False, permission_mode="bypassPermissions", dangerously_skip=True
+        prompt_path=p, permission_mode="bypassPermissions", dangerously_skip=True
     )
     out = runner.to_exec_start()
     assert "--bare" not in out
@@ -68,11 +77,18 @@ def test_clauderunner_optional_flags(tmp_path):
     assert "--dangerously-skip-permissions" in out
 
 
+def test_clauderunner_accepts_dontask_mode(tmp_path):
+    # dontAsk is a real mode per `claude --help`.
+    p = tmp_path / "job.txt"
+    p.write_text("x")
+    ClaudeRunner(prompt_path=p, permission_mode="dontAsk").validate()  # no raise
+
+
 def test_clauderunner_rejects_bad_permission_mode(tmp_path):
     p = tmp_path / "job.txt"
     p.write_text("x")
     with pytest.raises(CronClaudeError):
-        ClaudeRunner(prompt_path=p, permission_mode="dontAsk").validate()
+        ClaudeRunner(prompt_path=p, permission_mode="yolo").validate()
 
 
 def test_clauderunner_rejects_bad_output_format(tmp_path):

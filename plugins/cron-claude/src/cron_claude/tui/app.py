@@ -12,7 +12,7 @@ from cron_claude.systemd import control, timers
 
 
 class CronClaudeApp(App):
-    """List cron-claude schedules; r=run, x=remove, l=logs, q=quit."""
+    """List cron-claude schedules; r=run, x=remove (press twice), l=logs, q=quit."""
 
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("r", "run", "Run"),
@@ -20,6 +20,10 @@ class CronClaudeApp(App):
         Binding("l", "logs", "Logs"),
         Binding("q", "quit", "Quit"),
     ]
+
+    # Two-keypress confirm state for `x` (the CLI equivalent requires --force;
+    # zero-confirmation removal from a single keypress is too destructive).
+    _pending_remove: str | None = None
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -48,6 +52,7 @@ class CronClaudeApp(App):
         self.query_one("#log", RichLog).write(msg)
 
     def action_run(self) -> None:
+        self._pending_remove = None  # any other action cancels a pending removal
         name = self._selected()
         if not name:
             return
@@ -62,6 +67,14 @@ class CronClaudeApp(App):
         name = self._selected()
         if not name:
             return
+        if self._pending_remove != name:
+            self._pending_remove = name
+            self._log(
+                f"[yellow]press x again to remove {name!r}[/yellow] "
+                "(any other action cancels)"
+            )
+            return
+        self._pending_remove = None
         try:
             operations.remove_schedule(name)
             self._log(f"[yellow]removed {name}[/yellow]")
@@ -70,6 +83,7 @@ class CronClaudeApp(App):
             self._log(f"[red]remove failed:[/red] {exc}")
 
     def action_logs(self) -> None:
+        self._pending_remove = None  # any other action cancels a pending removal
         name = self._selected()
         if not name:
             return
