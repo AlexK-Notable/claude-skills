@@ -17,6 +17,12 @@ $H docker stop homeassistant
 # 2. BACK UP  (malformed JSON bricks startup — always have a rollback)
 $H cp "$F" "$F.bak.$(date +%s)"
 
+# 2b. OFF-HOST COPY — run from KOMI, before editing. The on-host .bak lives on
+#     the Nova's own microSD, which is documented to zero-fill files on an
+#     unclean reboot — an on-host backup can die with the original. Keep a
+#     copy on this machine too:
+$H cat "$F" > "./$(basename "$F").bak.$(date +%s)"
+
 # 3. EDIT     (jq/python for surgical changes; never reformat the whole file blindly)
 # 4. VALIDATE JSON  (must parse before you start HA)
 $H "python3 -c 'import json,sys; json.load(open(\"$F\"))' && echo OK"

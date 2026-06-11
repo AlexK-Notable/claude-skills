@@ -30,7 +30,12 @@ and the HA version live in **[references/TOPOLOGY.md](references/TOPOLOGY.md)**.
    ha-inventory --check      # exit 0 = fresh · 2 = drift (regenerate) · 1 = error
    ```
    On drift, `ha-inventory` (no args) regenerates it. The check compares content
-   hashes of HA's registry files, so it catches UI-made changes too.
+   hashes of the five `.storage` registry files **plus** `automations.yaml` and
+   `scripts.yaml`, so it catches UI-made changes to integrations, entities,
+   devices, areas, HACS, automations, and scripts. It does **not** see other
+   config (`configuration.yaml`, dashboards, exposed entities, Assist
+   pipelines) — don't treat "fresh" as covering those. A snapshot older than
+   `HA_STALE_AFTER_DAYS` also exits 2 even if content matches.
 3. For an entity's *live* state, an exact id in a read-only domain
    (sensor/binary_sensor/button/…), or to **confirm a change took**, query HA live
    via the **API** (the snapshot omits volatile state by design). There's an admin
@@ -48,9 +53,10 @@ What are you changing?
 ├─ An entity's STATE (turn on a light, set a number, run a script)
 │     → call the HA service. Lowest risk. Never edit files for this.
 ├─ A YAML-managed config (automations.yaml, scripts.yaml, configuration.yaml)
-│     → edit the file, then ALWAYS validate before reload:
-│         docker exec homeassistant python -m homeassistant \
-│             --script check_config -c /config        # exit 0 before you reload
+│     → edit the file, then ALWAYS validate before reload (runs from KOMI):
+│         ssh komi@192.168.1.232 'sudo -n docker exec homeassistant \
+│             python -m homeassistant --script check_config -c /config'
+│         # exit 0 before you reload
 │     → reload via the relevant service (automation.reload / etc.) or restart.
 ├─ A .storage/*.json file (registries, config_entries, exposed_entities, pipelines)
 │     → SURGERY. HA holds these in memory and rewrites them on shutdown, so a
@@ -127,9 +133,10 @@ If it's an HA operational lesson, it goes here — don't also stash it elsewhere
 |---|---|
 | `ha-inventory` | regenerate the secret-safe installed-state snapshot |
 | `ha-inventory --check` | drift check vs the snapshot (exit 0/2/1) — run before mutating |
-| `ha-inventory --diff` | same, with a human summary of what changed |
+| `ha-inventory --diff` | `--check` plus per-section counts (snapshot vs live) |
 | `ha-note "…" --fix … --repro …` | append one structured gotcha to the journal |
-| `ha-note --list` / `--selftest` | read the journal / verify the capture path is alive |
+| `ha-note --list [--grep TERM] [--tag TAG]` | read the journal (filtered — prefer this over the full dump) |
+| `ha-note --selftest` | verify the capture path is alive |
 
 Config seam (HA host, paths) is `config.sh` next to this file — the one place
 HA-specific values live.

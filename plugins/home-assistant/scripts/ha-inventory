@@ -16,23 +16,28 @@ script never reads those keys into output — it emits a fixed allowlist
 (domain / title / source / disabled_by). Everything else (registries,
 hacs.repositories) is secret-free by nature.
 
-STALENESS: the snapshot front-matter records each source file's mtime, size,
-and sha256. `--check` re-reads and compares — so it catches changes you made
-in the HA web UI (which rewrite these files) even though no Claude tool ran.
-Exit codes (Terraform-style):  0 = fresh,  2 = drift detected,  1 = error.
+STALENESS: the snapshot front-matter records each source .storage file's mtime,
+size, and sha256, plus sha256 of automations.yaml and scripts.yaml bodies.
+`--check` re-reads and compares — so it catches changes you made in the HA web
+UI (which rewrite these files) even though no Claude tool ran. A snapshot older
+than HA_STALE_AFTER_DAYS is reported as drift even when content matches.
+Exit codes (Terraform-style):  0 = fresh,  2 = drift/stale,  1 = error.
 
 Usage:
   ha-inventory                 # regenerate and write the snapshot
   ha-inventory --check         # compare live vs snapshot; exit 0/2/1; no write
   ha-inventory --stdout        # print snapshot to stdout, don't write the file
-  ha-inventory --diff          # like --check but print a human summary of changes
+  ha-inventory --diff          # --check plus a per-section count summary (snapshot vs live)
+  ha-inventory --force-empty   # write mode: allow overwriting a populated snapshot
+                               # with one that has 0 entities (normally refused)
 
 Config (env overrides, normally set by the skill's config.sh):
-  HA_SSH        ssh target for the HA host           (default komi@192.168.1.229)
+  HA_SSH        ssh target for the HA host           (default komi@192.168.1.232)
   HA_CONFIG     HA config dir on that host           (default /home/komi/homeassistant/config)
   HA_CONTAINER  docker container name for version     (default homeassistant)
 """
 import os
+import re
 import sys
 import json
 import time
@@ -42,7 +47,6 @@ from datetime import datetime, timezone
 
 def _load_config():
     """Seed HA_* env defaults from the skill's config.sh (env still wins)."""
-    import re
     here = os.path.dirname(os.path.realpath(__file__))
     cfg = os.path.join(os.path.dirname(here), "skills", "home-assistant", "config.sh")
     if not os.path.exists(cfg):
@@ -56,7 +60,7 @@ def _load_config():
 
 _load_config()
 
-HA_SSH = os.environ.get("HA_SSH", "komi@192.168.1.229")
+HA_SSH = os.environ.get("HA_SSH", "komi@192.168.1.232")
 HA_CONFIG = os.environ.get("HA_CONFIG", "/home/komi/homeassistant/config")
 HA_CONTAINER = os.environ.get("HA_CONTAINER", "homeassistant")
 STALE_AFTER_DAYS = int(os.environ.get("HA_STALE_AFTER_DAYS", "7"))
@@ -124,7 +128,9 @@ def fetch_remote():
     if out.returncode != 0:
         die(f"ssh to {HA_SSH} failed (rc={out.returncode}): {out.stderr.strip()[:300]}")
 
-    return parse_remote(out.stdout)
+    d = parse_remote(out.stdout)
+    validate_remote(d)
+    return d
 
 
 def parse_remote(blob):
@@ -146,11 +152,11 @@ def parse_remote(blob):
                 pending_stat[name] = (0, 0)
         elif head.startswith("DATA "):
             name = head[5:].strip()
-            raw = body if body.endswith("\n") else body
+            raw = body if body.endswith("\n") else body + "\n"
             try:
                 parsed = json.loads(raw) if raw.strip() else {}
             except json.JSONDecodeError:
-                parsed = {}
+                parsed = None  # flagged as fatal by validate_remote()
             mtime, size = pending_stat.get(name, (0, 0))
             data["files"][name] = {
                 "mtime": mtime,
@@ -165,6 +171,31 @@ def parse_remote(blob):
         elif head == "SCRIPTS":
             data["scripts_yaml"] = body
     return data
+
+
+def validate_remote(d):
+    """Fail HARD on any sign of a broken remote read.
+
+    The remote command line falls back to "0 0" / "{}" per file so the marker
+    stream stays parseable — but a broken sudo, a moved config dir, or a
+    truncated cat would otherwise yield a "valid" EMPTY snapshot that silently
+    os.replace()s the good one (and autosync would commit it). Refuse instead."""
+    problems = []
+    for f in STORAGE_FILES:
+        meta = d["files"].get(f)
+        if meta is None:
+            problems.append(f"{f}: missing from remote output entirely")
+            continue
+        if (meta["mtime"], meta["size"]) == (0, 0):
+            problems.append(f"{f}: stat failed — file missing or `sudo -n` broken on {HA_SSH}?")
+        if meta["json"] is None:
+            problems.append(f"{f}: cat output is not valid JSON (truncated/partial read?)")
+        elif meta["json"] == {}:
+            problems.append(f"{f}: read back empty — cat failed (sudo/path broken on {HA_SSH}?)")
+    if problems:
+        die("refusing to use this remote read — it looks broken, not empty:\n  "
+            + "\n  ".join(problems)
+            + f"\n  (host: {HA_SSH}, config: {HA_CONFIG})")
 
 
 # ---- extractors (each returns plain rows; never touches data/options) ----
@@ -247,26 +278,52 @@ def x_hacs(d):
     return rows
 
 
-def x_yaml_blocks(text):
-    """Cheap enumeration of UI-managed automations/scripts: id + alias.
+def x_automations_yaml(text):
+    """Cheap enumeration of UI-managed automations: id + alias.
 
-    Avoids a YAML dep — these files have a stable `- id:` / `alias:` shape."""
+    Avoids a YAML dep — automations.yaml is a top-level LIST whose items start
+    `- id:` at column 0. Match ONLY at column 0: automations also contain
+    nested `- id:` lines (trigger ids, indented), which must not count."""
     rows = []
-    cur = {}
+    cur = None
     for line in text.splitlines():
-        s = line.strip()
-        if s.startswith("- id:"):
+        if line.startswith("- id:"):
             if cur:
                 rows.append(cur)
-            cur = {"id": s.split(":", 1)[1].strip().strip('"\''), "alias": ""}
-        elif s.startswith("alias:") and cur:
-            cur["alias"] = s.split(":", 1)[1].strip().strip('"\'')
+            cur = {"id": line.split(":", 1)[1].strip().strip('"\''), "alias": ""}
+        elif cur is not None and not cur["alias"] and re.match(r"^ {2}alias:", line):
+            cur["alias"] = line.split(":", 1)[1].strip().strip('"\'')
+    if cur:
+        rows.append(cur)
+    return rows
+
+
+def x_scripts_yaml(text):
+    """Enumerate scripts: name + alias.
+
+    scripts.yaml is NOT a `- id:` list — it's a top-level MAPPING
+    (`script_name:\\n  alias: ...`), so it needs its own parser. Top-level keys
+    sit at column 0; the alias is the first `alias:` line indented under one."""
+    rows = []
+    cur = None
+    for line in text.splitlines():
+        m = re.match(r"^([A-Za-z0-9_]+):", line)
+        if m:
+            if cur:
+                rows.append(cur)
+            cur = {"id": m.group(1), "alias": ""}
+        elif cur is not None and not cur["alias"] and re.match(r"^ {2}alias:", line):
+            cur["alias"] = line.split(":", 1)[1].strip().strip('"\'')
     if cur:
         rows.append(cur)
     return rows
 
 
 # ---- rendering ----
+
+def _sha16(text):
+    return hashlib.sha256(text.encode("utf-8", "replace")).hexdigest()[:16]
+
 
 def render(d):
     areas = x_areas(d)
@@ -279,8 +336,8 @@ def render(d):
         """Entity's explicit area, else inherited from its device."""
         return areas.get(e["area_id"] or dev_area.get(e["device_id"]), "")
     hacs = x_hacs(d)
-    autos = x_yaml_blocks(d["automations_yaml"])
-    scripts = x_yaml_blocks(d["scripts_yaml"])
+    autos = x_automations_yaml(d["automations_yaml"])
+    scripts = x_scripts_yaml(d["scripts_yaml"])
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # entity counts by domain
@@ -295,10 +352,16 @@ def render(d):
     # GENERATED banner + front-matter (machine-readable staleness fingerprint)
     L.append("<!-- GENERATED by ha-inventory — DO NOT EDIT. Regenerate; manual edits are overwritten. -->")
     L.append("<!-- ha-inventory:fingerprint")
+    fp_files = {n: {"mtime": m["mtime"], "size": m["size"], "sha256": m["sha256"]}
+                for n, m in d["files"].items()}
+    # The YAML bodies too — UI edits to an EXISTING automation/script rewrite
+    # only automations.yaml/scripts.yaml, so without these --check would say
+    # "fresh" while the snapshot is stale.
+    fp_files["automations.yaml"] = {"sha256": _sha16(d["automations_yaml"])}
+    fp_files["scripts.yaml"] = {"sha256": _sha16(d["scripts_yaml"])}
     fp = {"generated_at": now, "ha_version": d["version"], "source": HA_SSH,
           "stale_after_days": STALE_AFTER_DAYS,
-          "files": {n: {"mtime": m["mtime"], "size": m["size"], "sha256": m["sha256"]}
-                    for n, m in d["files"].items()}}
+          "files": fp_files}
     L.append(json.dumps(fp, indent=2))
     L.append("-->")
     L.append("")
@@ -448,6 +511,24 @@ def staleness_note(fp):
         return None
 
 
+def snapshot_section_counts():
+    """Counts parsed back out of the committed snapshot's section headings."""
+    counts = {}
+    try:
+        with open(SNAPSHOT_PATH) as f:
+            txt = f.read()
+    except OSError:
+        return counts
+    for sec, pat in [("integrations", r"^## Integrations \((\d+)\)"),
+                     ("entities", r"^## Entities \((\d+) registry-tracked"),
+                     ("automations", r"^## Automations \((\d+)\)"),
+                     ("scripts", r"^## Scripts \((\d+)\)")]:
+        m = re.search(pat, txt, re.M)
+        if m:
+            counts[sec] = int(m.group(1))
+    return counts
+
+
 def main():
     mode = "write"
     if "--check" in sys.argv:
@@ -467,8 +548,27 @@ def main():
     if mode in ("check", "diff"):
         old_fp = read_snapshot_fingerprint()
         changes = compare(old_fp, new_fp)
+        if mode == "diff":
+            # Per-section count summary — what --diff adds over --check.
+            snap = snapshot_section_counts()
+            live = {"integrations": len(x_integrations(d)),
+                    "entities": len(x_entities(d)),
+                    "automations": len(x_automations_yaml(d["automations_yaml"])),
+                    "scripts": len(x_scripts_yaml(d["scripts_yaml"]))}
+            print("ha-inventory: section counts (snapshot → live):")
+            for sec in ("integrations", "entities", "automations", "scripts"):
+                o = snap.get(sec, "?")
+                mark = "" if o == live[sec] else "   ← differs"
+                print(f"  {sec:13s} {o} → {live[sec]}{mark}")
         if not changes:
             age = staleness_note(old_fp) if old_fp else None
+            # HA_STALE_AFTER_DAYS enforcement: an old snapshot is suspect even
+            # when content happens to match — surface it as drift (exit 2).
+            if age is not None and age > STALE_AFTER_DAYS:
+                print(f"ha-inventory: STALE — content matches, but the snapshot is "
+                      f"{age:.1f}d old (threshold {STALE_AFTER_DAYS}d, HA_STALE_AFTER_DAYS).")
+                print("Run `ha-inventory` (no args) to regenerate and refresh the timestamp.")
+                return 2
             agestr = f" (snapshot age {age:.1f}d)" if age is not None else ""
             print(f"ha-inventory: fresh — live HA matches the committed snapshot{agestr}")
             return 0
@@ -479,6 +579,17 @@ def main():
         return 2
 
     # write mode
+    # Sanity floor: a populated snapshot must not be replaced by an entity-less
+    # one — that shape is a broken read, not a real install. (validate_remote
+    # catches hard failures; this catches "valid JSON, suspiciously empty".)
+    if "--force-empty" not in sys.argv:
+        old_entities = snapshot_section_counts().get("entities", 0)
+        new_entities = len(x_entities(d))
+        if old_entities > 0 and new_entities == 0:
+            die(f"sanity floor: existing snapshot has {old_entities} entities but this "
+                f"read produced 0 — that almost certainly means a broken remote read, "
+                f"not a wiped HA. Refusing to overwrite {SNAPSHOT_PATH}.\n"
+                f"If HA really has zero registry entities, re-run with --force-empty.")
     os.makedirs(os.path.dirname(SNAPSHOT_PATH), exist_ok=True)
     tmp = SNAPSHOT_PATH + ".tmp"
     with open(tmp, "w") as f:

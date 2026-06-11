@@ -25,10 +25,13 @@ Usage:
       [--ha-version 2026.5.4] [--applies "container install only"] \
       [--tag bluetooth --tag govee]
 
-  ha-note --list            # print the journal
+  ha-note --list                       # print the whole journal
+  ha-note --list --grep govee          # only entries containing "govee" (case-insensitive)
+  ha-note --list --tag bluetooth       # only entries tagged "bluetooth" (repeatable, ANDed)
   ha-note --selftest        # append + verify a synthetic entry grew the journal (then prints how to remove)
 """
 import os
+import re
 import sys
 import fcntl
 import argparse
@@ -56,14 +59,15 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 
 def append_entry(text):
     os.makedirs(os.path.dirname(JOURNAL), exist_ok=True)
-    # Create with header if absent.
-    if not os.path.exists(JOURNAL):
-        with open(JOURNAL, "w") as f:
-            f.write(JOURNAL_HEADER)
     # Atomic append under an exclusive lock (safe across concurrent callers).
+    # "a" creates the file if absent; the header decision happens UNDER the
+    # lock (fstat of the locked fd), so two concurrent first-callers can't
+    # both decide to write the header.
     with open(JOURNAL, "a") as f:
         fcntl.flock(f.fileno(), fcntl.LOCK_EX)
         try:
+            if os.fstat(f.fileno()).st_size == 0:
+                f.write(JOURNAL_HEADER)
             f.write(text)
             f.flush()
             os.fsync(f.fileno())
@@ -92,6 +96,49 @@ def build_entry(a):
     return "\n".join(lines) + "\n"
 
 
+def list_journal(grep=None, tags=()):
+    """Print the journal, optionally filtered by --grep / --tag.
+
+    The journal is 140+ lines and growing — agents need filtered reads, not
+    the whole file, to find the one relevant gotcha."""
+    if not os.path.exists(JOURNAL):
+        print("(journal empty — nothing captured yet)")
+        return 0
+    text = open(JOURNAL).read()
+    if not grep and not tags:
+        sys.stdout.write(text)
+        return 0
+    # Split into entries: each starts at a line beginning "### " (the dated
+    # heading). Everything before the first heading is the file header — skipped.
+    entries = []
+    cur = None
+    for line in text.splitlines():
+        if line.startswith("### "):
+            if cur:
+                entries.append("\n".join(cur).strip("\n"))
+            cur = [line]
+        elif cur is not None:
+            cur.append(line)
+    if cur:
+        entries.append("\n".join(cur).strip("\n"))
+
+    def keep(entry):
+        if grep and grep.lower() not in entry.lower():
+            return False
+        if tags:
+            m = re.search(r"^- \*\*Tags:\*\* (.+)$", entry, re.M)
+            have = {t.strip().lower() for t in m.group(1).split(",")} if m else set()
+            if not all(t.lower() in have for t in tags):
+                return False
+        return True
+
+    matched = [e for e in entries if keep(e)]
+    if matched:
+        sys.stdout.write("\n\n".join(matched) + "\n")
+    print(f"({len(matched)}/{len(entries)} entries matched)", file=sys.stderr)
+    return 0
+
+
 def main():
     p = argparse.ArgumentParser(add_help=True)
     p.add_argument("summary", nargs="?", help="one-line symptom/lesson")
@@ -105,15 +152,13 @@ def main():
     g.add_argument("--verified", action="store_true")
     g.add_argument("--unverified", action="store_true")
     p.add_argument("--list", action="store_true")
+    p.add_argument("--grep", metavar="TERM",
+                   help="with --list: only entries containing TERM (case-insensitive)")
     p.add_argument("--selftest", action="store_true")
     a = p.parse_args()
 
     if a.list:
-        if os.path.exists(JOURNAL):
-            sys.stdout.write(open(JOURNAL).read())
-        else:
-            print("(journal empty — nothing captured yet)")
-        return 0
+        return list_journal(grep=a.grep, tags=a.tag)
 
     if a.selftest:
         before = os.path.getsize(JOURNAL) if os.path.exists(JOURNAL) else 0
@@ -123,14 +168,16 @@ def main():
         ok = after > before
         print(f"ha-note selftest: journal grew {before}->{after} bytes — "
               + ("OK" if ok else "FAILED"))
-        print(f"  remove the test entry with: sed -i '/SELFTEST {marker}/,+1d' {JOURNAL}")
+        # The test entry is 3 lines: a leading blank, the ### heading, the
+        # status line. The range deletes the latter two; the trailing `$` block
+        # drops the now-dangling blank line at EOF.
+        print(f"  remove the test entry with: sed -i '/SELFTEST {marker}/,+1d; ${{/^$/d}}' {JOURNAL}")
         return 0 if ok else 1
 
     if not a.summary:
         p.error("summary is required (or use --list / --selftest)")
-    # Default to unverified unless the caller asserts verification — fail safe.
-    if not a.verified:
-        a.verified = False
+    # Entries default to unverified (argparse store_true) — fail safe: a gotcha
+    # is only `verified` when the caller explicitly asserts --verified.
 
     append_entry(build_entry(a))
     status = "verified" if a.verified else "unverified (re-check before acting)"

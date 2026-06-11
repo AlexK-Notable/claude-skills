@@ -203,19 +203,19 @@ if ! bw status 2>/dev/null | grep -q '"status":"unlocked"'; then
 fi
 
 # Preflight: stash present + non-empty?
-[[ -r "$SECRET_FILE" ]] || { echo "✗ Stash $SECRET_FILE missing"; exit 1; }
-SECRET=$(cat "$SECRET_FILE")
-[[ -n "$SECRET" ]] || { echo "✗ Stash empty"; exit 1; }
+[[ -s "$SECRET_FILE" ]] || { echo "✗ Stash $SECRET_FILE missing or empty"; exit 1; }
 
-# Build + create + metadata-only output (jq strips secrets from scrollback)
-jq -n --arg s "$SECRET" '{
+# Build + create + metadata-only output (jq strips secrets from scrollback).
+# --rawfile reads the secret straight from the stash, so the value never
+# enters any argv (a --arg value would be visible in `ps`/ /proc/*/cmdline).
+jq -n --rawfile s "$SECRET_FILE" '{
   type: 2,
   name: "<descriptive name>",
   notes: "<context: where the secret came from, when, what depends on it>",
   secureNote: {type: 0},
   favorite: false,
   fields: [
-    {name: "<label>", value: $s, type: 1}
+    {name: "<label>", value: ($s | rtrimstr("\n")), type: 1}
   ]
 }' | bw encode | bw create item \
    | jq '{id, name, type, created: .creationDate, fields: [.fields[] | {name, type}]}'
@@ -347,7 +347,7 @@ Default output is JSON; `-o` accepts `json`, `yaml`, `env`, `table`, `tsv`, `non
 
 - **`bws secret create` takes the value as a positional arg → it lands in shell history.** Easiest safe path is the wrapper **`~/bin/bws-secret-add KEY [PROJECT_ID]`** (reads the value hidden, auto-loads the token, auto-resolves the project, strips plaintext from output — see `references/secrets-manager.md`). The underlying manual pattern, if you need it:
   ```bash
-  read -rs 'val?Paste value: '
+  read -rsp 'Paste value: ' val; echo
   bws secret create OPENAI_API_KEY "$val" 18f14ed9-8ba5-4cc6-bbd4-b45b01534270
   unset val
   ```

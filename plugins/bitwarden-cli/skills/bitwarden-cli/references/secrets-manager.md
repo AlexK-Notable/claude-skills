@@ -57,8 +57,8 @@ The token is the bootstrap secret: whatever runs `bws` unattended must read it i
 
 ```bash
 mkdir -p ~/.config/bws
-read -rs 'tok?Paste bws access token: '       # hidden input, not in history
-umask 177; print -r -- "BWS_ACCESS_TOKEN=$tok" > ~/.config/bws/token.env
+read -rsp 'Paste bws access token: ' tok; echo   # hidden input, not in history
+umask 177; printf 'BWS_ACCESS_TOKEN=%s\n' "$tok" > ~/.config/bws/token.env
 unset tok; chmod 600 ~/.config/bws/token.env
 ```
 Use it:
@@ -115,7 +115,7 @@ All commands need `BWS_ACCESS_TOKEN` in the environment (or `-t`). Add `-o env|t
 
 **Secret creation hygiene** (the value is positional → history):
 ```bash
-read -rs 'val?Paste value: '
+read -rsp 'Paste value: ' val; echo
 bws secret create ANTHROPIC_API_KEY "$val" 18f14ed9-8ba5-4cc6-bbd4-b45b01534270 --note "Claude API, HA conversation agent"
 unset val
 ```

@@ -1,7 +1,7 @@
 # home-assistant
 
 Operate the user's self-hosted Home Assistant (HA in Docker on the Nova,
-`192.168.1.229:8123`) safely, and remember what we learn.
+`192.168.1.232:8123`) safely, and remember what we learn.
 
 Two channels, split by volatility:
 
