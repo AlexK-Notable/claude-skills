@@ -152,3 +152,11 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 
 ### SELFTEST 2026-06-14T19:38:28Z
 - **Status:** verified (self-test, delete me)
+
+### 2026-06-14 — Voice PE status LED ring is a controllable rgb light (light.<device>_led_ring); if exposed to Assist, a generic 'turn the lights <color>' command sweeps it up and it stays stuck on that color
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** The HA Voice PE exposes its status ring as an rgb light entity. When that entity is exposed to the conversation agent, 'turn the lights red' targets it alongside the real room lights. The ring then holds that color indefinitely - nothing auto-resets it, and the entity is not in the recorder, so there is no history/logbook trail to trace it (looked like an unexplained red ring for a week).
+- **Fix:** Keep light.<device>_led_ring UNEXPOSED to the conversation assistant. Verify by asking the agent to enumerate controllable lights (ring should be absent), and by checking it is not in .storage/homeassistant.exposed_entities with .data.assistants expose-new empty. To recover a stuck ring: light.turn_on with desired rgb_color (e.g. white 255,255,255).
+- **Repro / verify:** `Ring shows a fixed rgb in its light state with no recorder history; agent's controllable-lights list excludes it once unexposed`
+- **Tags:** assist
