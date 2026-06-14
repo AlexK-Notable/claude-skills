@@ -141,3 +141,14 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Fix:** stop HA, set the entry's disabled_by to null in .storage/core.config_entries, validate JSON, start HA
 - **Repro / verify:** `entry shows disabled_by=user in core.config_entries; integration absent until disabled_by cleared`
 - **Tags:** storage
+
+### 2026-06-14 — Nova DHCP IP change (192.168.1.229 -> .232) silently broke zeroconf-pinned Wyoming STT + wake entries (and Glances-Nova); Piper on the Pi was unaffected
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** Wyoming + Glances config entries store the IP that was resolved at zeroconf discovery time. When the Nova's DHCP lease moved .229 -> .232, the entries kept the stale host, so HA's connect failed -> state=setup_retry 'Unable to connect'; the bedroom Voice PE then reported stt-provider-missing for stt.sensevoice_rknn. Looked like 'not connected to Anthropic' but the Anthropic entry was loaded fine - STT just never reached it.
+- **Fix:** Edit .storage/core.config_entries data.host .229 -> .232 for the affected entries (HA STOPPED), then start. A config-entry RELOAD does NOT help - host is read from entry data, not re-resolved. Durable fix: give the Nova a DHCP reservation / static IP so it stops moving.
+- **Repro / verify:** `config_entries/get shows wyoming entries setup_retry/Unable to connect while 'ss' on the Nova shows :10300/:10400 listening; HA container can TCP-connect to .232 but .229 times out / host-unreachable`
+- **Tags:** wyoming
+
+### SELFTEST 2026-06-14T19:38:28Z
+- **Status:** verified (self-test, delete me)
