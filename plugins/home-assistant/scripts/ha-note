@@ -139,6 +139,68 @@ def list_journal(grep=None, tags=()):
     return 0
 
 
+CURATED = os.path.join(_references_dir(), "GOTCHAS.md")
+_STOP = set(
+    "the a an and or of to is are was were for in on with you your it its not no be by "
+    "as at do does dont can cant use used using via per when then this that if so we our "
+    "they them but into out off only need needs make does only via from has have had".split())
+
+
+def _sig_tokens(s):
+    return {w for w in re.findall(r"[a-z0-9_]{4,}", s.lower()) if w not in _STOP}
+
+
+def pending_promotions():
+    """REVIEW AID (heuristic, not authoritative): list *verified* journal entries
+    that don't appear to be in the curated GOTCHAS.md yet, so promotion candidates
+    are easy to spot. Matching is by title-word overlap — you still decide what to
+    promote and where. Promotion itself stays a hand edit (the skill's rule)."""
+    if not os.path.exists(JOURNAL):
+        print("(journal empty — nothing to promote)")
+        return 0
+    curated = open(CURATED).read() if os.path.exists(CURATED) else ""
+    curated_heads = [blk.split("\n", 1)[0] for blk in re.split(r"^### ", curated, flags=re.M)[1:]]
+    curated_tok = [_sig_tokens(h) for h in curated_heads]
+
+    # parse journal into (heading, body) entries
+    entries, cur = [], None
+    for line in open(JOURNAL).read().splitlines():
+        if line.startswith("### "):
+            if cur:
+                entries.append(cur)
+            cur = {"head": line[4:], "body": [line]}
+        elif cur is not None:
+            cur["body"].append(line)
+    if cur:
+        entries.append(cur)
+
+    pending, promoted = [], []
+    for e in entries:
+        if "selftest" in e["head"].lower():
+            continue
+        if "**status:** verified" not in "\n".join(e["body"]).lower():
+            continue  # only surface verified lessons for promotion
+        t = _sig_tokens(e["head"])
+        best, where = 0, None
+        for h, ct in zip(curated_heads, curated_tok):
+            ov = len(t & ct)
+            if ov > best:
+                best, where = ov, h.strip()
+        (promoted if best >= 3 else pending).append((e["head"], where, best))
+
+    print(f"=== PENDING promotion — verified, not obviously in GOTCHAS.md ({len(pending)}) ===")
+    for head, _, _ in pending:
+        print(f"  ● {head}")
+    if not pending:
+        print("  (none — every verified entry has a likely match in GOTCHAS.md)")
+    if promoted:
+        print(f"\n=== likely already promoted ({len(promoted)}) ===")
+        for head, where, n in promoted:
+            print(f"  ✓ {head[:90]}\n      ↳ ~ \"{where}\" ({n} shared words)")
+    print("\n(heuristic by title-word overlap — verify before trusting; promote by hand.)")
+    return 0
+
+
 def main():
     p = argparse.ArgumentParser(add_help=True)
     p.add_argument("summary", nargs="?", help="one-line symptom/lesson")
