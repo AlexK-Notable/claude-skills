@@ -48,18 +48,20 @@ def _references_dir():
 
 JOURNAL = os.path.join(_references_dir(), "GOTCHAS.journal.md")
 JOURNAL_HEADER = """\
-# GOTCHAS — journal (append-only, captured via `ha-note`)
+# GOTCHAS — journal (append-only meta-record, captured via `ha-note`)
 
-Raw, dated operational lessons. The DURABLE store in the lean model: append here
-via `ha-note`, never rewrite this file with an LLM. Promote well-worn, reconfirmed
-entries up into the curated `GOTCHAS.md` by hand, then leave the journal entry in
-place (provenance). `unverified` entries must be re-checked before you act on them.
+A dated record of paths taken and what was believed AT THE TIME — provenance,
+NOT a live mirror of HA. Append via `ha-note`; never rewrite or delete an entry.
+Promote well-worn entries into the curated `GOTCHAS.md` by hand. When an entry
+later proves wrong/stale, DON'T edit it — file a revision in the companion
+`GOTCHAS.revisions.md` via `ha-note --supersede <ref>`; `ha-note --list` then
+flags it. `unverified` entries must be re-checked before you act on them.
 
 ---
 """
 
 
-def append_entry(text, path=JOURNAL):
+def append_entry(text, path=JOURNAL, header=JOURNAL_HEADER):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     # Atomic append under an exclusive lock (safe across concurrent callers).
     # "a" creates the file if absent; the header decision happens UNDER the
@@ -69,7 +71,7 @@ def append_entry(text, path=JOURNAL):
         fcntl.flock(f.fileno(), fcntl.LOCK_EX)
         try:
             if os.fstat(f.fileno()).st_size == 0:
-                f.write(JOURNAL_HEADER)
+                f.write(header)
             f.write(text)
             f.flush()
             os.fsync(f.fileno())
