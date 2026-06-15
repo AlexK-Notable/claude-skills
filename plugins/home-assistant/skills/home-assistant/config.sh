@@ -20,7 +20,8 @@ export HA_BWS_TOKEN_ENV=~/.config/bws/token.env  # file exporting BWS_ACCESS_TOK
 
 # --- knowledge files (Channel B), for reference ---
 # WRITABLE (ha-note appends; you curate):
-#   references/GOTCHAS.journal.md   append-only capture target
+#   references/GOTCHAS.journal.md   append-only meta-record (paths/attempts); never rewritten
+#   references/GOTCHAS.revisions.md append-only correction layer (ha-note --supersede <ref>)
 #   references/GOTCHAS.md           curated wisdom, hand-promoted from the journal
 # GENERATED (never hand-edit; regenerate with ha-inventory):
 #   references/INVENTORY.generated.md
