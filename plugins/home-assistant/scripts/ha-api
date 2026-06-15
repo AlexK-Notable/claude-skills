@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""ha-api — one-liner access to the live Home Assistant REST/WS API.
+
+Fetches the admin token itself (via bws / config.sh), so you stop re-doing the
+`source token.env; bws secret get …; H=…; A=…` dance on every call. The token is
+never printed. Read-only except `call`/`post`.
+
+Usage:
+  ha-api get <path>                      # GET /api/<path>   e.g. ha-api get states/light.bedroom_lights
+  ha-api states [regex]                  # list "<entity_id> => <state>" (optional id filter)
+  ha-api call <domain.service> [json]    # POST a service   e.g. ha-api call light.turn_on '{"entity_id":"light.x"}'
+  ha-api template '<jinja>'              # render/validate a template
+  ha-api post <path> [json]              # raw POST
+  ha-api entries [--bad]                 # config entries (WS): state/domain/title/reason; --bad = not loaded
+"""
+import sys
+import os
+import re
+import json
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import ha_lib
+
+
+def _emit(obj):
+    print(obj if isinstance(obj, str) else json.dumps(obj, indent=2))
+
+
+def main(argv):
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__.strip())
+        return 0 if argv else 2
+    cmd, rest = argv[0], argv[1:]
+
+    if cmd == "get":
+        if not rest:
+            sys.exit("usage: ha-api get <path>")
+        _emit(ha_lib.api_get(rest[0]))
+    elif cmd == "post":
+        if not rest:
+            sys.exit("usage: ha-api post <path> [json]")
+        _emit(ha_lib.api_post(rest[0], json.loads(rest[1]) if len(rest) > 1 else {}))
+    elif cmd == "states":
+        pat = re.compile(rest[0]) if rest else None
+        for s in ha_lib.api_get("states"):
+            if not pat or pat.search(s["entity_id"]):
+                print(f'{s["entity_id"]} => {s["state"]}')
+    elif cmd == "call":
+        if not rest:
+            sys.exit("usage: ha-api call <domain.service> [json]")
+        svc = rest[0].replace(".", "/", 1)
+        _emit(ha_lib.api_post("services/" + svc, json.loads(rest[1]) if len(rest) > 1 else {}))
+    elif cmd == "template":
+        if not rest:
+            sys.exit("usage: ha-api template '<jinja>'")
+        _emit(ha_lib.api_post("template", {"template": rest[0]}))
+    elif cmd == "entries":
+        bad = "--bad" in rest
+        entries = ha_lib.config_entries()
+        rows = [e for e in entries if e.get("state") != "loaded"] if bad else entries
+        if bad and not rows:
+            print("all config entries loaded ✓")
+            return 0
+        for e in sorted(rows, key=lambda e: (e.get("state") == "loaded", e.get("domain") or "")):
+            reason = f'  ← {e.get("reason")}' if e.get("reason") else ""
+            print(f'{str(e.get("state")):16} {str(e.get("domain")):14} {e.get("title")}{reason}')
+    else:
+        print(f"ha-api: unknown command {cmd!r} (try --help)", file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
