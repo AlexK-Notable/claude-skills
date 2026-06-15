@@ -150,9 +150,6 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Repro / verify:** `config_entries/get shows wyoming entries setup_retry/Unable to connect while 'ss' on the Nova shows :10300/:10400 listening; HA container can TCP-connect to .232 but .229 times out / host-unreachable`
 - **Tags:** wyoming
 
-### SELFTEST 2026-06-14T19:38:28Z
-- **Status:** verified (self-test, delete me)
-
 ### 2026-06-14 — Voice PE status LED ring is a controllable rgb light (light.<device>_led_ring); if exposed to Assist, a generic 'turn the lights <color>' command sweeps it up and it stays stuck on that color
 - **Status:** verified
 - **HA version:** 2026.5.4
