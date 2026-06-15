@@ -129,7 +129,9 @@ The journal is an append-only **meta-record** — paths taken and what was belie
 stale, don't edit it: file a correction in the companion `GOTCHAS.revisions.md`
 with `ha-note --supersede <ref> --why …` (refs show in `--list`). The revision
 then marks the entry in `--list` and drops it from `--pending` — history stays
-intact, with the correction layered on top.
+intact, with the correction layered on top. When you DO promote an entry into
+GOTCHAS.md, record it with `ha-note --promoted <ref> "<curated title>"` so
+`--pending` stays authoritative (explicit `✓=` beats the title-overlap guess `✓~`).
 
 ## Where HA knowledge lives (routing rule — avoid memory sprawl)
 
@@ -153,7 +155,7 @@ If it's an HA operational lesson, it goes here — don't also stash it elsewhere
 | `ha-note "…" --fix … --repro …` | append one structured gotcha to the journal |
 | `ha-note --list [--grep TERM] [--tag TAG]` | read the journal (filtered — prefer this over the full dump) |
 | `ha-note --pending` | verified journal entries not yet in GOTCHAS.md (promotion candidates) |
-| `ha-note --revisions` · `--supersede REF --why …` | correction layer: file/read supersessions that point at journal entries (the journal is never rewritten) |
+| `ha-note --revisions` · `--supersede REF --why …` · `--promoted REF "title"` | annotation layer pointing at journal entries (journal never rewritten): corrections + promotion status |
 | `ha-note --selftest` | verify the capture path is alive (self-cleaning) |
 
 Config seam (HA host, paths) is `config.sh` next to this file — the one place
