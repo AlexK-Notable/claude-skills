@@ -129,7 +129,7 @@ def parse_entries(text):
 
 
 REVISIONS = os.path.join(_references_dir(), "GOTCHAS.revisions.md")
-REV_STATUSES = ("superseded", "corrected", "retracted", "confirmed")
+REV_STATUSES = ("superseded", "corrected", "retracted", "confirmed", "promoted")
 REVISIONS_HEADER = """\
 # GOTCHAS — revisions (append-only companion to the journal)
 
