@@ -42,6 +42,11 @@ Each entry: what bit us, why, the fix, and when it applies. `unverified` entries
 - **Cause:** the Claude conversation agent has control, but an exposed *script* didn't appear as a callable tool ("script isn't available in this configuration"), while direct light control worked.
 - **Fix:** use a **sentence-trigger automation** + `prefer_local_intents: true` instead of routing through the LLM (see ASSIST.md). Sentence triggers need no exposure and are handled locally.
 
+### The Voice PE status LED ring is a controllable light — keep it UNEXPOSED to Assist
+- **Status:** verified · **Applies when:** an HA Voice PE (or similar satellite with a status light) is exposed to the conversation agent
+- **Cause:** the Voice PE exposes its status ring as `light.<device>_led_ring` (rgb). If that entity is exposed, a generic "turn the lights `<color>`" sweeps it up alongside the real room lights, and the ring then **holds that color indefinitely** — nothing auto-resets it, and the entity isn't in the recorder, so there's no history/logbook to trace it (presented as an unexplained red ring for a week).
+- **Fix:** keep `light.<device>_led_ring` unexposed (confirm it's absent from `.storage/homeassistant.exposed_entities` and that `.data.assistants` expose-new is empty). Verify *effective* exposure by **asking the agent to enumerate controllable entities** (the ring should not appear). Recover a stuck ring with `light.turn_on` + `rgb_color` (white = `255,255,255`).
+
 ### govee2mqtt does NOT honor `transition` — long fades snap
 - **Status:** verified · **Applies when:** any Govee light via govee2mqtt, smooth multi-second-plus ramps
 - **Cause:** Govee/govee2mqtt ignores or hard-caps the transition time.
