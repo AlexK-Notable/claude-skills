@@ -119,7 +119,8 @@ defaults to `unverified` and must be re-checked before anyone acts on it.
 
 Curated, well-worn lessons live in **[references/GOTCHAS.md](references/GOTCHAS.md)**;
 raw captures land in `references/GOTCHAS.journal.md`. Promote journal → curated by
-hand when an entry has proven itself. `ha-note --list` shows the journal;
+hand when an entry has proven itself — `ha-note --pending` lists verified entries
+not yet in GOTCHAS.md (promotion candidates). `ha-note --list` shows the journal;
 `ha-note --selftest` proves the capture path still works (a dead path = silent
 stop-learning).
 
