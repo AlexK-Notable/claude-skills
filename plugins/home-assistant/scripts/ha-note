@@ -161,18 +161,28 @@ def main():
         return list_journal(grep=a.grep, tags=a.tag)
 
     if a.selftest:
-        before = os.path.getsize(JOURNAL) if os.path.exists(JOURNAL) else 0
-        marker = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        append_entry(f"\n### SELFTEST {marker}\n- **Status:** verified (self-test, delete me)\n")
-        after = os.path.getsize(JOURNAL)
-        ok = after > before
-        print(f"ha-note selftest: journal grew {before}->{after} bytes — "
-              + ("OK" if ok else "FAILED"))
-        # The test entry is 3 lines: a leading blank, the ### heading, the
-        # status line. The range deletes the latter two; the trailing `$` block
-        # drops the now-dangling blank line at EOF.
-        print(f"  remove the test entry with: sed -i '/SELFTEST {marker}/,+1d; ${{/^$/d}}' {JOURNAL}")
-        return 0 if ok else 1
+        # Exercise the REAL append path (header-init + locked write + fsync) on a
+        # throwaway file IN THE JOURNAL'S DIRECTORY — proves that directory is
+        # writable (a dead path = silent stop-learning) WITHOUT polluting the
+        # journal with a "delete me" entry. Self-cleaning.
+        test_path = os.path.join(os.path.dirname(JOURNAL), ".ha-note-selftest.tmp")
+        try:
+            if os.path.exists(test_path):
+                os.unlink(test_path)
+            append_entry("\n### SELFTEST\n- **Status:** verified (synthetic)\n", path=test_path)
+            grew = os.path.getsize(test_path) > 0
+            head_ok = open(test_path).read().startswith("# GOTCHAS — journal")
+            ok = grew and head_ok
+            print("ha-note selftest: "
+                  + ("OK — append path + header-init work; journal untouched" if ok
+                     else f"FAILED (grew={grew}, header-init={head_ok})"))
+            return 0 if ok else 1
+        finally:
+            if os.path.exists(test_path):
+                os.unlink(test_path)
+
+    if a.pending:
+        return pending_promotions()
 
     if not a.summary:
         p.error("summary is required (or use --list / --selftest)")
