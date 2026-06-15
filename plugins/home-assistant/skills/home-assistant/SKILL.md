@@ -20,6 +20,11 @@ and the HA version live in **[references/TOPOLOGY.md](references/TOPOLOGY.md)**.
 
 ## Before you touch anything: orient, don't trust stale state
 
+**Triage first when something's wrong:** `ha-doctor` (read-only, one shot) reports
+container status, **config entries not loaded** (the usual culprit), unavailable
+entities, recent log errors, and inventory drift — start here for any "X stopped
+working" before reading files by hand.
+
 1. **Read the inventory for orientation**, not for ground truth:
    [references/INVENTORY.generated.md](references/INVENTORY.generated.md) lists
    installed integrations, HACS, areas, devices, the controllable entity surface,
@@ -39,9 +44,10 @@ and the HA version live in **[references/TOPOLOGY.md](references/TOPOLOGY.md)**.
 3. For an entity's *live* state, an exact id in a read-only domain
    (sensor/binary_sensor/button/…), or to **confirm a change took**, query HA live
    via the **API** (the snapshot omits volatile state by design). There's an admin
-   token in bws (`HA_TOKEN`); the recipes — `GET /api/states/<id>`, `POST
-   /api/services/<domain>/<service>`, and `POST /api/template` (to **validate
-   automation Jinja before it runs live**) — are in
+   token in bws (`HA_TOKEN`). Prefer the **`ha-api`** helper — it fetches the token
+   for you: `ha-api get states/<id>`, `ha-api call <domain.service> '<json>'`,
+   `ha-api template '<jinja>'` (validate Jinja before it runs live), `ha-api entries
+   --bad` (which integrations aren't loaded). Raw curl recipes are in
    [TOPOLOGY.md](references/TOPOLOGY.md#live-api-access). Never echo the token.
 
 ## Safe-mutation discipline (the core rule)
