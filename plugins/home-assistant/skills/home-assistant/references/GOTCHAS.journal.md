@@ -157,3 +157,11 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Fix:** Keep light.<device>_led_ring UNEXPOSED to the conversation assistant. Verify by asking the agent to enumerate controllable lights (ring should be absent), and by checking it is not in .storage/homeassistant.exposed_entities with .data.assistants expose-new empty. To recover a stuck ring: light.turn_on with desired rgb_color (e.g. white 255,255,255).
 - **Repro / verify:** `Ring shows a fixed rgb in its light state with no recorder history; agent's controllable-lights list excludes it once unexposed`
 - **Tags:** assist
+
+### 2026-06-15 — Removing a config entry is a REST DELETE, not a WS command
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** The WS API has config_entries/get but NO config_entries/remove (returns success:false, error code unknown_command). Deletion is what the UI's delete button calls: an HTTP DELETE.
+- **Fix:** DELETE /api/config/config_entries/entry/<entry_id> (e.g. ha_lib._req('DELETE', 'config/config_entries/entry/<id>')). Returns {require_restart: bool}; HA unloads the entry and removes its entities automatically — no .storage surgery, no restart for a clean unload. Used it to drop an orphan Adaptive Lighting instance ('Ada', no lights).
+- **Repro / verify:** `WS {"type":"config_entries/remove","entry_id":...} -> {success:false, error:{code:unknown_command}}; the REST DELETE on the same entry_id -> {require_restart:false}.`
+- **Tags:** api
