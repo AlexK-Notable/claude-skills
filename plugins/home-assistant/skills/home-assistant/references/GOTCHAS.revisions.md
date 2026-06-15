@@ -17,3 +17,9 @@ retracted (was never right) · confirmed (re-verified still true).
 - **Status:** superseded
 - **Why:** Nova moved to wired enP4p65s0 (DHCP-reserved .232) and wlan0 is DOWN — the premise (HA host on Wi-Fi) is inverted, so 'HA seems down = Wi-Fi blip' no longer applies.
 - **See instead:** config.sh (Nova on wired). The generic diagnostic (docker ps/API up = not a crash; Klipper print independent of HA) still holds.
+
+### 2026-06-15 — promoted 7867b8
+- **Target:** `7867b8` — 2026-06-03 — lovelace.dashboards is indented 2 spaces under 'lovelace:'; a string-replace 
+- **Status:** promoted
+- **Why:** promoted into the curated GOTCHAS.md
+- **See instead:** Anchored config edits can silently no-op — verify the change landed
