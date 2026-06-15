@@ -124,6 +124,13 @@ not yet in GOTCHAS.md (promotion candidates). `ha-note --list` shows the journal
 `ha-note --selftest` proves the capture path still works (a dead path = silent
 stop-learning).
 
+The journal is an append-only **meta-record** — paths taken and what was believed
+*at the time*, never rewritten or deleted. When an entry later proves wrong or
+stale, don't edit it: file a correction in the companion `GOTCHAS.revisions.md`
+with `ha-note --supersede <ref> --why …` (refs show in `--list`). The revision
+then marks the entry in `--list` and drops it from `--pending` — history stays
+intact, with the correction layered on top.
+
 ## Where HA knowledge lives (routing rule — avoid memory sprawl)
 
 The user runs several memory systems. Keep them separate:
@@ -146,6 +153,7 @@ If it's an HA operational lesson, it goes here — don't also stash it elsewhere
 | `ha-note "…" --fix … --repro …` | append one structured gotcha to the journal |
 | `ha-note --list [--grep TERM] [--tag TAG]` | read the journal (filtered — prefer this over the full dump) |
 | `ha-note --pending` | verified journal entries not yet in GOTCHAS.md (promotion candidates) |
+| `ha-note --revisions` · `--supersede REF --why …` | correction layer: file/read supersessions that point at journal entries (the journal is never rewritten) |
 | `ha-note --selftest` | verify the capture path is alive (self-cleaning) |
 
 Config seam (HA host, paths) is `config.sh` next to this file — the one place
