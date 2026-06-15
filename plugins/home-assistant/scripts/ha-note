@@ -29,6 +29,8 @@ Usage:
   ha-note --list --grep govee          # only entries containing "govee" (case-insensitive)
   ha-note --list --tag bluetooth       # only entries tagged "bluetooth" (repeatable, ANDed)
   ha-note --pending         # verified entries not yet in GOTCHAS.md (promotion candidates)
+  ha-note --revisions       # the companion revisions doc (superseded/corrected entries)
+  ha-note --supersede REF --why "…" [--status corrected|retracted|confirmed] [--see "…"]
   ha-note --selftest        # verify the capture path works (self-cleaning; journal untouched)
 """
 import os
