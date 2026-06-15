@@ -124,6 +124,11 @@ Each entry: what bit us, why, the fix, and when it applies. `unverified` entries
 - **Cause:** AL re-adapts on an interval and would fight manual color/brightness.
 - **Fix:** AL owns **color temp only** (`adapt_brightness` switch OFF, `take_over_control: false` so brightness steps don't pause color). Brightness + the night red are owned by **stepped** automations (`bedroom_morning_ramp`, `bedroom_evening_wind_down`); `adapt_color` is toggled OFF at sundown / ON at sunrise−15 (daily, via `bedroom_al_color_resume`). If AL starts fighting the ramps, check `adapt_brightness` and `take_over_control` first.
 
+### AL snapping a light to ~1% on an interval = sleep_mode is ON
+- **Status:** verified · **Applies when:** a light keeps reverting to ~1% every AL interval despite manual changes
+- **Cause:** with `sleep_mode` on (and `adapt_brightness` on), AL forces `sleep_brightness` (default 1%) + `sleep_color_temp` (~1000K) every interval, and with `take_over_control: false` it ignores manual changes. Nothing in YAML manages `sleep_mode`, so a stray toggle stays stuck.
+- **Fix:** turn off `switch.adaptive_lighting_<name>_adaptive_lighting_sleep_mode_<name>` (and `adapt_brightness` if AL should be colour-only). Fastest diagnostic: the AL **master** switch's `brightness_pct` attribute shows AL's computed target.
+
 ## Hardware (Nova / RK3588)
 
 ### Onboard Bluetooth (RTL8821CS) BLE won't power on — dead end
