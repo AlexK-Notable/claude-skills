@@ -141,7 +141,8 @@ ref. `ha-note --list` then flags that entry; `--pending` drops superseded /
 retracted ones from promotion candidates.
 
 Status vocabulary: superseded (no longer true) · corrected (true with a fix) ·
-retracted (was never right) · confirmed (re-verified still true).
+retracted (was never right) · confirmed (re-verified still true) ·
+promoted (now in the curated GOTCHAS.md — silences the --pending heuristic).
 
 ---
 """
@@ -227,10 +228,12 @@ def list_journal(grep=None, tags=()):
         print(f"### {e['head']}  ⟨ref:{e['ref']}⟩")
         rev = revs.get(e["ref"])
         if rev:
+            sym = "✓" if rev["status"] in ("promoted", "confirmed") else "⚠"
             extra = f" — {rev['why']}" if rev["why"] else ""
-            print(f"> ⚠ {rev['status'].upper()} ({rev['date']}, see GOTCHAS.revisions.md){extra}")
+            print(f"> {sym} {rev['status'].upper()} ({rev['date']}, see GOTCHAS.revisions.md){extra}")
             if rev["see"]:
-                print(f">   see instead: {rev['see']}")
+                label = "curated as" if rev["status"] == "promoted" else "see instead"
+                print(f">   {label}: {rev['see']}")
         tail = e["body"][1:]
         while tail and not tail[-1].strip():
             tail.pop()
