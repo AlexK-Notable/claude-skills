@@ -61,19 +61,26 @@ def main():
     except SystemExit as e:
         print(f"  {WARN} {e}")
 
-    section("unavailable entities")
+    # FYI, not a fault: "unavailable" is normal for any offline device (away
+    # phones, a powered-off printer/plug, disabled cloud). Grouped by device so a
+    # real signal ("suddenly ALL govee is unavailable") stands out from the noise.
+    section("unavailable entities (FYI — usually just offline devices)")
     try:
         un = [s["entity_id"] for s in ha_lib.api_get("states")
               if s["state"] == "unavailable"]
         if not un:
             print(f"  {OK} none unavailable")
         else:
-            print(f"  {BAD} {len(un)} unavailable:")
-            for eid in un[:40]:
-                print(f"      {eid}")
-            if len(un) > 40:
-                print(f"      … +{len(un) - 40} more")
-            problems += 1
+            groups = collections.Counter()
+            for eid in un:
+                rest = eid.split(".", 1)[1] if "." in eid else eid
+                groups["_".join(rest.split("_")[:2])] += 1  # device-ish key
+            print(f"  {WARN} {len(un)} unavailable across {len(groups)} groups "
+                  f"(not a fault — confirm which should be online):")
+            for key, n in groups.most_common(15):
+                print(f"      {n:>4}  {key}*")
+            if len(groups) > 15:
+                print(f"      … +{len(groups) - 15} more groups")
     except SystemExit as e:
         print(f"  {WARN} {e}")
 
