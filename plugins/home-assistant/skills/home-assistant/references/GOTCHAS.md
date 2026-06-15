@@ -47,6 +47,11 @@ Each entry: what bit us, why, the fix, and when it applies. `unverified` entries
 - **Cause:** the Voice PE exposes its status ring as `light.<device>_led_ring` (rgb). If that entity is exposed, a generic "turn the lights `<color>`" sweeps it up alongside the real room lights, and the ring then **holds that color indefinitely** — nothing auto-resets it, and the entity isn't in the recorder, so there's no history/logbook to trace it (presented as an unexplained red ring for a week).
 - **Fix:** keep `light.<device>_led_ring` unexposed (confirm it's absent from `.storage/homeassistant.exposed_entities` and that `.data.assistants` expose-new is empty). Verify *effective* exposure by **asking the agent to enumerate controllable entities** (the ring should not appear). Recover a stuck ring with `light.turn_on` + `rgb_color` (white = `255,255,255`).
 
+### Bare relative light commands ("dim", "brighter") have no built-in intent — they fall to the LLM
+- **Status:** verified · **Applies when:** voice/Assist with `prefer_local_intents` and an LLM fallback agent
+- **Cause:** every built-in `HassLightSet` sentence requires an explicit `<brightness>` value, and there is no relative-brightness intent at all. So "dim the lights" / "brighter" / "lights down" match no local intent and fall through to the Claude agent, which verbosely enumerates every affected bulb. (Verbose per-bulb output is itself the tell that the LLM handled it, not local intents.)
+- **Fix:** add local `conversation` sentence-trigger automations for the vague/relative phrasings, acting on the room's light **group** with `set_conversation_response` for a one-line reply (the `*_terse` automations). Plain on/off/set-percent already resolve locally + tersely because the Voice PE satellite is assigned to its area.
+
 ### govee2mqtt does NOT honor `transition` — long fades snap
 - **Status:** verified · **Applies when:** any Govee light via govee2mqtt, smooth multi-second-plus ramps
 - **Cause:** Govee/govee2mqtt ignores or hard-caps the transition time.
