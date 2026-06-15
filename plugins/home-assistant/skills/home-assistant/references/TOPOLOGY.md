@@ -48,6 +48,12 @@ ssh komi@192.168.1.232 'sudo -n docker exec homeassistant python -m homeassistan
 Wyoming STT server: systemd **user** service `wyoming-sensevoice.service` on the Nova
 (`journalctl --user -u wyoming-sensevoice`). Details in ASSIST.md.
 
+**Bedroom satellite:** Home Assistant **Voice PE** — device "Home Assistant Voice 0a78d4"
+(ESPHome), currently `192.168.1.230`. Wake/mic/speaker plus an RGB status **LED ring**
+(`light.home_assistant_voice_0a78d4_led_ring`). ESPHome rediscovers via mDNS, so its IP is
+informational. The LED ring is a *controllable light* — keep it **unexposed** to Assist or
+"turn the lights `<color>`" will grab it (see ASSIST.md / GOTCHAS: Networking & Integrations).
+
 ## Secrets (all in bws, project `home-assistant` = 18f14ed9-8ba5-4cc6-bbd4-b45b01534270)
 
 `HA_OWNER_PASSWORD`, `HA_TOKEN`, `HA-Anthropic`, `HA-Spotify`, `MQTT_PASSWORD`,
