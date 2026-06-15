@@ -131,12 +131,15 @@ If it's an HA operational lesson, it goes here — don't also stash it elsewhere
 
 | Command | Purpose |
 |---|---|
+| `ha-doctor` | **one-shot health triage** (read-only): container · config entries not loaded · unavailable entities · log errors · drift. Start here for any "X stopped working". |
+| `ha-api get <path>` · `states [re]` · `call <dom.svc> '<json>'` · `template '<jinja>'` · `entries [--bad]` | live REST/WS API; **fetches the token itself** (no manual bws/source). Never prints it. |
 | `ha-inventory` | regenerate the secret-safe installed-state snapshot |
 | `ha-inventory --check` | drift check vs the snapshot (exit 0/2/1) — run before mutating |
 | `ha-inventory --diff` | `--check` plus per-section counts (snapshot vs live) |
 | `ha-note "…" --fix … --repro …` | append one structured gotcha to the journal |
 | `ha-note --list [--grep TERM] [--tag TAG]` | read the journal (filtered — prefer this over the full dump) |
-| `ha-note --selftest` | verify the capture path is alive |
+| `ha-note --pending` | verified journal entries not yet in GOTCHAS.md (promotion candidates) |
+| `ha-note --selftest` | verify the capture path is alive (self-cleaning) |
 
 Config seam (HA host, paths) is `config.sh` next to this file — the one place
 HA-specific values live.
