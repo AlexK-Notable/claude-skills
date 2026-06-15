@@ -110,6 +110,54 @@ Common patterns:
 
 After fixing: `systemctl --user reset-failed <unit>`.
 
+### Worked example: arch-update-tray (env-import race)
+
+`arch-update-tray.service` (package unit, `After=/WantedBy=graphical-session.target`, runs `arch-update --tray`) fails at login with `Could not load the Qt platform plugin "xcb"` → `start-limit-hit`. **It looks identical to the Qt6↔Python skew above but is NOT it** — the tells are an *empty* platform string + "could not connect to display" in the journal, and the binary launches fine once the display env is present (`QT_QPA_PLATFORM=wayland timeout 3 arch-update --tray` survives → exit 124). Cause is the env-import race, not an ABI mismatch.
+
+Durable fix — chezmoi-managed drop-in at `~/.config/systemd/user/arch-update-tray.service.d/override.conf`:
+
+```ini
+[Unit]
+StartLimitIntervalSec=120
+StartLimitBurst=20
+
+[Service]
+RestartSec=2
+Environment="QT_QPA_PLATFORM=wayland;xcb"
+```
+
+**Distinguishing test** for any "no Qt platform plugin" failure: a *display/platform* error in `journalctl --user -u <unit>` = this race; a *symbol/version* error = a real ABI break (→ Qt6↔Python skew).
+
+## Empty system tray (StatusNotifierWatcher / kded6)
+
+### Symptom
+- Waybar tray module is empty; tray apps (Blueman, Steam, Variety, Vesktop) never appear.
+- Apps log `No such object path '/StatusNotifierWatcher'`.
+
+### Root cause
+On Hyprland with KDE components installed, `kded6` claims the `org.kde.StatusNotifierWatcher` D-Bus name but doesn't load the actual module — so nothing services tray registrations.
+
+### Fix
+Force the module to autoload via `~/.config/kded6rc` (chezmoi-managed):
+
+```ini
+[Module-statusnotifierwatcher]
+autoload=true
+```
+
+Verify, or load it without a restart:
+
+```bash
+# List registered tray items (empty / "No such object path" = watcher not working)
+dbus-send --session --dest=org.kde.StatusNotifierWatcher --type=method_call \
+  --print-reply /StatusNotifierWatcher org.freedesktop.DBus.Properties.Get \
+  string:org.kde.StatusNotifierWatcher string:RegisteredStatusNotifierItems
+# Manually load the module (temporary)
+qdbus6 org.kde.kded6 /kded org.kde.kded6.loadModule statusnotifierwatcher
+```
+
+After the fix, restart tray apps that started before the watcher worked — they must re-register.
+
 ## xdg-desktop-portal regressions
 
 ### Symptom

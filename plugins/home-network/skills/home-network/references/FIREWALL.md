@@ -1,7 +1,9 @@
 # FIREWALL.md
 
-UFW (Uncomplicated Firewall) recipes and conventions. Mirror-extends the
-"Networking & Firewall" section in `~/.config/CLAUDE.md`.
+UFW (Uncomplicated Firewall) recipes and conventions — the authoritative home
+for rule conventions, recipes, and diagnosis. `~/.config/CLAUDE.md` keeps only
+the machine's network identity, the deny-by-default posture landmine, and the
+open-ports inventory (mirrored below).
 
 ## Posture
 
