@@ -374,6 +374,10 @@ def main():
             p.error("--supersede requires --why")
         return file_revision(a.supersede, a.status, a.why, a.see)
 
+    if a.promoted:
+        ref, title = a.promoted
+        return file_revision(ref, "promoted", "promoted into the curated GOTCHAS.md", title)
+
     if not a.summary:
         p.error("summary is required (or use --list / --selftest)")
     # Entries default to unverified (argparse store_true) — fail safe: a gotcha
