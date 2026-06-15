@@ -352,6 +352,14 @@ def main():
     if a.pending:
         return pending_promotions()
 
+    if a.revisions:
+        return list_revisions()
+
+    if a.supersede:
+        if not a.why:
+            p.error("--supersede requires --why")
+        return file_revision(a.supersede, a.status, a.why, a.see)
+
     if not a.summary:
         p.error("summary is required (or use --list / --selftest)")
     # Entries default to unverified (argparse store_true) — fail safe: a gotcha
