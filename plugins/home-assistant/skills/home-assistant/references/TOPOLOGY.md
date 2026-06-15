@@ -72,6 +72,9 @@ The REST API (no SSH/sudo, works from anywhere on the LAN). Pull the token into 
 var — never echo it:
 
 ```bash
+# bws needs BWS_ACCESS_TOKEN, which is NOT set in non-interactive shells — source it first
+# (else `bws secret get` errors "Missing access token" and every API call 401s):
+set -a; source ~/.config/bws/token.env; set +a
 T=$(bws secret get 74edad23-6bd2-4617-a1d8-b45d016db173 | jq -r .value)
 H="http://192.168.1.232:8123/api"; A="Authorization: Bearer $T"
 
