@@ -97,6 +97,21 @@ Each entry: what bit us, why, the fix, and when it applies. `unverified` entries
 - **Cause:** HA requires the dashboard url-path slug to contain `-`.
 - **Fix:** use e.g. `bedroom-lighting:` not `lighting:` (the `title:` can be anything). Otherwise check_config fails: "Url path needs to contain a hyphen (-)".
 
+### "Sections" dashboards use a 12-col grid — Mushroom cards default to half-width
+- **Status:** verified · **Applies when:** building a `type: sections` view with custom (esp. Mushroom) cards
+- **Cause:** sections size each card on a 12-unit grid via per-card `grid_options.{columns,rows}`. Cards expose a default via `getGridOptions()`; Mushroom returns `columns: 6` (half), cards without it default to 12 (full). So Mushroom cards silently tile 2-up and centered chips drift off the edge.
+- **Fix:** set `grid_options: {columns: N}` per card (3/6/9/12; 12/`full` = full width). Dynamic-height cards (mini-graph, picture-entity, markdown) need `rows: auto` or they clip. A wide `column_span` section that won't span when placed after taller columns: set view-level `dense: true` and/or put the wide section first. `max_columns` is a cap, not a target — to pack more columns, lower the theme var `ha-view-sections-column-min-width` (default 320px).
+
+### Don't key dashboard logic on a light *group's* color_temp_kelvin
+- **Status:** verified · **Applies when:** Mushroom/Lovelace "active scene" coloring driven by a light group's attributes
+- **Cause:** an HA light group only exposes an attribute when its members agree; the group's `color_temp_kelvin` reads `None` whenever any member is in RGB mode (or members disagree). `state`/`brightness` are reliable, `color_temp` is not — so scene-button Jinja keyed on it always evaluates false.
+- **Fix:** drive active-scene state from an `input_select` set by per-scene scripts (a real source of truth), or use fixed button colors. Validate dashboard Jinja with `POST /api/template` (a.k.a. `ha-api template`) — `check_config` does **not** validate Lovelace templates.
+
+### Anchored config edits can silently no-op — verify the change landed
+- **Status:** verified · **Applies when:** editing YAML via a string-replace/anchor (e.g. registering a `lovelace.dashboards` entry)
+- **Cause:** `lovelace.dashboards` keys live at **4 spaces** (under a 2-space `dashboards:` under `lovelace:`). A replace anchored on the wrong indentation matches nothing, `str.replace` returns the string unchanged, the script still writes the file and prints "success" — a false positive; `check_config` passes because the (unregistered) dashboard simply isn't there.
+- **Fix:** after any anchored edit, **grep for the inserted key** to confirm it landed — never trust the editor's success message — and match exact indentation.
+
 ## Adaptive Lighting
 
 ### AL switch entity_ids are DOUBLED when you set `name`
