@@ -142,6 +142,12 @@ Each entry: what bit us, why, the fix, and when it applies. `unverified` entries
 - **Cause:** deep LPS causes instability.
 - **Fix:** `/etc/modprobe.d/rtw88.conf` → `options rtw88_core disable_lps_deep=1` (applies on reboot).
 
+### An unclean reboot can zero-fill a `.storage` file (microSD ext4) — HA self-recovers
+- **Status:** verified · **Applies when:** HA on the Nova's microSD after a power-loss / unclean reboot
+- **Cause:** ext4 on the microSD (`/dev/mmcblk0p1`, mounted `noatime,commit=60` — up to 60 s of writes unflushed) can, on an unclean reboot, update a file's size metadata but not its data blocks, so the file reads back as NULs. `core.restore_state` is the usual victim (HA rewrites it constantly). At next boot HA detects the unparseable file, quarantines it as `core.restore_state.corrupt.<ISO-ts>`, auto-creates a fresh default, and raises a repair.
+- **Fix:** confirm it's a reboot, not a bad edit — `od -An -c <file>` shows all `\0`, `dmesg` shows a kernel boot at the corruption timestamp, the container is `ExitCode 0 / RestartCount 0`. For `restore_state` it's **benign** (a restart-restore cache): click Submit on the repair and delete the zeroed `.corrupt` file — do **not** restore from backup. Confirm the other `.storage` JSON still parse. Reduce recurrence: clean reboots, a shorter `commit=`, and/or an explicit `data=ordered`.
+- **Note:** the original capture blamed `data=writeback`, but the root fs is currently mounted **default (`data=ordered`)** with `commit=60` — the long commit window + unclean power-loss is the real exposure. (Verified 2026-06-14; one `.corrupt` artifact from 2026-06-03 still present.)
+
 ## Inventory tooling (this skill)
 
 ### Area registry keys the id as `id`, not `area_id`
