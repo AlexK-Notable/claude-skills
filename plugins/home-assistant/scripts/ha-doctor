@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""ha-doctor — one-shot Home Assistant health triage (read-only).
+
+Answers "what's broken?" in a single command, in the order you'd actually check:
+  1. is the container up?
+  2. which config entries aren't loaded?  (the usual culprit — stale host, dead service, bad auth)
+  3. which entities are unavailable?
+  4. recent ERROR/WARNING clusters in the log (deduped)
+  5. is the inventory snapshot stale?
+
+Built for the opening 10 seconds of an incident — it would have surfaced this
+skill's Wyoming `setup_retry: Unable to connect` immediately. Read-only; never
+prints secrets. Exit 0 = clean, 1 = problems flagged.
+"""
+import sys
+import os
+import re
+import subprocess
+import collections
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import ha_lib
+
+OK, BAD, WARN = "✓", "✗", "!"
+_ANSI = re.compile(r'\x1b\[[0-9;]*m')
+
+
+def ssh(cmd):
+    r = subprocess.run(["ssh", ha_lib.HA_SSH, cmd],
+                       capture_output=True, text=True, timeout=30)
+    return r.returncode, r.stdout.strip(), r.stderr.strip()
+
+
+def section(t):
+    print(f"\n== {t} ==")
+
+
+def main():
+    problems = 0
+
+    section("container")
+    rc, out, _ = ssh(f"sudo -n docker ps --filter name={ha_lib.HA_CONTAINER} "
+                     f"--format '{{{{.Status}}}}'")
+    if rc == 0 and out:
+        print(f"  {OK} {ha_lib.HA_CONTAINER}: {out}")
+    else:
+        print(f"  {BAD} {ha_lib.HA_CONTAINER}: not running / unreachable")
+        problems += 1
+
+    section("config entries not loaded")
+    try:
+        entries = ha_lib.config_entries()
+        bad = [e for e in entries if e.get("state") != "loaded"]
+        if not bad:
+            print(f"  {OK} all {len(entries)} entries loaded")
+        else:
+            for e in bad:
+                print(f"  {BAD} {e.get('domain')} \"{e.get('title')}\": "
+                      f"{e.get('state')} — {e.get('reason')}")
+            problems += len(bad)
+    except SystemExit as e:
+        print(f"  {WARN} {e}")
+
+    section("unavailable entities")
+    try:
+        un = [s["entity_id"] for s in ha_lib.api_get("states")
+              if s["state"] == "unavailable"]
+        if not un:
+            print(f"  {OK} none unavailable")
+        else:
+            print(f"  {BAD} {len(un)} unavailable:")
+            for eid in un[:40]:
+                print(f"      {eid}")
+            if len(un) > 40:
+                print(f"      … +{len(un) - 40} more")
+            problems += 1
+    except SystemExit as e:
+        print(f"  {WARN} {e}")
+
+    section("log ERROR/WARNING (last 200 lines, deduped)")
+    rc, out, _ = ssh(f"sudo -n docker logs --tail 200 {ha_lib.HA_CONTAINER} 2>&1 | "
+                     f"grep -E 'ERROR|WARNING' || true")
+    if rc == 0 and out:
+        counter = collections.Counter()
+        for line in out.splitlines():
+            line = _ANSI.sub("", line)
+            m = re.search(r'(ERROR|WARNING)\s+\(.*?\)\s+(\[.*)', line)
+            counter[(m.group(2) if m else line)[:110]] += 1
+        for key, n in counter.most_common(12):
+            print(f"  x{n:<4} {key}")
+    else:
+        print(f"  {OK} no ERROR/WARNING in the last 200 lines")
+
+    section("inventory snapshot")
+    inv = os.path.join(os.path.dirname(os.path.realpath(__file__)), "ha-inventory")
+    rc = subprocess.run([inv, "--check"], capture_output=True, text=True).returncode
+    print({0: f"  {OK} fresh",
+           2: f"  {WARN} drift/stale — run `ha-inventory` to regenerate"}.get(
+              rc, f"  {BAD} ha-inventory --check error (rc={rc})"))
+
+    section("summary")
+    print(f"  {BAD} {problems} problem area(s) flagged" if problems
+          else f"  {OK} no problems detected")
+    return 1 if problems else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
