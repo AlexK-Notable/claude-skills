@@ -45,7 +45,7 @@ correct pinned commit for the current Hyprland version.
 ## Qt6 ↔ Python bindings skew
 
 ### Symptom
-- `arch-update-tray` or other Python+Qt apps crash on launch with SIGABRT.
+- A Python+Qt app crashes on launch with SIGABRT. (⚠ Don't assume this for `arch-update-tray` — its *usual* failure is the env-import race under "Failed systemd user units"; the error text is identical. Verify before blaming the skew.)
 - Journal shows: `This application failed to start because no Qt platform
   plugin could be initialized.` (Misleading — wayland IS in the available
   list. The fatal is actually in `QApplicationPrivate::init`.)
@@ -67,12 +67,14 @@ Mask any user-facing service that's looping on the broken binding to silence
 boot coredumps:
 
 ```bash
-systemctl --user mask arch-update-tray.service
+systemctl --user mask <looping-unit>.service
 # undo once python-pyqt6 catches up:
-systemctl --user unmask arch-update-tray.service
+systemctl --user unmask <looping-unit>.service
 ```
 
 Don't mask things you actually use — accept the noise if the app is needed.
+(For `arch-update-tray` specifically, masking is the *wrong* fix — its failure is
+the env-import race, solved by the drop-in. See "Failed systemd user units".)
 
 ## Failed systemd user units
 
@@ -103,6 +105,7 @@ Common patterns:
 | `An instance ... is already running` | Double-launch race (autostart + systemd unit + D-Bus) | Pick ONE startup path. Recommend keeping the systemd unit; remove the `exec-once` line from autostart.conf. Update via chezmoi. |
 | `Permission denied` on a path | XDG / permission drift | Check `XDG_RUNTIME_DIR`, dir ownership, `groups` membership |
 | Repeated `code=exited, status=1` with no other context | App-internal error | Run the binary in a foreground terminal to see real stderr |
+| `Could not load the Qt platform plugin` / empty platform string at login | **Env-import race** — unit reached `graphical-session.target` before Hyprland imported `WAYLAND_DISPLAY`/`DISPLAY`, burning its start limit in the env-less window | Drop-in: raise `StartLimitBurst`/`RestartSec` to outlast the import + pin `Environment="QT_QPA_PLATFORM=wayland;xcb"`. Worked example below. |
 | `start-limit-hit` reached | Cascade from any of the above | Fix the underlying issue, then `systemctl --user reset-failed <unit>` |
 
 After fixing: `systemctl --user reset-failed <unit>`.
