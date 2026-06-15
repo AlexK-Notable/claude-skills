@@ -278,27 +278,34 @@ def pending_promotions():
         if rev and rev["status"] in ("superseded", "retracted"):
             retired += 1
             continue  # retired via a revision — not a promotion candidate
+        if rev and rev["status"] == "promoted":
+            promoted.append((e["ref"], e["head"], rev["see"] or "(curated entry)", "explicit"))
+            continue  # explicitly recorded as promoted — no guessing
         t = _sig_tokens(e["head"])
         best, where = 0, None
         for h, ct in zip(curated_heads, curated_tok):
             ov = len(t & ct)
             if ov > best:
                 best, where = ov, h.strip()
-        (promoted if best >= 3 else pending).append((e["ref"], e["head"], where, best))
+        if best >= 3:
+            promoted.append((e["ref"], e["head"], where, f"{best} shared words"))
+        else:
+            pending.append((e["ref"], e["head"]))
 
-    print(f"=== PENDING promotion — verified, not obviously in GOTCHAS.md ({len(pending)}) ===")
-    for ref, head, _, _ in pending:
+    print(f"=== PENDING promotion — verified, not in GOTCHAS.md ({len(pending)}) ===")
+    for ref, head in pending:
         print(f"  ● ⟨{ref}⟩ {head}")
     if not pending:
-        print("  (none — every verified entry has a likely match in GOTCHAS.md)")
+        print("  (none — every verified entry is in GOTCHAS.md or annotated)")
     if promoted:
-        print(f"\n=== likely already promoted ({len(promoted)}) ===")
-        for ref, head, where, n in promoted:
-            print(f"  ✓ ⟨{ref}⟩ {head[:84]}\n        ↳ ~ \"{where}\" ({n} shared words)")
+        print(f"\n=== already promoted ({len(promoted)}) ===")
+        for ref, head, where, how in promoted:
+            mark = "=" if how == "explicit" else "~"
+            print(f"  ✓ ⟨{ref}⟩ {head[:84]}\n        ↳ {mark} \"{where}\" ({how})")
     if retired:
         word = "entry" if retired == 1 else "entries"
         print(f"\n({retired} superseded/retracted {word} hidden — see `ha-note --revisions`)")
-    print("\n(heuristic by title-word overlap — verify before trusting; promote by hand.)")
+    print("\n(✓= explicit via `ha-note --promoted`; ✓~ heuristic title-overlap guess. Promote by hand.)")
     return 0
 
 
@@ -328,6 +335,8 @@ def main():
                    help="with --supersede: nature of the revision (default: superseded)")
     p.add_argument("--why", help="with --supersede: why the entry is being revised")
     p.add_argument("--see", help="with --supersede: pointer to the correct info")
+    p.add_argument("--promoted", nargs=2, metavar=("REF", "TITLE"),
+                   help="record journal entry REF as promoted into GOTCHAS.md (as TITLE) — silences --pending")
     a = p.parse_args()
 
     if a.list:
