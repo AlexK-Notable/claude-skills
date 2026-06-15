@@ -92,6 +92,25 @@ curl -s -H "$A" -H 'Content-Type: application/json' -X POST "$H/template" \
 
 # config sanity (also runnable on the host): exit 0 before any reload/restart
 ssh komi@192.168.1.232 'sudo -n docker exec homeassistant python -m homeassistant --script check_config -c /config'
+
+# integration health — which config entries are NOT loaded (THE first check when something
+# "won't connect"). WS API; needs the `websockets` py lib (present on KOMI):
+python3 - "$T" <<'PY'
+import sys, json, asyncio, websockets
+async def main():
+    async with websockets.connect("ws://192.168.1.232:8123/api/websocket", max_size=None) as ws:
+        await ws.recv(); await ws.send(json.dumps({"type":"auth","access_token":sys.argv[1]})); await ws.recv()
+        await ws.send(json.dumps({"id":1,"type":"config_entries/get"}))
+        for e in json.loads(await ws.recv())["result"]:
+            if e["state"] != "loaded": print(e["domain"], e["title"], e["state"], e.get("reason"))
+asyncio.run(main())
+PY
+
+# reload a stuck integration WITHOUT a full HA restart (after the service it talks to recovers):
+curl -s -H "$A" -H 'Content-Type: application/json' -X POST \
+     "$H/services/homeassistant/reload_config_entry" -d '{"entry_id":"<entry_id>"}'
+# NOTE: reload re-runs setup but does NOT re-resolve a stale host in entry data —
+# for an IP change you must edit core.config_entries (see GOTCHAS: Networking).
 ```
 
 `/api/template` is the high-value one: it lets you prove a brightness/rgb/condition
