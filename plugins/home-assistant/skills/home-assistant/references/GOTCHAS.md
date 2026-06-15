@@ -62,6 +62,14 @@ Each entry: what bit us, why, the fix, and when it applies. `unverified` entries
 - **Cause:** MQTT entities have no state until govee2mqtt reconnects and republishes.
 - **Fix:** wait and re-query before concluding a light broke — it self-heals.
 
+## Networking
+
+### A host's DHCP IP change silently breaks integrations pinned to the old IP
+- **Status:** verified · **Applies when:** any zeroconf/IP-configured integration after a host's lease moves (Wyoming, Glances, ESPHome-by-IP, …)
+- **Cause:** config entries store the IP **resolved at discovery time**. When the Nova moved `.229 → .232`, the Wyoming STT + wake and Glances-Nova entries kept the stale host → `state=setup_retry`, reason "Unable to connect". The bedroom Voice PE then showed `stt-provider-missing`; it *looked* like "not connected to Anthropic", but the Anthropic entry was loaded fine — STT just never reached it. Piper (on the Pi, IP unchanged) stayed loaded.
+- **Fix:** edit `.storage/core.config_entries` `data.host` → new IP for the affected entries (HA **stopped**), then start. A config-entry **reload does NOT help** — host is read from entry data, not re-resolved. Durable fix: DHCP-reserve the host (the Nova is now reserved to `.232`).
+- **Repro / diagnose:** WS `config_entries/get` shows the entries `setup_retry`/"Unable to connect" while `ss -ltn` on the host shows the ports listening and a container TCP-connect test reaches the **new** IP but times out on the **old** one.
+
 ## Lovelace / dashboards
 
 ### YAML dashboard keys must contain a hyphen
