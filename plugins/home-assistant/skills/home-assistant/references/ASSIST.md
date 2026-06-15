@@ -44,13 +44,25 @@ sentence-trigger automation — no per-command prompt-fiddling, no exposure need
 
 - Entities are exposed via `.storage/homeassistant.exposed_entities`:
   `{"<entity_id>": {"assistants": {"conversation": {"should_expose": true}}}}`.
-- **Editing it requires HA stopped** (it's a `.storage` file — see STORAGE-SCHEMA.md).
+- **Editing the file requires HA stopped** (it's a `.storage` file — see STORAGE-SCHEMA.md).
+  The UI's **Settings → Voice assistants → Expose** tab (and the WS `homeassistant/expose_entity`
+  it calls) changes exposure **live** — only direct file edits need HA stopped.
 - HA does **not** auto-expose everything (privacy + LLM-context bloat). Sentence
   triggers need **no** exposure — that's why they're the primitive for phrase→action.
 - **Gotcha:** exposed *scripts* are not reliably surfaced to the LLM as callable
   tools. "Run the nightlight script" via the LLM failed even though the script was
   exposed and worked when called directly. The fix was the sentence-trigger above,
   not more exposure. Prefer sentence triggers for deterministic commands.
+- **Gotcha — the satellite's own LED ring is a "light":** the Voice PE exposes its
+  status ring as `light.home_assistant_voice_0a78d4_led_ring` (rgb). If it's exposed,
+  "turn the lights `<color>`" sweeps it up with the room lights and it **stays** that
+  color (the ring holds state, and it isn't recorded — no history to trace it). Keep it
+  **unexposed**; recover a stuck ring with `light.turn_on` + `rgb_color` (white = 255,255,255).
+
+**Verify what the agent can *actually* control** (effective exposure, defaults included):
+ask it. `POST /api/conversation/process` with `agent_id: conversation.claude_conversation`
+and text *"list every entity you can control"* — what it enumerates IS its controllable
+surface, faster and more truthful than reading `exposed_entities` by hand.
 
 ## Where it's configured
 
