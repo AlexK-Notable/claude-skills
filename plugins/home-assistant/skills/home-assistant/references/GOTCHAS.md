@@ -67,6 +67,21 @@ Each entry: what bit us, why, the fix, and when it applies. `unverified` entries
 - **Cause:** MQTT entities have no state until govee2mqtt reconnects and republishes.
 - **Fix:** wait and re-query before concluding a light broke — it self-heals.
 
+### Config-flow integrations can be provisioned headlessly via core.config_entries
+- **Status:** verified · **Applies when:** a config-flow-only integration (creds in `data{}`, not YAML) and you can't/won't click the UI
+- **Cause:** config-flow integrations store creds in `core.config_entries` `data{}` — `!secret` doesn't apply and they can't reuse another integration's key; the UI is the only *documented* path.
+- **Fix:** stop HA, append an entry whose top-level `version` = the integration's `CONFIG_VERSION` (read its `const.py`), `source: "user"`, `options: {}`, and a `data` dict byte-identical to what the flow's `async_create_entry()` builds (read `config_flow.py`); `entry_id` = a ULID. Feed the secret via stdin (`printf KEY | ssh 'sudo python3 inject.py'`) from bws so it never hits argv/transcript. Validate JSON, start. **Integration-dependent:** flows that do live validation / unique-id checks beyond the stored `data` may still reject a hand-written entry — verify it loads + authenticates after start.
+
+### Re-enabling a disabled integration needs a .storage edit with HA stopped
+- **Status:** verified · **Applies when:** an integration was disabled (`disabled_by: user`) and a restart doesn't bring it back
+- **Cause:** `core.config_entries` persists `disabled_by`; a plain restart won't re-enable it, and a *live* `.storage` edit is clobbered on shutdown.
+- **Fix:** stop HA, set the entry's `disabled_by` to `null` in `.storage/core.config_entries`, validate JSON, start — the same stop→edit→start surgery as any `.storage` change.
+
+### pyscript reloads look silent — confirm a load via DEBUG, not INFO
+- **Status:** verified · **Applies when:** editing files in `config/pyscript/` and reloading with `pyscript.reload`
+- **Cause:** pyscript only logs file compile + trigger registration at DEBUG (loggers `custom_components.pyscript.global_ctx` / `.decorators.timing`). A plain reload looks like nothing happened, so you can't tell if a new file loaded or its triggers parsed.
+- **Fix:** set logger `custom_components.pyscript: debug`, call `pyscript.reload`, look for `Reloaded /config/pyscript/<file>.py` + `trigger … time_next = <when>`. A temporary top-level `log.info()` proves module execution. `@time_trigger(once(sunrise - 15min))` is valid (no space needed); the timing DEBUG shows its next fire time, so you can confirm an automation is armed without waiting for the event.
+
 ## Networking
 
 ### A host's DHCP IP change silently breaks integrations pinned to the old IP
