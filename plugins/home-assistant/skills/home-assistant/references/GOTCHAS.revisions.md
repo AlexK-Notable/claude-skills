@@ -83,3 +83,45 @@ retracted (was never right) · confirmed (re-verified still true).
 - **Status:** promoted
 - **Why:** promoted into the curated GOTCHAS.md
 - **See instead:** The Voice PE status LED ring is a controllable light — keep it UNEXPOSED to Assist
+
+### 2026-06-15 — promoted b6fe52
+- **Target:** `b6fe52` — 2026-06-02 — govee2mqtt group devices (model BaseGroup/SameModeGroup) mirror Govee-app gro
+- **Status:** promoted
+- **Why:** promoted into the curated GOTCHAS.md
+- **See instead:** govee2mqtt group devices (BaseGroup/SameModeGroup) are functional, not cruft
+
+### 2026-06-15 — promoted 3673ab
+- **Target:** `3673ab` — 2026-06-02 — A YAML-mode lovelace dashboard key must contain a hyphen or check_config fail
+- **Status:** promoted
+- **Why:** promoted into the curated GOTCHAS.md
+- **See instead:** YAML dashboard keys must contain a hyphen
+
+### 2026-06-15 — promoted a0f9e0
+- **Target:** `a0f9e0` — 2026-06-02 — New entities (e.g. a YAML light group) don't hit on-disk core.entity_registry
+- **Status:** promoted
+- **Why:** promoted into the curated GOTCHAS.md
+- **See instead:** New entities lag the on-disk registry (HA debounces saves)
+
+### 2026-06-15 — promoted e1984f
+- **Target:** `e1984f` — 2026-06-02 — govee2mqtt (MQTT) light entities read 'unavailable' for a few seconds after a
+- **Status:** promoted
+- **Why:** promoted into the curated GOTCHAS.md
+- **See instead:** govee2mqtt lights read `unavailable` for ~10–20 s after an HA restart
+
+### 2026-06-15 — promoted b809ba
+- **Target:** `b809ba` — 2026-06-02 — govee2mqtt (Govee MQTT) lights do NOT honor light.turn_on 'transition' for sm
+- **Status:** promoted
+- **Why:** promoted into the curated GOTCHAS.md
+- **See instead:** govee2mqtt does NOT honor `transition` — long fades snap
+
+### 2026-06-15 — promoted 7ef6d6
+- **Target:** `7ef6d6` — 2026-06-02 — Adaptive Lighting switch entity_ids are DOUBLED when you set a 'name': switch
+- **Status:** promoted
+- **Why:** promoted into the curated GOTCHAS.md
+- **See instead:** AL switch entity_ids are DOUBLED when you set `name`
+
+### 2026-06-15 — promoted 1ea4f6
+- **Target:** `1ea4f6` — 2026-06-02 — Bedroom AL coexistence design (don't 'fix' it): AL owns COLOR TEMP only (adap
+- **Status:** promoted
+- **Why:** promoted into the curated GOTCHAS.md
+- **See instead:** Bedroom AL coexistence design — don't "fix" it
