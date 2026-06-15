@@ -1,0 +1,56 @@
+{
+  "agentic-engineering": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "high",
+    "description": "Engineering systems around frontier LLM agents — context, prompts, tools, multi-agent orchestration, loops",
+    "promptTriggers": {
+      "keywords": [
+        "agentic",
+        "agent system",
+        "agent architecture",
+        "multi-agent",
+        "subagent",
+        "orchestrator",
+        "orchestrator-worker",
+        "dispatch prompt",
+        "context engineering",
+        "context window",
+        "context budget",
+        "context rot",
+        "prompt engineering",
+        "tool design",
+        "stop condition",
+        "progressive disclosure",
+        "prompt caching",
+        "agent loop",
+        "single vs multi-agent"
+      ],
+      "intentPatterns": [
+        "(design|build|architect|structure).*?(agent|multi-?agent|subagent|agentic).*?(system|workflow|pipeline|loop)",
+        "(single|multi)[\\s-]?agent",
+        "(write|design|craft).*?(dispatch|orchestrat|subagent|agent).*?prompt",
+        "(manage|reduce|optimize|shrink).*?context\\s*(window|budget|length|rot)",
+        "context\\s*(engineering|rot|degradation|window|budget)",
+        "(stop|termination|halt|end).*?condition",
+        "why.*?(agent|multi-?agent).*?(fail|failing|degrad|broke|broken)",
+        "(prompt|context)\\s*(cach|caching)",
+        "progressive disclosure",
+        "(design|build).*?tools?\\s+for.*?(agent|llm|model)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [
+        "**/agents/**/*.md",
+        "**/.claude/agents/**",
+        "**/subagents/**"
+      ],
+      "contentPatterns": [
+        "subagent_type",
+        "orchestrator[- ]worker",
+        "multi-?agent",
+        "dispatch.*?agent"
+      ]
+    }
+  }
+}

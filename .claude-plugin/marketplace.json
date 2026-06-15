@@ -51,6 +51,12 @@
       "source": "./plugins/universal-directory-organizer",
       "description": "Interactive directory cleanup and organization with safety hooks.",
       "version": "1.0.0"
+    },
+    {
+      "name": "agentic-engineering",
+      "source": "./plugins/agentic-engineering",
+      "description": "Evidence-based guide to prompt, context, agent, and loop engineering for frontier LLM agents — theory plus orchestrator-worker, tool-design, and caching practice.",
+      "version": "1.0.0"
     }
   ]
 }

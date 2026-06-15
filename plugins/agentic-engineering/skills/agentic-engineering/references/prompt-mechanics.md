@@ -1,0 +1,39 @@
+# Prompt Mechanics
+
+Theory pillar T3 + Practice P1. Status: **complete** (researched content) — serial-position (T3.1) settled; instruction-following (T3.2) and structured output (T3.3/P1.5) integrated 2026-06-13. P1.1–P1.3 local dispatch patterns remain held back per source policy (see below) — a deliberate hold, not a research gap.
+
+## T3.1 — Serial position and frontloading: what's actually known `[MEDIUM]`
+
+The honest version of "put important things first":
+
+- Primacy and recency biases are real and measured, but the U-shaped lost-in-the-middle effect is **conditional on window occupancy** — strong up to ~50% occupancy, dissolving into recency-dominance beyond it (full treatment: `context-degradation.md` T2.3; open-source models only, Claude-family transfer untested).
+- Position effects are **second-order to lexical matching** (T2.2): a fact phrased in the query's vocabulary in the middle of the window is more findable than a paraphrased fact at the front.
+
+Defensible practice: frontload instructions and identity-critical content *when operating at low occupancy* (the usual case for curated agent prompts); anchor must-survive instructions near the end as well when windows run hot; never rely on position to rescue content that lacks lexical overlap with how it will be queried.
+
+## T3.2 — Instruction-following mechanics `[HIGH/MEDIUM — adversarial batch 2026-06-13]`
+
+- **Dropping an instruction is an enforcement failure at generation time, not a memory failure.** The "knows-but-violates" rate — the model can recite the constraint on probe (~97% recall) yet violates it while generating — ranges 8% to 99% across models and **does not correlate with capability** (GPT-5.4 8%, Gemini Pro 18%, Qwen3-235B 55%, Gemini Flash 76%, Llama-3.3-70B 93%, a Sonnet variant 99%) `[HIGH — arXiv:2604.28031, single preprint, multi-turn ideation domain]`. Load-bearing consequence: **reminding a high-violation model of a constraint it already knows does not fix the drop** — re-injection treats an enforcement problem as a memory problem.
+- **Constraint cost is front-loaded.** Compliance degrades steepest over the first ~5 constraints, then plateaus, across 28 models from 1.5B to 235B `[HIGH — arXiv:2601.22047]`. Practical rule: spend your first three-to-five constraints on what matters most, and keep the total modest (the same work suggests staying under ~15).
+- **The failure *shape* is model-tier-dependent.** As instruction count climbs (10–500 tested), stronger models hold near-perfect then drop sharply at a threshold (~150), mid-tier models degrade linearly, weaker models exponentially `[MEDIUM — IFScale, arXiv:2507.11538; cite the curve taxonomy, not the absolute N=500 scores, which the verification panel rejected]`.
+- **Constraints interfere with each other.** Opposed instructions trade off measurably — negative inter-constraint correlations between readability and forced keyword inclusion (~−0.28) and between "avoid X" / "use X" style twins (−0.33 to −0.53) `[CORROBORATED* single-verifier — MOSAIC, arXiv:2601.18554, marketing-copy domain]`. Don't assume constraints compose for free; conflicting ones silently degrade each other.
+- **Positive exemplars beat prohibitions, with a mechanism.** Naming a forbidden token tends to *prime* it: ~87.5% of "do not say X" violations were priming failures where mentioning X activated it `[MEDIUM — single model, Qwen-2.5-7B, arXiv:2601.08070; frontier transfer untested]`. This corroborates the settled vendor guidance to show desired output rather than enumerate prohibitions, and adds the **ironic-rebound** caveat that restating a prohibition can make it worse.
+- **In multi-turn work, reinforce in the *first* follow-up turn.** 74% of multi-turn instruction drift first violates by turn 2 of a 6-turn task; periodic reflection checkpoints reduced violations for some models (Qwen 55%→36%) but not others (Llama 93%→92%) `[MEDIUM — arXiv:2604.28031]`.
+
+**Placement (system vs user turn) — honest gap.** No peer-reviewed text-LLM quantification of system-prompt vs user-turn placement effect on compliance was found; widely-circulated "+32/+37.4pp on Gemini" figures are untraceable to a real source and should not be relied on. What *is* settled `[VENDOR-DOC]`: recent frontier models follow instructions more literally, so over-aggressive "CRITICAL: YOU MUST" language written for older models now overtriggers — dial it back to plain statements of when an action applies. This composes with T3.1: position is window-occupancy-conditional, and lexical overlap with the eventual query matters more than position.
+
+## T3.3 / P1.5 — Structured output `[CORROBORATED*/HIGH — Opus probe 2026-06-13]`
+
+Settled mechanics `[VENDOR-DOC]`: platform structured outputs guarantee schema-valid JSON via `output_config.format` / strict tool schemas; schema compilation is cached (~24h); constraints compose with tool use; refusals and token-limit truncation escape the guarantee. The empirical "why/when" beyond the mechanics:
+
+- **The 2024 "structured output hurts reasoning" alarm did not replicate on a same-prompt basis.** The origin result ("Let Me Speak Freely?", EMNLP 2024) tested no frontier reasoning models and was largely attributed to methodology — different prompts per condition and a faulty AI parser; a same-prompt rerun found constrained generation *matched or beat* free-form (Llama-3-8B Last Letter: 0.77 vs 0.65) `[CORROBORATED*, vendor-interested on both sides]`. Do not cite its magnitudes as current.
+- **The real, reproducible residual cost is field ordering.** Generation follows schema-declaration order, so a schema that puts the *answer field before a reasoning field* forces the model to commit before it thinks. **Fix (free, now consensus): declare a free-text `reasoning` field first.** `[CORROBORATED* — mechanism matches autoregressive generation]` Reasoning/thinking models largely sidestep this by emitting thinking tokens before the JSON block `[MEDIUM, inferential]`.
+- **Constraining can *raise* accuracy on weaker models** — JSONSchemaBench measured ~1–4% gains over free generation across GSM8K/Last Letter/Shuffle, a safety-net effect strongest on small models `[HIGH]`.
+- **Latency is rarely the deciding factor.** Optimized engines add tens of microseconds per token (sometimes net *faster*, since constraints shorten output); the only real cost is one-time grammar compilation on complex *uncached* schemas `[HIGH]`.
+- **Constrained decoding cannot refuse.** On out-of-schema input it fills required fields with schema-valid garbage (the "false confidence" failure: a banana receipt → `quantity: 1` instead of an error). Pair strict schemas with an explicit `error`/refusal field or a free-text escape hatch `[CORROBORATED*, vendor]`. Relatedly, over-typing a field (e.g. `integer` where the true value is 51.7) forces a wrong answer — leave latitude where the model needs it.
+
+**Decision rule:** constrain when the consumer is a machine and the model can't be trusted to emit valid JSON (weaker models, closed-enum extraction) — reliability gain, often an accuracy gain. Prefer free-generation-then-parse when the task needs hard reasoning you can't front-load, or when the model must be able to refuse invalid input. The `reasoning`-field-first pattern collapses most of the tradeoff for reasoning-bearing structured tasks.
+
+## P1.1–P1.3 — Dispatch prompt anatomy, purpose-first exploration, compaction-resilient anchors `[HELD BACK — source policy]`
+
+Locally validated patterns (objective/format/boundaries dispatch contracts; stating *why* before *what* in exploration prompts; critical reminders near the top to survive compaction) held back per source policy: local patterns enter the guide only where external research or community practice independently corroborates them. The orchestrator-worker contract content in `tool-design.md` P3.2 covers the externally-supported subset.

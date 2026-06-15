@@ -49,6 +49,7 @@ The user's personal skills used to be scattered across separate GitHub repos plu
 | `hypr-doctor` | post-`pacman -Syu` triage/repair for Arch/CachyOS Hyprland | `hypr-doctor` |
 | `chezmoi` | dotfiles management (apply/diff, templating, age encryption) | — |
 | `universal-directory-organizer` | interactive directory cleanup with safety hooks | — |
+| `agentic-engineering` | evidence-based reference for prompt/context/agent/loop engineering (theory + orchestrator-worker, tool-design, caching practice) | — |
 
 ## Activation
 
