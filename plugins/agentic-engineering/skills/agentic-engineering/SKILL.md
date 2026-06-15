@@ -40,9 +40,10 @@ Every substantive claim in the reference files carries one of:
 | `references/data-formats.md` | Practice: token-efficient serialization (shape × tier × direction) | **Complete** |
 | `references/loops-and-stop-conditions.md` | Practice: stop conditions, budget pressure, trust calibration (flagship) | **Mostly complete** — HITL gates / self-correction (P4.5/P4.6) not yet researched |
 | `references/prompt-mechanics.md` | Theory+Practice: serial position, instruction-following, structured output | **Complete** (researched); local dispatch patterns held back per source policy |
+| `references/SOURCES.md` | Provenance: bibliography (with source URLs), per-claim evidence ledger, refuted claims | **Complete** |
 
 ## How to use this skill
 
-For a **design decision** (single vs multi-agent, tool surface choice, context budget): read the relevant theory file first — the practice patterns assume its mental model. For a **failure diagnosis**: start with `multi-agent.md` (MAST categories) and `context-degradation.md` (length/distractor effects). For **building**: `tool-design.md` and `caching-and-knowledge-delivery.md` are self-contained.
+For a **design decision** (single vs multi-agent, tool surface choice, context budget): read the relevant theory file first — the practice patterns assume its mental model. For a **failure diagnosis**: start with `multi-agent.md` (MAST categories) and `context-degradation.md` (length/distractor effects). For **building**: `tool-design.md` and `caching-and-knowledge-delivery.md` are self-contained. To **trace a claim** to its source, confidence label, or the underlying paper: `SOURCES.md` is the bibliography + evidence ledger.
 
 Pending sections name the research pass that will fill them. Do not improvise content for pending sections from training data — the gaps exist because available evidence was checked and found insufficient or refuted.
