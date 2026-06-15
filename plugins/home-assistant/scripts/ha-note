@@ -100,46 +100,142 @@ def build_entry(a):
     return "\n".join(lines) + "\n"
 
 
-def list_journal(grep=None, tags=()):
-    """Print the journal, optionally filtered by --grep / --tag.
+def _entry_ref(head):
+    """Stable 6-hex handle for a journal entry, derived from its heading text
+    (everything after '### '). Stable because the journal is append-only — a
+    heading never changes once written."""
+    return hashlib.sha1(head.strip().encode("utf-8")).hexdigest()[:6]
 
-    The journal is 140+ lines and growing — agents need filtered reads, not
-    the whole file, to find the one relevant gotcha."""
-    if not os.path.exists(JOURNAL):
-        print("(journal empty — nothing captured yet)")
-        return 0
-    text = open(JOURNAL).read()
-    if not grep and not tags:
-        sys.stdout.write(text)
-        return 0
-    # Split into entries: each starts at a line beginning "### " (the dated
-    # heading). Everything before the first heading is the file header — skipped.
-    entries = []
-    cur = None
+
+def parse_entries(text):
+    """Split journal/revisions body into [{head, ref, body[list], text}].
+    Content before the first '### ' heading (the file preamble) is ignored."""
+    out, cur = [], None
     for line in text.splitlines():
         if line.startswith("### "):
             if cur:
-                entries.append("\n".join(cur).strip("\n"))
-            cur = [line]
+                out.append(cur)
+            cur = {"head": line[4:], "body": [line]}
         elif cur is not None:
-            cur.append(line)
+            cur["body"].append(line)
     if cur:
-        entries.append("\n".join(cur).strip("\n"))
+        out.append(cur)
+    for e in out:
+        e["ref"] = _entry_ref(e["head"])
+        e["text"] = "\n".join(e["body"]).strip("\n")
+    return out
 
-    def keep(entry):
-        if grep and grep.lower() not in entry.lower():
+
+REVISIONS = os.path.join(_references_dir(), "GOTCHAS.revisions.md")
+REV_STATUSES = ("superseded", "corrected", "retracted", "confirmed")
+REVISIONS_HEADER = """\
+# GOTCHAS — revisions (append-only companion to the journal)
+
+The journal is a META-RECORD of paths taken and what was believed AT THE TIME —
+provenance, not a live mirror of HA. Journal entries are never rewritten or
+deleted. When one later proves wrong, stale, or partial, file a revision here
+(`ha-note --supersede <ref> --why …`) that points at the journal entry by its
+ref. `ha-note --list` then flags that entry; `--pending` drops superseded /
+retracted ones from promotion candidates.
+
+Status vocabulary: superseded (no longer true) · corrected (true with a fix) ·
+retracted (was never right) · confirmed (re-verified still true).
+
+---
+"""
+
+
+def load_revisions():
+    """ref -> {status, why, see, date}; the most recently filed revision wins."""
+    revs = {}
+    if not os.path.exists(REVISIONS):
+        return revs
+    for e in parse_entries(open(REVISIONS).read()):
+        m = re.search(r"\*\*Target:\*\* `([0-9a-f]+)`", e["text"])
+        if not m:
+            continue
+        st = re.search(r"\*\*Status:\*\* (\w+)", e["text"])
+        why = re.search(r"\*\*Why:\*\* (.+)", e["text"])
+        see = re.search(r"\*\*See instead:\*\* (.+)", e["text"])
+        revs[m.group(1)] = {
+            "status": (st.group(1) if st else "superseded").lower(),
+            "why": why.group(1).strip() if why else "",
+            "see": see.group(1).strip() if see else "",
+            "date": e["head"].split(" — ", 1)[0],
+        }
+    return revs
+
+
+def file_revision(ref, status, why, see):
+    """Append a revision pointing at journal entry `ref`. The journal itself is
+    left untouched — provenance is preserved; the revision is the correction layer."""
+    entries = parse_entries(open(JOURNAL).read()) if os.path.exists(JOURNAL) else []
+    match = (next((e for e in entries if e["ref"] == ref), None)
+             or next((e for e in entries if e["ref"].startswith(ref)), None))
+    if not match:
+        print(f"ha-note: no journal entry with ref '{ref}' "
+              f"(find refs via `ha-note --list`).", file=sys.stderr)
+        return 2
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    block = "\n".join([
+        f"\n### {now} — {status} {match['ref']}",
+        f"- **Target:** `{match['ref']}` — {match['head'][:90]}",
+        f"- **Status:** {status}",
+        f"- **Why:** {why}",
+        f"- **See instead:** {see or '—'}",
+    ]) + "\n"
+    append_entry(block, path=REVISIONS, header=REVISIONS_HEADER)
+    print(f"ha-note: filed [{status}] for ⟨{match['ref']}⟩ → {REVISIONS}")
+    print(f"  target: {match['head'][:90]}")
+    return 0
+
+
+def list_revisions():
+    if not os.path.exists(REVISIONS):
+        print("(no revisions filed yet)")
+        return 0
+    sys.stdout.write(open(REVISIONS).read())
+    return 0
+
+
+def list_journal(grep=None, tags=()):
+    """Print the journal with each entry's ⟨ref⟩ and any revision marker, so a
+    reader sees at a glance which lessons were later superseded/corrected.
+    Optional --grep / --tag filtering (the journal grows; prefer filtered reads)."""
+    if not os.path.exists(JOURNAL):
+        print("(journal empty — nothing captured yet)")
+        return 0
+    entries = parse_entries(open(JOURNAL).read())
+    revs = load_revisions()
+
+    def keep(e):
+        if "selftest" in e["head"].lower():
+            return False
+        if grep and grep.lower() not in e["text"].lower():
             return False
         if tags:
-            m = re.search(r"^- \*\*Tags:\*\* (.+)$", entry, re.M)
+            m = re.search(r"^- \*\*Tags:\*\* (.+)$", e["text"], re.M)
             have = {t.strip().lower() for t in m.group(1).split(",")} if m else set()
             if not all(t.lower() in have for t in tags):
                 return False
         return True
 
-    matched = [e for e in entries if keep(e)]
-    if matched:
-        sys.stdout.write("\n\n".join(matched) + "\n")
-    print(f"({len(matched)}/{len(entries)} entries matched)", file=sys.stderr)
+    shown = [e for e in entries if keep(e)]
+    for e in shown:
+        print(f"### {e['head']}  ⟨ref:{e['ref']}⟩")
+        rev = revs.get(e["ref"])
+        if rev:
+            extra = f" — {rev['why']}" if rev["why"] else ""
+            print(f"> ⚠ {rev['status'].upper()} ({rev['date']}, see GOTCHAS.revisions.md){extra}")
+            if rev["see"]:
+                print(f">   see instead: {rev['see']}")
+        tail = e["body"][1:]
+        while tail and not tail[-1].strip():
+            tail.pop()
+        for line in tail:
+            print(line)
+        print()
+    print(f"({len(shown)} shown / {len(entries)} entries)", file=sys.stderr)
     return 0
 
 
