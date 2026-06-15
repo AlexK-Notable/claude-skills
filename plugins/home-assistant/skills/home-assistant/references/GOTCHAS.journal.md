@@ -165,3 +165,19 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Fix:** DELETE /api/config/config_entries/entry/<entry_id> (e.g. ha_lib._req('DELETE', 'config/config_entries/entry/<id>')). Returns {require_restart: bool}; HA unloads the entry and removes its entities automatically — no .storage surgery, no restart for a clean unload. Used it to drop an orphan Adaptive Lighting instance ('Ada', no lights).
 - **Repro / verify:** `WS {"type":"config_entries/remove","entry_id":...} -> {success:false, error:{code:unknown_command}}; the REST DELETE on the same entry_id -> {require_restart:false}.`
 - **Tags:** api
+
+### 2026-06-15 — pyscript @time_trigger('startup') fires on EVERY reload, not just HA boot
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** pyscript.reload and homeassistant.reload_all re-run the module and re-fire the startup trigger. bedroom_ramps' startup handler blindly called _al_color_mode(), so every reload at night re-armed Adaptive Lighting colour and overrode the red wind-down with ~2000K warm white; with adapt_color left on, AL then reverted any manual red each 90s interval.
+- **Fix:** startup handler must reconcile to the CURRENT time-of-day state, not blindly arm AL colour. Refactored: _resync_to_now() (night -> _apply_night red) is now shared by both the master OFF->ON state trigger and the startup trigger. A reload/restart at night now keeps red.
+- **Repro / verify:** `Run homeassistant.reload_all (or pyscript.reload) after 22:00 with master ON -> bedroom flips red->warm white; the reload's startup is the trigger.`
+- **Tags:** pyscript
+
+### 2026-06-15 — Adaptive Lighting intercept re-applies adaptive colour on light.turn_on — kill the AL MASTER to force a manual colour
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** With intercept:true (default), AL hooks light.turn_on and re-applies its computed colour. Turning the adapt_color (and even all sub-) switches OFF then immediately light.turn_on a manual rgb still snapped back to warm color_temp (switch-off vs turn_on race / intercept uses last adaptive value).
+- **Fix:** Turn OFF the AL MASTER switch (switch.<name>_adaptive_lighting_<name>) — disables intercept + all adaptation — then set the colour; it sticks. Verified: sub-switches off alone failed; master off + rgb red held across all 6 members. The morning routine re-enables the master, so this self-heals.
+- **Repro / verify:** `adapt_color off + light.turn_on rgb_color:[255,0,0] -> reads back color_temp warm; AL master off + same -> reads back rgb red.`
+- **Tags:** adaptive_lighting
