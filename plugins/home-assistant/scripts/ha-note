@@ -251,52 +251,48 @@ def _sig_tokens(s):
 
 
 def pending_promotions():
-    """REVIEW AID (heuristic, not authoritative): list *verified* journal entries
-    that don't appear to be in the curated GOTCHAS.md yet, so promotion candidates
-    are easy to spot. Matching is by title-word overlap — you still decide what to
-    promote and where. Promotion itself stays a hand edit (the skill's rule)."""
+    """REVIEW AID (heuristic): verified journal entries not obviously in the
+    curated GOTCHAS.md yet. Entries marked superseded/retracted via a revision are
+    dropped (no longer candidates). Title-word overlap — you decide what to promote
+    and where; promotion stays a hand edit."""
     if not os.path.exists(JOURNAL):
         print("(journal empty — nothing to promote)")
         return 0
     curated = open(CURATED).read() if os.path.exists(CURATED) else ""
     curated_heads = [blk.split("\n", 1)[0] for blk in re.split(r"^### ", curated, flags=re.M)[1:]]
     curated_tok = [_sig_tokens(h) for h in curated_heads]
+    revs = load_revisions()
 
-    # parse journal into (heading, body) entries
-    entries, cur = [], None
-    for line in open(JOURNAL).read().splitlines():
-        if line.startswith("### "):
-            if cur:
-                entries.append(cur)
-            cur = {"head": line[4:], "body": [line]}
-        elif cur is not None:
-            cur["body"].append(line)
-    if cur:
-        entries.append(cur)
-
-    pending, promoted = [], []
-    for e in entries:
+    pending, promoted, retired = [], [], 0
+    for e in parse_entries(open(JOURNAL).read()):
         if "selftest" in e["head"].lower():
             continue
-        if "**status:** verified" not in "\n".join(e["body"]).lower():
+        if "**status:** verified" not in e["text"].lower():
             continue  # only surface verified lessons for promotion
+        rev = revs.get(e["ref"])
+        if rev and rev["status"] in ("superseded", "retracted"):
+            retired += 1
+            continue  # retired via a revision — not a promotion candidate
         t = _sig_tokens(e["head"])
         best, where = 0, None
         for h, ct in zip(curated_heads, curated_tok):
             ov = len(t & ct)
             if ov > best:
                 best, where = ov, h.strip()
-        (promoted if best >= 3 else pending).append((e["head"], where, best))
+        (promoted if best >= 3 else pending).append((e["ref"], e["head"], where, best))
 
     print(f"=== PENDING promotion — verified, not obviously in GOTCHAS.md ({len(pending)}) ===")
-    for head, _, _ in pending:
-        print(f"  ● {head}")
+    for ref, head, _, _ in pending:
+        print(f"  ● ⟨{ref}⟩ {head}")
     if not pending:
         print("  (none — every verified entry has a likely match in GOTCHAS.md)")
     if promoted:
         print(f"\n=== likely already promoted ({len(promoted)}) ===")
-        for head, where, n in promoted:
-            print(f"  ✓ {head[:90]}\n      ↳ ~ \"{where}\" ({n} shared words)")
+        for ref, head, where, n in promoted:
+            print(f"  ✓ ⟨{ref}⟩ {head[:84]}\n        ↳ ~ \"{where}\" ({n} shared words)")
+    if retired:
+        word = "entry" if retired == 1 else "entries"
+        print(f"\n({retired} superseded/retracted {word} hidden — see `ha-note --revisions`)")
     print("\n(heuristic by title-word overlap — verify before trusting; promote by hand.)")
     return 0
 
@@ -319,6 +315,14 @@ def main():
     p.add_argument("--selftest", action="store_true")
     p.add_argument("--pending", action="store_true",
                    help="list verified journal entries not yet in GOTCHAS.md (promotion candidates)")
+    p.add_argument("--revisions", action="store_true",
+                   help="print the revisions companion (superseded/corrected entries)")
+    p.add_argument("--supersede", metavar="REF",
+                   help="file a revision against journal entry REF (find refs via --list)")
+    p.add_argument("--status", choices=REV_STATUSES, default="superseded",
+                   help="with --supersede: nature of the revision (default: superseded)")
+    p.add_argument("--why", help="with --supersede: why the entry is being revised")
+    p.add_argument("--see", help="with --supersede: pointer to the correct info")
     a = p.parse_args()
 
     if a.list:
