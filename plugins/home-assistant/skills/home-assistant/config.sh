@@ -12,6 +12,12 @@ export HA_CONFIG="/home/komi/homeassistant/config"
 export HA_CONTAINER="homeassistant"              # docker container name (version probe)
 export HA_STALE_AFTER_DAYS="7"
 
+# --- live REST/WS API access (ha-api, ha-doctor) ---
+export HA_URL="http://192.168.1.232:8123"        # LAN base URL (no trailing /api)
+export HA_TOKEN_BWS_ID="74edad23-6bd2-4617-a1d8-b45d016db173"  # bws secret id: admin long-lived token
+export HA_BWS_TOKEN_ENV=~/.config/bws/token.env  # file exporting BWS_ACCESS_TOKEN (bws machine account)
+# token resolution order in the scripts: $HA_LLAT override → bws (needs the env above). Never printed.
+
 # --- knowledge files (Channel B), for reference ---
 # WRITABLE (ha-note appends; you curate):
 #   references/GOTCHAS.journal.md   append-only capture target
