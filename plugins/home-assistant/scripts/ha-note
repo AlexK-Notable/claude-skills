@@ -57,13 +57,13 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 """
 
 
-def append_entry(text):
-    os.makedirs(os.path.dirname(JOURNAL), exist_ok=True)
+def append_entry(text, path=JOURNAL):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     # Atomic append under an exclusive lock (safe across concurrent callers).
     # "a" creates the file if absent; the header decision happens UNDER the
     # lock (fstat of the locked fd), so two concurrent first-callers can't
     # both decide to write the header.
-    with open(JOURNAL, "a") as f:
+    with open(path, "a") as f:
         fcntl.flock(f.fileno(), fcntl.LOCK_EX)
         try:
             if os.fstat(f.fileno()).st_size == 0:
