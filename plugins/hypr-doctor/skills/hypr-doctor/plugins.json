@@ -27,7 +27,7 @@
       "so_path": "/home/komi/repos/dynamic-cursors/out/dynamic-cursors.so",
       "loader_directive_file": "/home/komi/.config/hypr/hyprland.conf",
       "loader_directive_pattern": "hyprctl plugin load .*dynamic-cursors\\.so",
-      "notes": "Pin to a hyprpm.toml-matrix commit matching the running Hyprland version. Read `git show origin/main:hyprpm.toml` to find the right commit, not the working tree (could be detached)."
+      "notes": "Upstream is VirtCode/hypr-dynamic-cursors (origin), NOT raybbian — fix any docs that say otherwise. Tracked as detached-HEAD on a hyprpm.toml pin. After a Hyprland update: `git -C /home/komi/repos/dynamic-cursors fetch origin && git show origin/main:hyprpm.toml` (left col = Hyprland commit, right col = plugin commit to build), `git checkout <plugin-commit>`, then rebuild. Re-enabled 2026-06-15 for Hyprland 0.55.4 → pin da447486c84e0be81f2cdd208af1ef92469f0a88."
     }
   ],
   "watched_venvs": [
