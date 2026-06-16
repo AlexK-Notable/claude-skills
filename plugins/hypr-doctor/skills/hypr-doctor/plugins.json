@@ -17,9 +17,8 @@
     },
     {
       "name": "dynamic-cursors",
-      "enabled": false,
+      "enabled": true,
       "loaded_name": "dynamic-cursors",
-      "disabled_reason": "Not yet compatible with Hyprland 0.55.x. Re-enable when upstream raybbian/dynamic-cursors PR #139 (or successor) lands and the hyprpm.toml pin matrix lists a 0.55.x-compatible commit.",
       "repo_dir": "/home/komi/repos/dynamic-cursors",
       "branch": null,
       "remote_push_to": null,
