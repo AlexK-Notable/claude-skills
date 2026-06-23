@@ -125,3 +125,9 @@ retracted (was never right) · confirmed (re-verified still true).
 - **Status:** promoted
 - **Why:** promoted into the curated GOTCHAS.md
 - **See instead:** Bedroom AL coexistence design — don't "fix" it
+
+### 2026-06-23 — superseded 0cda9c
+- **Target:** `0cda9c` — 2026-06-23 — Govee (govee2mqtt) light brightness is NOT in the HA recorder — reconstruct r
+- **Status:** superseded
+- **Why:** The govee2mqtt Command/DeviceState values reflect what the Govee CLOUD accepted/cached, NOT the physical bulb, for the H6006 bulbs (cloud Platform-API-only, not LAN-capable). Under ramp+AL load the cloud throttles/drops commands but returns 200 success, so a clean ramp in the govee2mqtt log can be physical fiction. Trust the log as physical truth ONLY for LAN-controlled Govee devices (strip/lamp); cloud devices need a real sensor or your eyes. See the cloud-vs-physical desync note.
+- **See instead:** —
