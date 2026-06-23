@@ -181,3 +181,11 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Fix:** Turn OFF the AL MASTER switch (switch.<name>_adaptive_lighting_<name>) — disables intercept + all adaptation — then set the colour; it sticks. Verified: sub-switches off alone failed; master off + rgb red held across all 6 members. The morning routine re-enables the master, so this self-heals.
 - **Repro / verify:** `adapt_color off + light.turn_on rgb_color:[255,0,0] -> reads back color_temp warm; AL master off + same -> reads back rgb red.`
 - **Tags:** adaptive_lighting
+
+### 2026-06-23 — Govee (govee2mqtt) light brightness is NOT in the HA recorder — reconstruct ramps from the govee2mqtt container log, minding a timezone split
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** These Govee lights record only on/off to HA history; historical on-states carry attributes=['friendly_name'] only (no brightness/color_mode), so /api/history shows brightness=None throughout a ramp. The real per-command brightness lives in 'docker logs govee2mqtt' ({"state":"ON","brightness":N}). TZ TRAP: govee2mqtt log timestamps AND 'docker logs --since/--until' are LOCAL (America/Los_Angeles), but the HA /api/history JSON returns UTC — querying govee with a UTC time silently returns the wrong hour of data.
+- **Fix:** For Govee brightness/ramp debugging use: docker logs --since <LOCAL ISO> --until <LOCAL ISO> govee2mqtt | grep 'Command for' (brightness vs color_temp commands) and the 'DeviceState { ... brightness: N }' poll lines. Treat HA history as on/off-only for these lights.
+- **Repro / verify:** `Pull light.smart_led_bulb HA history across a known morning ramp -> every on-state bri=None, attrs=['friendly_name']; same window in govee2mqtt shows brightness:1,3,4,5,7... climbing.`
+- **Tags:** govee
