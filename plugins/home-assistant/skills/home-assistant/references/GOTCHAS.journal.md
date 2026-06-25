@@ -197,3 +197,11 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Fix:** Not fixable on the cloud path and not LAN-capable. Resolution: replace with Zigbee bulbs on ZHA (local, no cloud), then repoint the light.bedroom_lights HA group helper + dashboard per-bulb refs + Adaptive Lighting lights to the new entities. Until then, physical state is the only truth for these bulbs.
 - **Repro / verify:** `Set light.bedroom_lights to 10pct while already on -> physically dims and holds across AL refreshes. Cold OFF then turn_on brightness 1 -> bulbs stay physically OFF while cloud reports off. Morning ramp: govee log shows brightness 1..99 climbing and app shows ~1pct, but bulbs are physically ~100pct.`
 - **Tags:** govee
+
+### 2026-06-25 — ZHA (and other integration) *device* triggers fail check_config but load fine at runtime
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** check_config runs an offline sandbox that does NOT start integrations, so ZHA device-trigger validation can't resolve the gateway/device and errors: 'Device <id> has no config entry from domain zha' — the automation is disabled IN THE CHECK ONLY
+- **Fix:** Verify validity differently: confirm device is integration-bound (device_attr config_entries/identifiers) and that the trigger came from HA's own device_automation/trigger/list; then reload and confirm the automation entity is state=on at runtime
+- **Repro / verify:** `Add an automation with trigger: device / domain: zha / type: remote_button_short_press, run check_config -> ERROR; reload + GET states/automation.<x> -> on`
+- **Tags:** automations, zha, check_config
