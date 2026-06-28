@@ -205,3 +205,11 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Fix:** Verify validity differently: confirm device is integration-bound (device_attr config_entries/identifiers) and that the trigger came from HA's own device_automation/trigger/list; then reload and confirm the automation entity is state=on at runtime
 - **Repro / verify:** `Add an automation with trigger: device / domain: zha / type: remote_button_short_press, run check_config -> ERROR; reload + GET states/automation.<x> -> on`
 - **Tags:** automations, zha, check_config
+
+### 2026-06-28 — HA Lovelace frontend auth != API auth: a long-lived token works for the REST API via the Authorization: Bearer header, but the frontend reads its session from localStorage key 'hassTokens', NOT the bearer header. A LLAT alone won't log a browser into the UI.
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** frontend uses home-assistant-js-websocket Auth, which loads saved tokens from localStorage.hassTokens (access_token + refresh_token + expires); LLATs are only accepted on API calls
+- **Fix:** inject localStorage.hassTokens = {access_token: <LLAT>, token_type: 'Bearer', hassUrl: <url>, clientId: null, expires: <far-future-ms>, expires_in: 1800, refresh_token: ''} on the HA origin, then reload. clientId:null + far-future expires => frontend uses access_token directly and never tries to refresh. Used to drive dashboards via Playwright.
+- **Repro / verify:** `navigate Playwright to http://192.168.1.232:8123 (redirects to /auth/authorize), set hassTokens in localStorage, reload -> lands authenticated on /home/overview`
+- **Tags:** frontend, auth
