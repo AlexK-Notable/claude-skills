@@ -1,0 +1,17 @@
+{
+  "name": "wow-addon-management",
+  "version": "1.0.0",
+  "description": "Manage World of Warcraft retail addons on Linux — packaged GitHub-release downloads (libs bundled, version pinned) + CurseForge API, with a Firecrawl-backed CurseForge reconciliation guard, relative-symlink management, library fetching, BugGrabber error analysis, WoW 12.x API-fix patterns, and gamescope/Hyprland display setup. Drives the tooling in ~/repos/WoW.",
+  "author": {
+    "name": "Alex Kechichian",
+    "email": "alexkechichian1@gmail.com",
+    "url": "https://github.com/AlexK-Notable"
+  },
+  "homepage": "https://github.com/AlexK-Notable/claude-skills",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AlexK-Notable/claude-skills.git"
+  },
+  "license": "MIT",
+  "keywords": ["wow", "warcraft", "addons", "curseforge", "github-release", "symlinks", "lua", "firecrawl", "linux-gaming"]
+}

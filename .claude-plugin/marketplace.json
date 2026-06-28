@@ -57,6 +57,12 @@
       "source": "./plugins/agentic-engineering",
       "description": "Evidence-based guide to prompt, context, agent, and loop engineering for frontier LLM agents — theory plus orchestrator-worker, tool-design, and caching practice.",
       "version": "1.0.0"
+    },
+    {
+      "name": "wow-addon-management",
+      "source": "./plugins/wow-addon-management",
+      "description": "Manage World of Warcraft retail addons on Linux — GitHub-release + CurseForge downloads with a Firecrawl reconciliation guard, relative-symlink management, library fetching, BugGrabber analysis, and gamescope display setup. Drives the tooling in ~/repos/WoW.",
+      "version": "1.0.0"
     }
   ]
 }

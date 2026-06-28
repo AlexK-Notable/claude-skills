@@ -1,0 +1,57 @@
+{
+  "wow-addon-management": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "high",
+    "description": "Managing World of Warcraft retail addons on Linux — downloads (GitHub release / CurseForge), symlinks, libraries, BugGrabber errors, WoW API fixes, gamescope display",
+    "promptTriggers": {
+      "keywords": [
+        "wow addon",
+        "wow addons",
+        "world of warcraft addon",
+        "update addons",
+        "addon-registry",
+        "curseforge",
+        "bartender",
+        "plater",
+        "buggrabber",
+        "bugsack",
+        "savedvariables",
+        ".pkgmeta",
+        "ace3",
+        "fetch-libs",
+        "addon symlinks",
+        "interface version",
+        "gamescope",
+        "/wow"
+      ],
+      "intentPatterns": [
+        "(update|download|pull|refresh|install|manage|fix).*?(wow|warcraft)?\\s*addons?",
+        "(download|fetch|grab).*?(from )?curseforge",
+        "(manage|fix|recreate|repair).*?(addon )?symlinks?",
+        "(check|fix|analyze|parse).*?(buggrabber|bugsack|savedvariables|addon errors?)",
+        "fetch.*?(addon )?librar(y|ies)|\\.pkgmeta|ace3",
+        "(wow|addon).*?(api change|secret value|removed global|12\\.x|midnight)",
+        "(gamescope|wrong monitor|wow window|wow display)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [
+        "**/addon-registry.json",
+        "**/addon-lock.json",
+        "**/repos/WoW/**",
+        "**/Interface/AddOns/**",
+        "**/*.toc",
+        "**/.pkgmeta"
+      ],
+      "contentPatterns": [
+        "addon-registry",
+        "curseforge_project_id",
+        "gameVersionTypeId",
+        "github-release",
+        "## Interface:",
+        "BugGrabber"
+      ]
+    }
+  }
+}
