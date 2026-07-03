@@ -221,3 +221,11 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Fix:** Set sleep_rgb_or_color_temp: rgb_color — AL 1.30.1 then lerps the post-sunset glide in RGB/HSV space with force_rgb_color=True (color_and_brightness.py ~line 357), bypassing the CCT floor; sleep_rgb_color becomes the real target
 - **Repro / verify:** `With color_temp mode: compare AL switch attrs (color_temp_kelvin 1105) vs the light's actual state (2168K, the bulb floor) late evening`
 - **Tags:** adaptive-lighting, zha
+
+### 2026-07-03 — HA check_config prints ERROR for ZHA device-trigger automations but exits 0 — false positive, do not 'fix'
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** check_config runs in an isolated context without the live device registry, so device_id triggers from domain zha fail to resolve there; the running instance loads the same automations fine
+- **Fix:** Treat exit code 0 as the verdict; confirm the automation entities are loaded/on in the live instance instead
+- **Repro / verify:** `check_config on a config with SNZB-01P device triggers: 2 ERROR lines, exit 0, automations work live`
+- **Tags:** config-validation, zha
