@@ -213,3 +213,11 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Fix:** inject localStorage.hassTokens = {access_token: <LLAT>, token_type: 'Bearer', hassUrl: <url>, clientId: null, expires: <far-future-ms>, expires_in: 1800, refresh_token: ''} on the HA origin, then reload. clientId:null + far-future expires => frontend uses access_token directly and never tries to refresh. Used to drive dashboards via Playwright.
 - **Repro / verify:** `navigate Playwright to http://192.168.1.232:8123 (redirects to /auth/authorize), set hassTokens in localStorage, reload -> lands authenticated on /home/overview`
 - **Tags:** frontend, auth
+
+### 2026-07-03 — AL transition_until_sleep with sleep_rgb_or_color_temp=color_temp stalls at the bulbs' CCT floor — sleep_rgb_color is silently unused
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** The evening glide interpolates min_color_temp→sleep_color_temp in color-temp space; lights clamp requests below their hardware min (Third Reality 3RCB01057Z floor ≈2202K), so a 1000K sleep target renders as dim warm-white, never red
+- **Fix:** Set sleep_rgb_or_color_temp: rgb_color — AL 1.30.1 then lerps the post-sunset glide in RGB/HSV space with force_rgb_color=True (color_and_brightness.py ~line 357), bypassing the CCT floor; sleep_rgb_color becomes the real target
+- **Repro / verify:** `With color_temp mode: compare AL switch attrs (color_temp_kelvin 1105) vs the light's actual state (2168K, the bulb floor) late evening`
+- **Tags:** adaptive-lighting, zha
