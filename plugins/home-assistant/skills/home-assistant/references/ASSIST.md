@@ -3,11 +3,16 @@
 ## Shape of it
 
 ```
-"ok nabu" (openWakeWord, Nova:10400)
+"ok nabu" (microWakeWord ON-DEVICE on the Voice PE — the openWakeWord container on
+           Nova:10400 is running but UNUSED: the pipeline's wake_word_entity is null)
    → STT SenseVoice fp16 on the NPU (Nova:10300, Wyoming)
    → conversation agent (local Assist intents first, then conversation.claude_conversation)
-   → TTS Piper (Pi:10200)
+   → TTS Piper (Pi:10200, voice en_US-hfc_female-medium per the pipeline setting)
 ```
+
+> Latency + model-choice benchmarks (2026-07-03): `~/repos/voice-assistant/research/`
+> `2026-07-03-voice-benchmarks.md` — STT decode is ~650 ms of the round trip (CPU int8
+> would be ~120 ms); the Claude leg is 1.6–5.8 s and dominates.
 
 Two Anthropic subentries exist — **don't confuse them**:
 - `conversation.claude_conversation` — the **voice agent** (`llm_hass_api: ['assist']`,
