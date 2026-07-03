@@ -41,8 +41,8 @@ ssh komi@192.168.1.232 'sudo -n docker exec homeassistant python -m homeassistan
 | Role | Where | Endpoint |
 |---|---|---|
 | STT — SenseVoice fp16 (NPU) | Nova | `:10300` (Wyoming; zeroconf-advertised) |
-| Wake word — openWakeWord (`ok_nabu`) | Nova | `:10400` |
-| TTS — Piper (`en_US-lessac-medium`) | Pi 5 | `:10200` |
+| Wake word — on-device (microWakeWord on the Voice PE); the openWakeWord container (`:10400`) is running but unused (pipeline `wake_word_entity` is null) | Nova | `:10400` |
+| TTS — Piper (pipeline voice `en_US-hfc_female-medium`; container preloads lessac-medium) | Pi 5 | `:10200` |
 | Conversation agent | HA | `conversation.claude_conversation` (Anthropic) |
 
 Wyoming STT server: systemd **user** service `wyoming-sensevoice.service` on the Nova
