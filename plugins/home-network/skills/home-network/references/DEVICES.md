@@ -198,7 +198,7 @@ for corrections.
 | Role | Smart plug in the Z-Print corner (3D-printer area, per HA area assignment) |
 | Open ports | 80 (Tasmota web UI + **unauthenticated** HTTP API) |
 | HTTP API | `curl 'http://192.168.1.177/cm?cmnd=Power'` (relay state), `…cmnd=Status%206` (MQTT health), `…cmnd=Status%200` (everything) — read commands are safe; commands with an argument WRITE config |
-| HA integration | `tasmota` via MQTT — broker is Mosquitto on the Nova `192.168.1.232:1883`, MqttUser `ha`, client `DVES_743198` |
+| HA integration | `tasmota` via MQTT — broker is Mosquitto on the Nova `192.168.1.232:1883`, MqttUser `ha`, client `DVES_743198`, HA entity `switch.ezplug` |
 | Matter | Advertises `_matterc._udp` port 5540 (Tasmota's built-in Matter endpoint, test VID 0xFFF1, commissionable) — this advert is what the 2026-05-24 audit logged as an unidentified "Matter/Thread hub" at .177 (same MAC; it was this plug all along, and it's an endpoint, not a hub) |
 | Security note | The HTTP API is unauthenticated — anyone on the LAN can toggle the relay or rewrite its MQTT config. Set a `WebPassword` if that ever matters. |
 | Incident 2026-07-04 | Showed **"unavailable" in HA** while the user assumed it was just switched off. Actual cause: stale `MqttHost 192.168.1.229` (the Nova's old Wi-Fi IP — broker moved to wired `.232` on 2026-06-08), `MqttCount: 0` = never connected. Fixed via `/cm?cmnd=MqttHost%20192.168.1.232`; re-verified same day: `MqttHost 192.168.1.232`, `MqttCount: 1` (connected). "Unavailable" tracks broker connectivity, NOT relay state — see [TROUBLESHOOTING.md §13](TROUBLESHOOTING.md#13-tasmota-device-shows-unavailable-in-home-assistant). |

@@ -564,6 +564,9 @@ Decision:
   ```bash
   curl "http://<device-ip>/cm?cmnd=MqttHost%20192.168.1.232"
   ```
+  Applying this makes the device **reboot itself** — the web UI drops for
+  ~15–30 s before it comes back and HA recovers. Don't misread that blip as
+  the plug going offline (observed on the EZPlug, 2026-07-04).
 - `MqttHost` correct but `MqttCount: 0` → broker side: is Mosquitto up?
   `port-check 192.168.1.232 1883`.
 - Can't reach port 80 at all → now it may genuinely be unplugged /
