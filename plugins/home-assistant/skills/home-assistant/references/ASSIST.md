@@ -11,8 +11,8 @@
 ```
 
 > Latency + model-choice benchmarks (2026-07-03): `~/repos/voice-assistant/research/`
-> `2026-07-03-voice-benchmarks.md` — STT decode is ~650 ms of the round trip (CPU int8
-> would be ~120 ms); the Claude leg is 1.6–5.8 s and dominates.
+> `2026-07-03-voice-benchmarks.md` — STT decode is now ~120 ms (CPU int8; was ~650 ms on
+> the NPU pre-swap); the Claude leg is 1.6–5.8 s and dominates the round trip.
 
 Two Anthropic subentries exist — **don't confuse them**:
 - `conversation.claude_conversation` — the **voice agent** (`llm_hass_api: ['assist']`,
