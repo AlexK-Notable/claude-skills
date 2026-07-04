@@ -184,6 +184,26 @@ for corrections.
 | Notes | DHCP — IP may change. Default firewall posture (block-all-inbound) consistent with a Windows or Linux desktop/laptop. The hostname "Moug" is the DHCP-supplied name; rename if the actual identity becomes clear. |
 | Verified | 2026-05-24 via home-net-learn |
 
+### EZPlug (Tasmota smart plug — Z-Print / 3D-printer corner)
+
+| Field | Value |
+|-------|-------|
+| IPv4 | 192.168.1.177 *(DHCP — the MAC is the stable key)* |
+| IPv6 (global) | 2600:1700:4811:4e70:e6b3:23ff:fe74:3198 *(EUI-64 from MAC)* |
+| MAC | e4:b3:23:74:31:98 |
+| OUI | E4:B3:23 — Espressif (ESP8685 v0.4 = ESP32-C3 class) |
+| Hostname (DHCP) | `ezplug-printer-4504` |
+| Hostname (mDNS) | `E4B323743198.local` *(resolves from KOMI; also carries the Matter advert)* |
+| Hardware / FW | EZPlug (Tasmota module `EZPLUG_V2`), Tasmota **14.4.1** (tasmota32) |
+| Role | Smart plug in the Z-Print corner (3D-printer area, per HA area assignment) |
+| Open ports | 80 (Tasmota web UI + **unauthenticated** HTTP API) |
+| HTTP API | `curl 'http://192.168.1.177/cm?cmnd=Power'` (relay state), `…cmnd=Status%206` (MQTT health), `…cmnd=Status%200` (everything) — read commands are safe; commands with an argument WRITE config |
+| HA integration | `tasmota` via MQTT — broker is Mosquitto on the Nova `192.168.1.232:1883`, MqttUser `ha`, client `DVES_743198` |
+| Matter | Advertises `_matterc._udp` port 5540 (Tasmota's built-in Matter endpoint, test VID 0xFFF1, commissionable) — this advert is what the 2026-05-24 audit logged as an unidentified "Matter/Thread hub" at .177 (same MAC; it was this plug all along, and it's an endpoint, not a hub) |
+| Security note | The HTTP API is unauthenticated — anyone on the LAN can toggle the relay or rewrite its MQTT config. Set a `WebPassword` if that ever matters. |
+| Incident 2026-07-04 | Showed **"unavailable" in HA** while the user assumed it was just switched off. Actual cause: stale `MqttHost 192.168.1.229` (the Nova's old Wi-Fi IP — broker moved to wired `.232` on 2026-06-08), `MqttCount: 0` = never connected. Fixed via `/cm?cmnd=MqttHost%20192.168.1.232`; re-verified same day: `MqttHost 192.168.1.232`, `MqttCount: 1` (connected). "Unavailable" tracks broker connectivity, NOT relay state — see [TROUBLESHOOTING.md §13](TROUBLESHOOTING.md#13-tasmota-device-shows-unavailable-in-home-assistant). |
+| Verified | 2026-07-04 live from KOMI (ARP REACHABLE, web UI HTTP 200, Status 0/2/5/6 queried; first couple of `/cm` requests timed out then all answered in ~0.1 s — treat one slow reply as transient, not absence) |
+
 ### AT&T residential gateway (router)
 
 | Field | Value |
@@ -210,7 +230,7 @@ These appeared on `avahi-browse` during 2026-05-24 audit.
 | 192.168.1.85 | 44:6d:7f:22:59:5b | Amazon Echo — SpotifyConnect #2 + Matter + `_meshcop._udp` (Thread border router). **Advertises Thread mesh ULA `fd43:c8e2:678:1::/64` via ICMPv6 RA** — shows up on neighboring hosts as `ip -6 route` entry via `fe80::466d:7fff:fe22:595b` (link-local derived from Echo's MAC). Unusual but correct TBR behavior. |
 | 192.168.1.151 | 0e:7b:9c:c9:3e:97 *(randomized)* | iPad on Wi-Fi (`iPad.local`) |
 | 192.168.1.160 | d6:77:f4:f4:b3:fa *(randomized)* | MacBook Pro — `Alexs-MacBook-Pro.local`, AirPlay port 7000 |
-| 192.168.1.177 | e4:b3:23:74:31:98 | Matter/Thread hub — `_matterc._udp` port 5540 (OUI: Espressif) |
+| 192.168.1.177 | e4:b3:23:74:31:98 | **EZPlug** — Tasmota smart plug, promoted to a verified entry above (2026-07-04). The `_matterc._udp` port 5540 advert that suggested "Matter/Thread hub" is the plug's own Tasmota Matter endpoint. |
 | 192.168.1.179 | 00:4b:12:4e:62:5c | DIY ESP32 device — `_ekg._tcp` port 8888 (`EKG-4e-62-5c.local`) |
 | 192.168.1.187 | ac:9f:c3:* | **Ring (Amazon)** doorbell or camera — OUI AC:9F:C3 is Ring LLC |
 
