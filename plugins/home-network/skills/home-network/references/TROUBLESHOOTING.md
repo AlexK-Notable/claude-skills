@@ -16,6 +16,7 @@ Decision trees for common LAN problems.
 10. "avahi-daemon shows active but mDNS doesn't resolve"
 11. "Corrupt OS install vs board failure on an SBC" (SD swap-test)
 12. "Is an SBC's MAC stable, or randomized per boot?"
+13. "Tasmota device shows 'unavailable' in Home Assistant"
 
 ---
 
@@ -536,3 +537,48 @@ Verified on nova 2026-06-08: active eth MAC `66:02:35:01:cc:21`
 (u-boot/SoC-derived, LA bit, held stable across an SD→eMMC migration) vs
 r8168's bogus "permanent" `2a:8e:88:79:95:fd`. See DEVICES.md §"indiedroid
 nova (bredOS)" for the full case.
+
+## 13. "Tasmota device shows 'unavailable' in Home Assistant"
+
+**"Unavailable" ≠ powered off.** HA's `tasmota` integration rides MQTT. A
+Tasmota plug whose relay is OFF still publishes availability and telemetry
+over MQTT — a healthy-but-off device shows as *off*, never *unavailable*.
+"Unavailable" means the **device ↔ broker link is down**, and the first
+suspect after a broker-host IP change is a stale `MqttHost` on the device.
+
+Diagnose over Tasmota's port-80 HTTP API — it's unauthenticated and works
+even when MQTT is dead:
+
+```bash
+curl "http://<device-ip>/cm?cmnd=Status%206"   # MQTT health
+# Key fields:
+#   MqttHost  — must be the broker's CURRENT IP (Mosquitto on the Nova = 192.168.1.232)
+#   MqttCount — connections since boot; 0 = never connected → config or broker problem
+curl "http://<device-ip>/cm?cmnd=Power"        # actual relay state, independent of MQTT
+```
+
+Decision:
+
+- `MqttCount: 0` **and** `MqttHost` wrong/stale → rewrite the broker IP;
+  the device restarts its MQTT link immediately and HA recovers in ~30 s:
+  ```bash
+  curl "http://<device-ip>/cm?cmnd=MqttHost%20192.168.1.232"
+  ```
+- `MqttHost` correct but `MqttCount: 0` → broker side: is Mosquitto up?
+  `port-check 192.168.1.232 1883`.
+- Can't reach port 80 at all → now it may genuinely be unplugged /
+  off-LAN — fall back to the §1 L2-presence-by-MAC sweep. (One slow `/cm`
+  reply is transient — retry before concluding anything; observed on the
+  EZPlug 2026-07-04.)
+
+**Why this bites on this LAN:** the Mosquitto broker lives on the Nova,
+which moved from Wi-Fi `.229` to wired `.232` (2026-06-08). Tasmota stores
+the broker as a static IP, so every Tasmota device configured before the
+move breaks silently on its next reconnect. Real case: EZPlug
+(`192.168.1.177`) on 2026-07-04 — HA showed "unavailable", user assumed it
+was switched off; actual cause was stale `MqttHost 192.168.1.229`,
+`MqttCount: 0`. The relay *was* off, but that was invisible to HA until the
+broker IP was fixed. If any other Tasmota/MQTT device shows "unavailable",
+check for the same stale broker IP first.
+
+See DEVICES.md §"EZPlug (Tasmota smart plug)" for the device entry.
