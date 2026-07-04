@@ -5,7 +5,7 @@
 ```
 "ok nabu" (microWakeWord ON-DEVICE on the Voice PE — the openWakeWord container on
            Nova:10400 is running but UNUSED: the pipeline's wake_word_entity is null)
-   → STT SenseVoice fp16 on the NPU (Nova:10300, Wyoming)
+   → STT SenseVoice int8 ONNX on CPU, 2 threads (Nova:10300, Wyoming; off the NPU since 2026-07-03)
    → conversation agent (local Assist intents first, then conversation.claude_conversation)
    → TTS Piper (Pi:10200, voice en_US-hfc_female-medium per the pipeline setting)
 ```
