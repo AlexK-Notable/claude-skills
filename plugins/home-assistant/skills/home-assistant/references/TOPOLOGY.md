@@ -43,7 +43,7 @@ ssh komi@192.168.1.232 'sudo -n docker exec homeassistant python -m homeassistan
 | STT — SenseVoice **int8 ONNX on CPU** (2 threads; swapped off the NPU 2026-07-03 — see `~/repos/voice-assistant/planning/2026-07-03-voice-system-assessment.md`) | Nova | `:10300` (Wyoming; zeroconf-advertised) |
 | Wake word — on-device (microWakeWord on the Voice PE); the openWakeWord container (`:10400`) is running but unused (pipeline `wake_word_entity` is null) | Nova | `:10400` |
 | TTS — Piper (pipeline voice `en_US-hfc_female-medium`; container preloads lessac-medium) | Pi 5 | `:10200` |
-| Conversation agent | HA | `conversation.claude_conversation` (Anthropic) |
+| Conversation agent | HA | `conversation.google_ai_conversation` (gemini-3.1-flash-lite, since 2026-07-03; `conversation.claude_conversation` kept as fallback) |
 
 Wyoming STT server: systemd **user** service `wyoming-sensevoice.service` on the Nova
 (`journalctl --user -u wyoming-sensevoice`). Details in ASSIST.md.

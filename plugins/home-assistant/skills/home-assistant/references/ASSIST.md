@@ -6,9 +6,18 @@
 "ok nabu" (microWakeWord ON-DEVICE on the Voice PE — the openWakeWord container on
            Nova:10400 is running but UNUSED: the pipeline's wake_word_entity is null)
    → STT SenseVoice int8 ONNX on CPU, 2 threads (Nova:10300, Wyoming; off the NPU since 2026-07-03)
-   → conversation agent (local Assist intents first, then conversation.claude_conversation)
+   → conversation agent (sentence triggers + local Assist intents first, then
+     conversation.google_ai_conversation — gemini-3.1-flash-lite since 2026-07-03;
+     conversation.claude_conversation kept configured as fallback)
    → TTS Piper (Pi:10200, voice en_US-hfc_female-medium per the pipeline setting)
 ```
+
+> **`prefer_local_intents` is a PIPELINE option** (`.storage/assist_pipeline.pipelines`),
+> not an agent option. It was **False** on the production pipeline until 2026-07-03 —
+> the `prefer_local_intents: true` on the Anthropic *subentry* did not preempt for the
+> pipeline path (phase-1 bench: even "what time is it" went to Claude). With the
+> pipeline flag now True, grammar-covered commands resolve in ~0.1 s with no LLM call
+> (verified via bench/ha_pipeline_bench.py). Sentence triggers fire regardless of agent.
 
 > Latency + model-choice benchmarks (2026-07-03): `~/repos/voice-assistant/research/`
 > `2026-07-03-voice-benchmarks.md` — STT decode is now ~120 ms (CPU int8; was ~650 ms on
