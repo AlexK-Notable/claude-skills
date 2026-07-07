@@ -237,3 +237,19 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Fix:** add 'lists: {item: {wildcard: true}}' to the custom_sentences yaml; verify with the conversation/agent/homeassistant/debug WS command after conversation.reload
 - **Repro / verify:** `add a custom sentence using {item} without lists:, conversation.reload, then any non-trigger utterance -> hassil.errors.MissingListError in the log`
 - **Tags:** assist, custom-sentences
+
+### 2026-07-07 — pyscript cannot evaluate generator expressions — runtime crash, not load error
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** pyscript's AST interpreter has no ast.GeneratorExp handler; tuple(f(x) for x in y) parses fine at (re)load and only raises NotImplementedError 'not implemented ast ast_generatorexp' when the line first executes — a path that looks deployed can be dead for days
+- **Fix:** use list comprehensions inside tuple()/any()/etc: tuple([f(x) for x in y]); scan with python3 ast.walk for GeneratorExp before shipping pyscript code
+- **Repro / verify:** `put tuple(int(x) for x in [1,2]) in a @service, reload, call it, see NotImplementedError in home-assistant.log (bedroom_autopilot night ramp crashed 4 nights straight this way)`
+- **Tags:** pyscript
+
+### 2026-07-07 — pyscript log.info never reaches home-assistant.log on this install
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** custom_components.pyscript.file.* INFO is below the effective logger threshold — only WARNING/ERROR land in the log, so all of bedroom_autopilot's designed diagnostics (override bails, mid-ramp exits) are invisible
+- **Fix:** for must-see diagnostics use log.warning or write a pyscript state entity (state.set) and read it via API
+- **Repro / verify:** `call a @service that does log.info('MARKER ...'); grep MARKER home-assistant.log -> nothing; same via state.set -> visible`
+- **Tags:** pyscript
