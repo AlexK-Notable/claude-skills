@@ -253,3 +253,11 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Fix:** for must-see diagnostics use log.warning or write a pyscript state entity (state.set) and read it via API
 - **Repro / verify:** `call a @service that does log.info('MARKER ...'); grep MARKER home-assistant.log -> nothing; same via state.set -> visible`
 - **Tags:** pyscript
+
+### 2026-07-08 — Govee 'Tree Floor Lamp' (member of light.bedroom_lights) flares bright then settles on each night-downramp step; exposes stale phantom segment sub-entities
+- **Status:** unverified  ⚠ re-check before acting
+- **HA version:** 2026.5.4
+- **Cause:** LEADING HYPOTHESIS (unconfirmed): the ramp sends one light.turn_on with rgb_color+brightness_pct+transition:2 every 60s; the Govee applies the color at its prior brightness first, then drops brightness, so each step briefly brightens before dimming. Only surfaced 2026-07-07 — first night the downramp reached the group (prior 4 nights it crashed at step 1). Separately, light.tree_floor_lamp_segment_001/002/003 report 255/white but last_changed 2026-07-03 — stale phantom entities the integration no longer syncs; NOT the live driver (parent + physical LEDs correctly followed the ramp to red@1%).
+- **Fix:** TODO tomorrow, test off-hours: try brightness-before-color as two ordered calls, or drop transition for Govee members, or split the tree lamp out of the group ramp. Night hold sends no commands so it stays put after 22:00 — flares are winddown-window only.
+- **Repro / verify:** `watch light.tree_floor_lamp physically during a 20:30-22:00 downramp; compare parent last_updated (tracks ramp) vs segment_00x last_changed (frozen 2026-07-03)`
+- **Tags:** govee, lighting
