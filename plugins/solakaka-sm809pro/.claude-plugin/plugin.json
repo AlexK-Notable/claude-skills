@@ -1,0 +1,17 @@
+{
+  "name": "solakaka-sm809pro",
+  "version": "1.0.0",
+  "description": "Configure the Solakaka SM809Pro gaming mouse (Yuandaxin/Elan 04f3:026e wired / 04f3:026f 2.4G) on Linux — HID/udev permissions, decoding & editing the WebHID configurator's Onboard_Config.json (button remaps, DPI, lighting, sensor tuning), the 3-byte action-code convention, and direct hidraw feature-report access to onboard memory. Ships the sm809-codec CLI.",
+  "author": {
+    "name": "Alex Kechichian",
+    "email": "alexkechichian1@gmail.com",
+    "url": "https://github.com/AlexK-Notable"
+  },
+  "homepage": "https://github.com/AlexK-Notable/claude-skills",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AlexK-Notable/claude-skills.git"
+  },
+  "license": "MIT",
+  "keywords": ["mouse", "sm809pro", "solakaka", "yuandaxin", "elan", "hidraw", "webhid", "udev", "uaccess", "gaming-mouse", "keybindings", "wow"]
+}

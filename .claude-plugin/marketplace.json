@@ -63,6 +63,12 @@
       "source": "./plugins/wow-addon-management",
       "description": "Manage World of Warcraft retail addons on Linux — GitHub-release + CurseForge downloads with a Firecrawl reconciliation guard, relative-symlink management, library fetching, BugGrabber analysis, and gamescope display setup. Drives the tooling in ~/repos/WoW.",
       "version": "1.0.0"
+    },
+    {
+      "name": "solakaka-sm809pro",
+      "source": "./plugins/solakaka-sm809pro",
+      "description": "Configure the Solakaka SM809Pro gaming mouse (Yuandaxin/Elan) on Linux — HID/udev access, decode/edit the WebHID Onboard_Config.json (buttons, DPI, lighting, sensor tuning), the 3-byte action-code convention, and direct hidraw onboard access. Ships sm809-codec.",
+      "version": "1.0.0"
     }
   ]
 }

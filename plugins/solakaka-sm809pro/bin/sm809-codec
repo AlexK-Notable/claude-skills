@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+"""
+sm809-codec — decode/encode Solakaka SM809Pro (Yuandaxin/Elan 04f3) button byte-codes.
+
+The web configurator (driver.yuandaxin-tech.com) stores each button action as a
+3-byte code [TYPE, P1, P2]. This tool converts between human labels and those bytes,
+and can decode a whole exported Onboard_Config.json.
+
+Usage:
+    sm809-codec decode <Onboard_Config.json>     # pretty-print every button
+    sm809-codec key <spec>                        # e.g. "7"  "Ctrl+C"  "F5"  "["
+    sm809-codec explain 0x70 0x00 0x24            # decode a raw triplet
+
+Sourced from the app bundle (index-*.js): HID Keyboard usage page 0x07,
+modifier bitmap, and the vendor's TYPE prefixes.
+"""
+import sys, json
+
+# --- HID Keyboard/Keypad usage page 0x07 (name -> usage id) --------------------
+KB = {**{c: 4+i for i, c in enumerate("abcdefghijklmnopqrstuvwxyz")},
+      **{str((i+1) % 10): 30+i for i in range(10)},  # 1..9 =30..38, 0=39
+      "enter":40, "esc":41, "escape":41, "backspace":42, "tab":43, "space":44, " ":44,
+      "-":45, "=":46, "[":47, "]":48, "\\":49, ";":51, "'":52, "`":53,
+      ",":54, ".":55, "/":56, "capslock":57,
+      **{f"f{i}": 57+i for i in range(1, 13)},                    # F1..F12 =58..69
+      "printscreen":70, "scrolllock":71, "pause":72, "insert":73, "home":74,
+      "pageup":75, "delete":76, "end":77, "pagedown":78,
+      "right":79, "left":80, "down":81, "up":82, "numlock":83}
+KB_REV = {v: k for k, v in KB.items()}
+
+# --- modifier bitmap (keyboard TYPE, byte1) ------------------------------------
+MODS = {"ctrl":0x01, "control":0x01, "shift":0x02, "alt":0x04,
+        "win":0x08, "meta":0x08, "gui":0x08, "cmd":0x08,
+        "rctrl":0x10, "rshift":0x20, "ralt":0x40, "rwin":0x80}
+MOD_NAMES = [(0x01,"Ctrl"),(0x02,"Shift"),(0x04,"Alt"),(0x08,"Win"),
+             (0x10,"RCtrl"),(0x20,"RShift"),(0x40,"RAlt"),(0x80,"RWin")]
+
+MOUSE_BTN = {0x01:"Left", 0x02:"Right", 0x04:"Middle", 0x08:"Back(btn4)", 0x10:"Forward(btn5)"}
+DPI_SUB   = {0x01:"DPI Cycle", 0x02:"DPI +", 0x03:"DPI -"}
+CONSUMER  = {0x0194:"My Computer"}          # extend as discovered
+
+def encode(spec: str):
+    """Return [TYPE,P1,P2] hex-string list for a human spec."""
+    parts = [p.strip() for p in spec.split("+")]
+    mod = 0
+    key = parts[-1]
+    for p in parts[:-1]:
+        if p.lower() not in MODS:
+            raise ValueError(f"unknown modifier: {p}")
+        mod |= MODS[p.lower()]
+    kl = key.lower()
+    # mouse buttons
+    mouse = {"leftclick":0x01,"rightclick":0x02,"middleclick":0x04,"back":0x08,"forward":0x10}
+    if kl in mouse:
+        return _hex([0x10, mouse[kl], 0x00])
+    if kl in ("dpicycle","dpiloop"): return _hex([0x40,0x01,0x00])
+    if kl in ("dpiplus","dpi+"):     return _hex([0x40,0x02,0x00])
+    if kl in ("dpiminus","dpi-"):    return _hex([0x40,0x03,0x00])
+    # keyboard
+    if key in KB:  usage = KB[key]
+    elif kl in KB: usage = KB[kl]
+    else: raise ValueError(f"unknown key: {key}")
+    return _hex([0x70, mod, usage])
+
+def _hex(b): return [f"0x{x:02x}" for x in b]
+
+def explain(code):
+    b = [int(x, 16) if isinstance(x, str) else x for x in code]
+    t = b[0]
+    if t == 0x10: return f"MOUSE  {MOUSE_BTN.get(b[1], hex(b[1]))}"
+    if t == 0x30: return f"FIRE   left-click, interval={b[1]}, count={b[2]}{' (hold=continuous)' if b[2]==0 else ''}"
+    if t == 0x40: return f"DPI    {DPI_SUB.get(b[1], 'sub '+hex(b[1]))}"
+    if t == 0x70:
+        m = "+".join(n for bit, n in MOD_NAMES if b[1] & bit)
+        k = KB_REV.get(b[2], f"usage 0x{b[2]:02x}")
+        return f"KEY    {(m+'+' if m else '')}{k}"
+    if t == 0x80:
+        usage = b[1] | (b[2] << 8)
+        return f"MEDIA  {CONSUMER.get(usage, f'consumer usage 0x{usage:04x}')}"
+    return f"?      {code}"
+
+def decode_file(path):
+    cfg = json.load(open(path))
+    print(f"{'btn':>4}  {'id':>4}  {'enabled':>7}  {'label':<22} {'code':<20} decoded")
+    print("-" * 92)
+    for k in sorted(cfg["keys"], key=lambda x: int(x[6:])):
+        v = cfg["keys"][k]; ck = v["currentKey"]
+        label = v.get("name") or v.get("nameKey", "").replace("mouse.labels.", "")
+        code = "[" + " ".join(ck["code"]) + "]"
+        print(f"{k[6:]:>4}  {ck['id']:>4}  {str(v['enabled']):>7}  {label:<22} {code:<20} {explain(ck['code'])}")
+
+def main():
+    if len(sys.argv) < 2:
+        print(__doc__); sys.exit(1)
+    cmd = sys.argv[1]
+    if cmd == "decode":
+        decode_file(sys.argv[2])
+    elif cmd == "key":
+        print(" ".join(encode(sys.argv[2])))
+    elif cmd == "explain":
+        print(explain(sys.argv[2:]))
+    else:
+        print(__doc__); sys.exit(1)
+
+if __name__ == "__main__":
+    main()

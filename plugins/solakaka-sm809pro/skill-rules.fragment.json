@@ -1,0 +1,51 @@
+{
+  "solakaka-sm809pro": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "high",
+    "description": "Configuring the Solakaka SM809Pro gaming mouse on Linux (udev/HID access, button remaps, DPI/lighting/sensor settings, onboard-memory protocol)",
+    "promptTriggers": {
+      "keywords": [
+        "sm809",
+        "sm809pro",
+        "solakaka",
+        "yuandaxin",
+        "onboard config",
+        "onboard_config",
+        "mouse config",
+        "mouse configurator",
+        "mouse keybind",
+        "mouse binding",
+        "remap mouse",
+        "dpi stage",
+        "lift off distance",
+        "angle snap",
+        "motion sync",
+        "ripple control",
+        "hidraw",
+        "webhid",
+        "mouse firmware"
+      ],
+      "intentPatterns": [
+        "(config|configure|remap|rebind|bind).*?(mouse|sm809|side button)",
+        "(mouse|sm809).*?(button|dpi|lighting|rgb|polling|lift.?off|macro)",
+        "(udev|uaccess|hidraw|permission).*?(mouse|hid|device)",
+        "(decode|encode|edit).*?(onboard.?config|mouse.*?json)",
+        "(sm809|solakaka|yuandaxin).*?"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [
+        "**/Onboard_Config*.json",
+        "**/*SM809*",
+        "**/*sm809*"
+      ],
+      "contentPatterns": [
+        "mouse\\.labels\\.",
+        "\"sensorType\"",
+        "currentKey.*code.*0x70",
+        "driver\\.yuandaxin-tech\\.com"
+      ]
+    }
+  }
+}
