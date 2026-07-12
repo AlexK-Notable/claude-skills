@@ -1,0 +1,49 @@
+# self-learn.toml — host: nsys-marketplace   (merged OVER self-learn.defaults.toml; host wins)
+#
+# deploy = `claude plugin install` -> frozen cache copy; repo edits NOT live, so ALL writable
+#   state is external. Only host facts + overrides here; module policy is inherited from
+#   defaults. Interpolation/validator rules: see the defaults header.
+
+[host]
+host_id        = "nsys-marketplace"
+repo_root      = "${CLAUDE_PLUGIN_ROOT}"               # literal; the harness resolves it from env at runtime
+runtime_root   = "${CLAUDE_PLUGIN_ROOT}"
+deploy_model   = "cache-copy"                          # a HINT only; the runtime capability-probe verifies the
+                                                       #   store is reachable from the resolved runtime root (else disables)
+state_dir      = "${HOME}/.cache/nsys-marketplace/self-learn"   # matches existing ~/.cache/nsys marker root
+skill_glob     = "skills/*/"                           # dir == skill (per context-discovery.sh); not all
+                                                       #   dirs have a SKILL.md (e.g. docmill-assistance)
+skill_captures = ["skill"]                             # single wildcard; the `skill` capture is the per-skill key
+commands_dir   = "commands"
+agents_dir     = "agents"
+exclude        = ["**/_archived/**"]                   # fnmatch `**`; applies to skill_glob + commands/agents (e.g. commands/_archived/)
+# v1 stores SKILL-scoped directives only; command/agent/global directive homes are v2.
+
+# [skills].in_scope inherits the default ["*"]
+
+[store]
+backend = "znote"               # host-native idiom = znote-mcp (already in .mcp.json)
+
+  [store.znote]
+  project      = "self-learn"          # znote project partition
+  embeddings   = false                 # OFF by default (ZNOTE_EMBEDDINGS_ENABLED unset); dedup degrades
+                                       #   to FTS5/lexical — may admit near-dups semantic matching would merge
+  mcp_server   = "znote-mcp"           # reuse host's registered server — no new registration
+  partition_by = "tag"                 # per-skill scoping (parallels flat's path_template)
+  tag_template = "skill:{skill}"       # {skill} from skill_captures — symmetric addressing with the flat backend
+  history      = "layered"             # create-only + status:superseded + refines-link over a mutating store;
+                                       #   znote's own git recovers history
+
+[capture]
+worker = "sdk"                  # no detached claude -p exists here; SDK worker (adapter-owned)
+
+  [capture.sdk]
+  allowed_tools = ["Read", "Grep"]     # the SDK manages auth + the agent loop
+
+[inject]
+hook_registration = "hooks.json"
+auto_register     = true        # emit/merge a declarative hooks.json block (no settings.json edit)
+hook_cmd_root     = "${CLAUDE_PLUGIN_ROOT}"   # literal: emitted hooks.json command uses CC's plugin-root substitution
+
+[inspector]
+expose_slash_command = true     # nsys has a command system (/znote:*) -> also expose `/self-learn`

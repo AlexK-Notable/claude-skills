@@ -1,0 +1,59 @@
+# self-learn.toml — host: claude-skills   (merged OVER self-learn.defaults.toml; host wins)
+#
+# deploy = live symlink into ~/.claude/; repo edits are live, and directives written in-repo
+#   are version-controlled + autosynced. Only host facts + deliberate overrides appear here;
+#   module policy (markers, models, autonomy, safety, inject event/mode, schema_version) is
+#   inherited from defaults. Interpolation/validator rules: see the defaults header.
+
+[host]
+host_id        = "claude-skills"
+repo_root      = "/home/komi/repos/claude-skills"      # glob source root
+runtime_root   = "${HOME}/.claude"                     # loader-expanded base the CLI resolves paths against
+deploy_model   = "symlink"                             # a HINT only; the runtime capability-probe verifies a
+                                                       #   writable+durable+isolated store (else degrades to disabled)
+state_dir      = "${HOME}/.cache/claude-skills/self-learn"   # transient ONLY: markers + locks
+skill_glob     = "plugins/*/skills/*/"                 # dir == skill; SKILL.md read if present
+skill_captures = ["plugin", "skill"]                   # names the wildcards L->R; the `skill` capture is
+                                                       #   the per-skill key (used in in_scope / skill_overrides)
+commands_dir   = ""                                    # none
+agents_dir     = ""                                    # none at repo level (one skill bundles its own)
+exclude        = []                                    # fnmatch `**`; applies to skill_glob + commands/agents
+# v1 stores SKILL-scoped directives only; command/agent/global directive homes are v2.
+
+[skills]
+in_scope = ["home-assistant", "home-network", "hypr-doctor"]   # overrides the default ["*"]
+
+[skill_overrides.home-assistant]
+# normalized from plugins/home-assistant/skills/home-assistant/SKILL.md:111-114
+#   (markdown `**` and leading articles stripped — NOT a verbatim copy)
+capture_checklist = [
+  "version-specific behavior change in HA or an integration",
+  "undocumented service/entity quirk you had to discover",
+  "place where documented behavior was wrong",
+  "integration gotcha (auth dance, env reload, a setting that fights another)",
+]
+
+[store]
+backend = "flat"                # host-native idiom = ha-note flat journals
+
+  [store.flat]
+  location      = "in-repo"     # consequence of deploy_model=symlink: version-controlled + autosynced
+  path_template = "plugins/{plugin}/skills/{skill}/.self-learn/directives.md"   # tokens ⊆ skill_captures
+  format        = "md+frontmatter"   # allowed: md+frontmatter (future: znote-note) — znote-migration parity
+  history       = "native"           # true append: per-file flock + companion revisions (ha-note model)
+
+[capture]
+worker = "claude_p"             # reuse home-net-capture's detached `setsid claude -p`
+                                #   (value = TOML-bare-key spelling so it matches [capture.claude_p])
+
+  [capture.claude_p]
+  claude_bin   = "claude"
+  worker_tools = ["Read", "Grep"]
+  git_lock     = "/tmp/claude-skills-git.lock"   # EXISTING autosync git mutex (home-net-capture:219);
+                                                 #   flat writes themselves are atomic via per-file flock
+
+[inject]
+hook_registration = "settings.json"
+auto_register     = false       # DOCTRINE: never auto-edit settings.json — emit snippet + instruct
+hook_cmd_root     = "$HOME/.claude"   # LITERAL (bare $HOME): emitted snippet matches the host's existing
+                                      #   settings.json hook style, shell-expanded by Claude Code at run time
