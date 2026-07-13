@@ -7,6 +7,15 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO"
 
+# self-learn autosync-pause sentinel (docs/specs/self-learn 02 §3 / 08 T12):
+# while a review/apply flow holds the sentinel (mtime < 2 h), skip sync
+# entirely — exit 0, commit nothing. Stale sentinels are ignored.
+SELF_LEARN_SENTINEL="${XDG_CACHE_HOME:-$HOME/.cache}/claude-skills/self-learn/autosync-pause"
+if [ -f "$SELF_LEARN_SENTINEL" ] && [ -n "$(find "$SELF_LEARN_SENTINEL" -mmin -120 2>/dev/null)" ]; then
+  echo "claude-skills-sync: paused by self-learn sentinel ($SELF_LEARN_SENTINEL)" >&2
+  exit 0
+fi
+
 note() { command -v notify-send >/dev/null && notify-send "claude-skills sync" "$1" || echo "$1" >&2; }
 
 # Nothing to commit? just keep up with the remote and exit (no loop).
