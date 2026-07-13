@@ -1,0 +1,75 @@
+# self-learn.defaults.toml — module-shipped DEFAULTS.
+#
+# A host's self-learn.toml is merged OVER these (host wins on any conflict). This is the
+# single home for MODULE POLICY that's constant across hosts; a host manifest states only
+# its host facts + deliberate overrides. (Fixes the prior ~50% duplication between manifests.)
+#
+# Interpolation (governs values inside ANY self-learn TOML):
+#   ${HOME}                → loader-expanded (the loader knows it).
+#   ${CLAUDE_PLUGIN_ROOT}  → passed through literally; resolved by Claude Code at runtime.
+#   bare $VAR              → passed through literally; resolved later by the shell.
+#   ~                      → NOT expanded.
+#   Emitted hook-command snippets follow the host's native style via [inject].hook_cmd_root,
+#   which is intentionally a literal (not loader-expanded) so it lands in the host's hook file
+#   in shell/Claude-Code form. (This is the loader-scope vs emitted-snippet-scope split.)
+#
+# A pydantic/JSON-Schema validator ships with the module and enforces the discriminated
+# unions ([store.<backend>] and [capture.<worker>]): required-per-variant fields, no
+# cross-variant fields, and a sub-table that matches the discriminator.
+#
+# Merge: a host table DEEP-MERGES key-by-key onto these defaults; scalars AND lists are
+#   REPLACED wholesale by the host (no list append/subtract in v1 — to drop a default,
+#   shadow the whole key).
+# Safety keys ([safety].*) are MONOTONIC: a host may override them only in the STRICTER
+#   direction. The validator knows each key's polarity (source_trust may only narrow;
+#   approve_before_first_use / quarantine_on_recurrence may only go true; injection_cap may
+#   only go lower) and rejects a loosening override. Defaults set the weakest SAFE value.
+# Discriminator spelling: the sub-table key equals the discriminator value verbatim, so
+#   discriminator values use TOML-bare-key spelling — e.g. worker = "claude_p" -> [capture.claude_p].
+# Captures: skill_captures MUST include `skill` (the per-skill key). A flat backend's
+#   path_template tokens must equal skill_captures (it reconstructs the full path); a znote
+#   backend's tag_template needs only {skill}. `history` values are per-backend:
+#   flat -> "native", znote -> "layered".
+
+schema_version = 1   # validator rejects an unknown major; additive fields are minor/back-compatible
+
+[skills]
+in_scope = ["*"]     # default: every discovered skill; a host narrows this
+
+[capture]            # proposer != verifier
+event          = "SessionEnd"   # lifecycle hook that drives capture (cf. [inject].event)
+markers        = ["correction", "teaching", "reversal", "error-then-fix"]
+worker_model   = "claude-haiku-4-5"   # proposer (cheap gate + classify)
+verifier_model = "claude-opus-4-8"    # verifier
+
+[inject]             # Level-B consumption mechanism
+event = "SessionStart"
+mode  = "stdout"     # SessionStart stdout -> additionalContext
+
+[retrieval]          # consult-time: which directives the inject hook picks, within injection_cap
+strategy = "recency_x_confidence"   # top-K rank; semantic relevance added when store.embeddings=true,
+                                    #   else lexical/recency-only (an accepted v1 limitation)
+# ranks over directive fields: confidence, last_used/created timestamps, topic (see schema)
+
+[autonomy]
+visibility  = "quiet"      # append + one transcript line
+promotion   = "manual"     # a human approves promotion (and first use; see [safety])
+enforcement = "advisory"   # v1 = consulted only (block / modify-input / verify-output = v2)
+
+[safety]             # decided 2026-06-23 · keys are MONOTONIC (host may only TIGHTEN — see header)
+approve_before_first_use = true               # an AUTO-captured directive stays `pending` and influences
+                                              #   NO session until a human approves it once. (Explicit
+                                              #   `self-learn teach` = Tier-1: the invocation IS the approval,
+                                              #   so it lands active, skipping pending.)
+quarantine_on_recurrence = true               # if a correction recurs in an active directive's `topic`,
+                                              #   auto-quarantine it (damped: cooldown + cause + contested-topic
+                                              #   terminal state — see decisions E2.2)
+source_trust             = "user-correction-only"   # governs the AUTO (Tier-2) path: only direct-user-correction
+                                              #   text auto-captures; tool/file/web text is inert (Tier-3).
+                                              #   Heuristic, not a hard boundary — `self-learn teach` (Tier-1) is.
+injection_cap            = 25                 # per-SESSION total budget (NOT per-skill). The [retrieval]
+                                              #   top-K fills it across all in-scope skills, so more skills =
+                                              #   tighter competition, never a blow-up.
+
+[inspector]          # the `self-learn` CLI is always available; the slash command is opt-in per host
+expose_slash_command = false
