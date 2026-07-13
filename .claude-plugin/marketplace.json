@@ -57,6 +57,12 @@
       "source": "./plugins/agentic-engineering",
       "description": "Evidence-based guide to prompt, context, agent, and loop engineering for frontier LLM agents — theory plus orchestrator-worker, tool-design, and caching practice.",
       "version": "1.0.0"
+    },
+    {
+      "name": "self-learn",
+      "source": "./plugins/self-learn",
+      "description": "Capture, triage, and route durable session lessons into skills, CLAUDE.md, references, and hooks via a git-backed ledger — teach/review commands plus the self-learn CLI.",
+      "version": "0.1.0"
     }
   ]
 }

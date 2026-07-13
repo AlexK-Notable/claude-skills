@@ -3,6 +3,7 @@
 #
 # Deploys via LIVE SYMLINKS, not `claude plugin install` (see CLAUDE.md "Deployment model"):
 #   - ~/.claude/skills/<name>  -> plugins/<name>/skills/<name>      (skills load live)
+#   - ~/.claude/commands/<name> -> plugins/<name>/commands           (slash commands, colon-namespaced)
 #   - ~/bin/<script>           -> plugins/<name>/{scripts,bin}/<exe> (shell CLIs)
 #   - merges plugins/*/skill-rules.fragment.json -> ~/.claude/skills/skill-rules.json
 #   - bundles the activation hook into ~/.claude/hooks (live symlink)
@@ -13,6 +14,7 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILLS_DIR="$HOME/.claude/skills"
+COMMANDS_DIR="$HOME/.claude/commands"
 BIN_DIR="$HOME/bin"
 HOOKS_DIR="$HOME/.claude/hooks"
 SETTINGS="$HOME/.claude/settings.json"
@@ -37,13 +39,22 @@ link() { # $1=real src  $2=link path
 }
 
 command -v jq >/dev/null || { echo "jq required"; exit 1; }
-mkdir -p "$SKILLS_DIR" "$BIN_DIR" "$HOOKS_DIR" "$UNIT_DIR"
+mkdir -p "$SKILLS_DIR" "$COMMANDS_DIR" "$BIN_DIR" "$HOOKS_DIR" "$UNIT_DIR"
 PLUGINS="$(jq -r '.plugins[].name' "$REPO/.claude-plugin/marketplace.json")"
 
 say "== skills (live symlinks) =="
 for name in $PLUGINS; do
   skill="$REPO/plugins/$name/skills/$name"
   if [ -d "$skill" ]; then link "$skill" "$SKILLS_DIR/$name"; else say "  WARN  no skill dir for $name"; fi
+done
+
+say "== slash commands (live symlinks) =="
+# Each plugins/<p>/commands/ DIRECTORY -> ~/.claude/commands/<p>; subdirectory
+# namespacing yields /<p>:<command> names (08-build-plan §1 Command-deploy pin).
+# Side effect, accepted: also activates any other plugin's dormant commands/ dir.
+for name in $PLUGINS; do
+  cmds="$REPO/plugins/$name/commands"
+  if [ -d "$cmds" ]; then link "$cmds" "$COMMANDS_DIR/$name"; fi
 done
 
 say "== shell CLIs (~/bin) =="
