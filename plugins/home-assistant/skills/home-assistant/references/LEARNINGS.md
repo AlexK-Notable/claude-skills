@@ -64,3 +64,14 @@ this file is append-only.
 - **Fix:** For Govee brightness/ramp debugging use: docker logs --since <LOCAL ISO> --until <LOCAL ISO> govee2mqtt | grep 'Command for' (brightness vs color_temp commands) and the 'DeviceState { ... brightness: N }' poll lines. Treat HA history as on/off-only for these lights.
 - **Repro / verify:** `Pull light.smart_led_bulb HA history across a known morning ramp -> every on-state bri=None, attrs=['friendly_name']; same window in govee2mqtt shows brightness:1,3,4,5,7... climbing.`
 - **Tags:** govee
+
+## 2026-07-14 — lrn-926390e9
+
+**Fact:** HA Lovelace frontend auth != API auth: a long-lived token works for the REST API via the Authorization: Bearer header, but the frontend reads its session from localStorage key 'hassTokens', NOT the bearer header. A LLAT alone won't log a browser into the UI.
+
+**Context:** - **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** frontend uses home-assistant-js-websocket Auth, which loads saved tokens from localStorage.hassTokens (access_token + refresh_token + expires); LLATs are only accepted on API calls
+- **Fix:** inject localStorage.hassTokens = {access_token: <LLAT>, token_type: 'Bearer', hassUrl: <url>, clientId: null, expires: <far-future-ms>, expires_in: 1800, refresh_token: ''} on the HA origin, then reload. clientId:null + far-future expires => frontend uses access_token directly and never tries to refresh. Used to drive dashboards via Playwright.
+- **Repro / verify:** `navigate Playwright to http://192.168.1.232:8123 (redirects to /auth/authorize), set hassTokens in localStorage, reload -> lands authenticated on /home/overview`
+- **Tags:** frontend, auth
