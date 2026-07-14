@@ -53,3 +53,14 @@ this file is append-only.
 - **Fix:** Not fixable on the cloud path and not LAN-capable. Resolution: replace with Zigbee bulbs on ZHA (local, no cloud), then repoint the light.bedroom_lights HA group helper + dashboard per-bulb refs + Adaptive Lighting lights to the new entities. Until then, physical state is the only truth for these bulbs.
 - **Repro / verify:** `Set light.bedroom_lights to 10pct while already on -> physically dims and holds across AL refreshes. Cold OFF then turn_on brightness 1 -> bulbs stay physically OFF while cloud reports off. Morning ramp: govee log shows brightness 1..99 climbing and app shows ~1pct, but bulbs are physically ~100pct.`
 - **Tags:** govee
+
+## 2026-07-14 — lrn-60fc4560
+
+**Fact:** Govee (govee2mqtt) light brightness is NOT in the HA recorder — reconstruct ramps from the govee2mqtt container log, minding a timezone split
+
+**Context:** - **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** These Govee lights record only on/off to HA history; historical on-states carry attributes=['friendly_name'] only (no brightness/color_mode), so /api/history shows brightness=None throughout a ramp. The real per-command brightness lives in 'docker logs govee2mqtt' ({"state":"ON","brightness":N}). TZ TRAP: govee2mqtt log timestamps AND 'docker logs --since/--until' are LOCAL (America/Los_Angeles), but the HA /api/history JSON returns UTC — querying govee with a UTC time silently returns the wrong hour of data.
+- **Fix:** For Govee brightness/ramp debugging use: docker logs --since <LOCAL ISO> --until <LOCAL ISO> govee2mqtt | grep 'Command for' (brightness vs color_temp commands) and the 'DeviceState { ... brightness: N }' poll lines. Treat HA history as on/off-only for these lights.
+- **Repro / verify:** `Pull light.smart_led_bulb HA history across a known morning ramp -> every on-state bri=None, attrs=['friendly_name']; same window in govee2mqtt shows brightness:1,3,4,5,7... climbing.`
+- **Tags:** govee
