@@ -3,16 +3,19 @@ id: lrn-ce37b7ee
 type: knowledge
 scope: skill:home-assistant
 source: backlog
-status: pending
+status: routed
 created_at: '2026-07-14T04:19:30Z'
 sightings: 1
 evidence:
   - origin: GOTCHAS.journal.md#sha256:70207cfda93a
     note: journal entry dated 2026-06-15
-routing: null
+routing:
+  routed_at: '2026-07-14T07:23:17Z'
+  destination: reference
+  by: human
 supersedes: null
 superseded_by: null
-resolution_note: null
+resolution_note: overnight batch per user authorization 2026-07-14 (safe subset) — reference append, reversible
 ---
 
 ## Fact
