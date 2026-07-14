@@ -3,7 +3,7 @@ id: lrn-3e4c2df3
 type: knowledge
 scope: skill:home-assistant
 source: backlog
-status: pending
+status: deferred
 created_at: '2026-07-14T04:19:30Z'
 sightings: 1
 evidence:
@@ -12,6 +12,8 @@ routing: null
 supersedes: null
 superseded_by: null
 resolution_note: null
+deferred_until: '2026-08-13'
+deferred_count: 1
 ---
 
 ## Fact
