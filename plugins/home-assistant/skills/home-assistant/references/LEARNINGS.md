@@ -141,3 +141,14 @@ this file is append-only.
 - **Fix:** Diagnose: 'docker ps' (container Up), curl /api/ (API running), 'docker logs --since 5m | grep -iE DNS|Connection lost|moonraker down' shows the blip window; getent hosts on the Nova confirms DNS recovered. It self-heals in ~1-2 min (sensors return, e.g. print state back to 'printing'). The PRINT is unaffected — Klipper runs on the printer board independent of HA. Durable fix: move the Nova to wired ethernet (enP4p65s0) and optionally disable wlan0 so it can't flap.
 - **Repro / verify:** `Watch docker logs during a wifi blip: spotify 'Timeout while contacting DNS servers' + BrokenPipeError/ConnectionError + moonraker 'connection down, restarting', all clearing within ~2 min.`
 - **Tags:** network, nova
+
+## 2026-07-14 — lrn-889241d9
+
+**Fact:** pyscript log.info never reaches home-assistant.log on this install
+
+**Context:** - **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** custom_components.pyscript.file.* INFO is below the effective logger threshold — only WARNING/ERROR land in the log, so all of bedroom_autopilot's designed diagnostics (override bails, mid-ramp exits) are invisible
+- **Fix:** for must-see diagnostics use log.warning or write a pyscript state entity (state.set) and read it via API
+- **Repro / verify:** `call a @service that does log.info('MARKER ...'); grep MARKER home-assistant.log -> nothing; same via state.set -> visible`
+- **Tags:** pyscript
