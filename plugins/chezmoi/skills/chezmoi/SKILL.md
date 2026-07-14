@@ -115,3 +115,7 @@ The user does **not** currently have age encryption configured (`~/.config/chezm
 - App secret stores
 
 …suggest setting up encryption first — see [references/encryption.md](references/encryption.md). Encrypting after the fact requires re-adding the file.
+
+<!-- self-learn:begin (do not hand-edit inside; managed by self-learn) -->
+- **When about to run `chezmoi cd` in a non-interactive shell (Claude Code Bash tool, scripts, cron jobs):** never use `chezmoi cd` there — it spawns an interactive child shell and blocks until the command times out (observed: 2m Bash-tool timeout, exit 143). *(lrn-98d42215)*
+<!-- self-learn:end -->
