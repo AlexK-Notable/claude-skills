@@ -20,3 +20,14 @@ this file is append-only.
 - **Fix:** Set sleep_rgb_or_color_temp: rgb_color — AL 1.30.1 then lerps the post-sunset glide in RGB/HSV space with force_rgb_color=True (color_and_brightness.py ~line 357), bypassing the CCT floor; sleep_rgb_color becomes the real target
 - **Repro / verify:** `With color_temp mode: compare AL switch attrs (color_temp_kelvin 1105) vs the light's actual state (2168K, the bulb floor) late evening`
 - **Tags:** adaptive-lighting, zha
+
+## 2026-07-14 — lrn-10b03b00
+
+**Fact:** Removing a config entry is a REST DELETE, not a WS command
+
+**Context:** - **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** The WS API has config_entries/get but NO config_entries/remove (returns success:false, error code unknown_command). Deletion is what the UI's delete button calls: an HTTP DELETE.
+- **Fix:** DELETE /api/config/config_entries/entry/<entry_id> (e.g. ha_lib._req('DELETE', 'config/config_entries/entry/<id>')). Returns {require_restart: bool}; HA unloads the entry and removes its entities automatically — no .storage surgery, no restart for a clean unload. Used it to drop an orphan Adaptive Lighting instance ('Ada', no lights).
+- **Repro / verify:** `WS {"type":"config_entries/remove","entry_id":...} -> {success:false, error:{code:unknown_command}}; the REST DELETE on the same entry_id -> {require_restart:false}.`
+- **Tags:** api
