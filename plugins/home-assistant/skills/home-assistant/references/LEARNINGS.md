@@ -31,3 +31,14 @@ this file is append-only.
 - **Fix:** DELETE /api/config/config_entries/entry/<entry_id> (e.g. ha_lib._req('DELETE', 'config/config_entries/entry/<id>')). Returns {require_restart: bool}; HA unloads the entry and removes its entities automatically — no .storage surgery, no restart for a clean unload. Used it to drop an orphan Adaptive Lighting instance ('Ada', no lights).
 - **Repro / verify:** `WS {"type":"config_entries/remove","entry_id":...} -> {success:false, error:{code:unknown_command}}; the REST DELETE on the same entry_id -> {require_restart:false}.`
 - **Tags:** api
+
+## 2026-07-14 — lrn-2692005a
+
+**Fact:** ZHA (and other integration) *device* triggers fail check_config but load fine at runtime
+
+**Context:** - **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** check_config runs an offline sandbox that does NOT start integrations, so ZHA device-trigger validation can't resolve the gateway/device and errors: 'Device <id> has no config entry from domain zha' — the automation is disabled IN THE CHECK ONLY
+- **Fix:** Verify validity differently: confirm device is integration-bound (device_attr config_entries/identifiers) and that the trigger came from HA's own device_automation/trigger/list; then reload and confirm the automation entity is state=on at runtime
+- **Repro / verify:** `Add an automation with trigger: device / domain: zha / type: remote_button_short_press, run check_config -> ERROR; reload + GET states/automation.<x> -> on`
+- **Tags:** automations, zha, check_config
