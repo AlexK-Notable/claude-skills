@@ -75,3 +75,14 @@ this file is append-only.
 - **Fix:** inject localStorage.hassTokens = {access_token: <LLAT>, token_type: 'Bearer', hassUrl: <url>, clientId: null, expires: <far-future-ms>, expires_in: 1800, refresh_token: ''} on the HA origin, then reload. clientId:null + far-future expires => frontend uses access_token directly and never tries to refresh. Used to drive dashboards via Playwright.
 - **Repro / verify:** `navigate Playwright to http://192.168.1.232:8123 (redirects to /auth/authorize), set hassTokens in localStorage, reload -> lands authenticated on /home/overview`
 - **Tags:** frontend, auth
+
+## 2026-07-14 — lrn-4c961d32
+
+**Fact:** pyscript @time_trigger('startup') fires on EVERY reload, not just HA boot
+
+**Context:** - **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** pyscript.reload and homeassistant.reload_all re-run the module and re-fire the startup trigger. bedroom_ramps' startup handler blindly called _al_color_mode(), so every reload at night re-armed Adaptive Lighting colour and overrode the red wind-down with ~2000K warm white; with adapt_color left on, AL then reverted any manual red each 90s interval.
+- **Fix:** startup handler must reconcile to the CURRENT time-of-day state, not blindly arm AL colour. Refactored: _resync_to_now() (night -> _apply_night red) is now shared by both the master OFF->ON state trigger and the startup trigger. A reload/restart at night now keeps red.
+- **Repro / verify:** `Run homeassistant.reload_all (or pyscript.reload) after 22:00 with master ON -> bedroom flips red->warm white; the reload's startup is the trigger.`
+- **Tags:** pyscript
