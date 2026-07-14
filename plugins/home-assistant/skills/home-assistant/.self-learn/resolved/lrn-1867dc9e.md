@@ -3,7 +3,7 @@ id: lrn-1867dc9e
 type: knowledge
 scope: skill:home-assistant
 source: backlog
-status: pending
+status: superseded
 created_at: '2026-07-14T04:19:30Z'
 sightings: 1
 evidence:
@@ -11,7 +11,7 @@ evidence:
     note: journal entry dated 2026-06-02
 routing: null
 supersedes: null
-superseded_by: null
+superseded_by: canon
 resolution_note: null
 ---
 
