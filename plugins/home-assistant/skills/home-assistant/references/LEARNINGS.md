@@ -86,3 +86,14 @@ this file is append-only.
 - **Fix:** startup handler must reconcile to the CURRENT time-of-day state, not blindly arm AL colour. Refactored: _resync_to_now() (night -> _apply_night red) is now shared by both the master OFF->ON state trigger and the startup trigger. A reload/restart at night now keeps red.
 - **Repro / verify:** `Run homeassistant.reload_all (or pyscript.reload) after 22:00 with master ON -> bedroom flips red->warm white; the reload's startup is the trigger.`
 - **Tags:** pyscript
+
+## 2026-07-14 — lrn-d1723a48
+
+**Fact:** pyscript cannot evaluate generator expressions — runtime crash, not load error
+
+**Context:** - **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** pyscript's AST interpreter has no ast.GeneratorExp handler; tuple(f(x) for x in y) parses fine at (re)load and only raises NotImplementedError 'not implemented ast ast_generatorexp' when the line first executes — a path that looks deployed can be dead for days
+- **Fix:** use list comprehensions inside tuple()/any()/etc: tuple([f(x) for x in y]); scan with python3 ast.walk for GeneratorExp before shipping pyscript code
+- **Repro / verify:** `put tuple(int(x) for x in [1,2]) in a @service, reload, call it, see NotImplementedError in home-assistant.log (bedroom_autopilot night ramp crashed 4 nights straight this way)`
+- **Tags:** pyscript
