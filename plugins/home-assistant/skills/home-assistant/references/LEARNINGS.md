@@ -119,3 +119,14 @@ this file is append-only.
 - **Fix:** Treat exit code 0 as the verdict; confirm the automation entities are loaded/on in the live instance instead
 - **Repro / verify:** `check_config on a config with SNZB-01P device triggers: 2 ERROR lines, exit 0, automations work live`
 - **Tags:** config-validation, zha
+
+## 2026-07-14 — lrn-a103d52a
+
+**Fact:** custom_sentences wildcard slots need a lists: declaration per file; check_config does not validate custom_sentences
+
+**Context:** - **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** hassil resolves {item} as a slot-list reference; builtin intents declare their own lists, custom files do not inherit them. A MissingListError then breaks ALL local intent recognition at runtime while check_config still exits 0
+- **Fix:** add 'lists: {item: {wildcard: true}}' to the custom_sentences yaml; verify with the conversation/agent/homeassistant/debug WS command after conversation.reload
+- **Repro / verify:** `add a custom sentence using {item} without lists:, conversation.reload, then any non-trigger utterance -> hassil.errors.MissingListError in the log`
+- **Tags:** assist, custom-sentences
