@@ -108,3 +108,14 @@ this file is append-only.
 - **Fix:** Turn OFF the AL MASTER switch (switch.<name>_adaptive_lighting_<name>) — disables intercept + all adaptation — then set the colour; it sticks. Verified: sub-switches off alone failed; master off + rgb red held across all 6 members. The morning routine re-enables the master, so this self-heals.
 - **Repro / verify:** `adapt_color off + light.turn_on rgb_color:[255,0,0] -> reads back color_temp warm; AL master off + same -> reads back rgb red.`
 - **Tags:** adaptive_lighting
+
+## 2026-07-14 — lrn-6b53a403
+
+**Fact:** HA check_config prints ERROR for ZHA device-trigger automations but exits 0 — false positive, do not 'fix'
+
+**Context:** - **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** check_config runs in an isolated context without the live device registry, so device_id triggers from domain zha fail to resolve there; the running instance loads the same automations fine
+- **Fix:** Treat exit code 0 as the verdict; confirm the automation entities are loaded/on in the live instance instead
+- **Repro / verify:** `check_config on a config with SNZB-01P device triggers: 2 ERROR lines, exit 0, automations work live`
+- **Tags:** config-validation, zha
