@@ -1,0 +1,38 @@
+destination: skill-md
+alternates: []
+rationale: >-
+  Textbook behavior/surface-rule per the routing map — a triage-order fix
+  scoped entirely to this skill's own audit workflow, no judgment call
+  needed to recognize the moment (a literal log-line match). skill-md is
+  already the narrowest surface that fires at every hypr-doctor invocation;
+  reference would under-load it since this must be known before diagnosis
+  starts, not looked up mid-triage.
+already_canon: false
+model: claude-sonnet-5
+analyzed_at: 2026-07-15T18:23:00Z
+card:
+  headline: >-
+    safe-update's own log lied about success three separate times (2026-07-05
+    and twice on 2026-07-15) — it prints "the rest still upgraded" on a
+    hard transaction abort, so triage kept diagnosing what a nonexistent
+    partial update broke instead of noticing nothing had been installed at
+    all.
+  provenance: "2026-07-15, post-update triage session (safe-update log misread)"
+  impact: >-
+    Keep: next time hypr-doctor triage starts and the safe-update log ends
+    with "paru exited 1 — a package may have failed to build; the rest
+    still upgraded", the skill will treat that as step zero — check for
+    "Errors occurred, no packages were upgraded" in the same log or a
+    "transaction started" line in `/var/log/pacman.log` — before diagnosing
+    anything as update-caused. Decline: the false "still upgraded" message
+    will keep masking full-abort failures as partial ones, and this exact
+    misdiagnosis already cost three separate triage sessions across two
+    weeks.
+  discuss: >-
+    Nothing contentious — this is a narrow, mechanically-verified step-zero
+    check with no judgment call and no reasonable competing destination.
+    One filing note: `generality: environment-specific` (it names this
+    machine's exact safe-update wrapper wording), so if that script is ever
+    rewritten to report exit status correctly, this rule becomes dead
+    weight and should be retired rather than left stale in skill-md.
+record_sha: sha256:1201432f0801
