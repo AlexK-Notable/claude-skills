@@ -104,3 +104,7 @@ Rule of thumb: **worktree → test → merge for projects; autosync for touch-up
 - **Scripts:** no file extension, shebang'd; `install.sh` symlinks them to `~/bin` (the user's `~/bin` scripts policy).
 - **No secrets in any tracked file** — the repo is private but cloned across machines, so a committed secret is a permanent leak. Route credentials through the `bitwarden-cli` skill.
 - **Don't `claude plugin install` on this machine** (see Deployment model).
+
+<!-- self-learn:begin (do not hand-edit inside; managed by self-learn) -->
+- **When about to sandbox-copy a uv Python project (cp -r, rsync) to run mutation tests, kill checks, or any experiment against the copy:** delete the copied venv first (rm -rf <copy>/.venv) and re-sync in the copy — the copied venv's editable install still points at the ORIGINAL source tree, so anything run inside the copy silently executes the original's code and every mutation appears to change nothing *(lrn-25968266)*
+<!-- self-learn:end -->
