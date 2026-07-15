@@ -188,3 +188,7 @@ into [recovery-playbook.md](references/recovery-playbook.md) over time, via
 a background `claude -p` agent invoked at the end of each meaningful repair
 session. Not implemented today; the playbook is hand-curated for now.
 Add this when the recurring patterns become tedious to re-recognize.
+
+<!-- self-learn:begin (do not hand-edit inside; managed by self-learn) -->
+- **When safe-update/paru/pacman -Syu fails with 'error: failed to commit transaction (conflicting files)' naming files under /usr/lib/node_modules/, or /var/log/pacman.log shows repeated 'starting full system upgrade' with no 'transaction started' after it:** A root 'npm install -g' wrote into pacman territory — npm self-updates in place, and files new to that npm version are unowned, colliding when the repo package catches up. Confirm the split-brain: pacman -Q npm vs "version" in /usr/lib/node_modules/npm/package.json. Fix (user runs): sudo rm -rf /usr/lib/node_modules/npm && sudo pacman -Syu — overwriting only the listed conflicts leaves hundreds of unowned strays (283 in the 2026-07 incident). Prevent: never sudo npm install -g on this machine; use npx or a user prefix *(lrn-6883f824)*
+<!-- self-learn:end -->
