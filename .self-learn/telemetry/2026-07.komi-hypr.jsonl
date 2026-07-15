@@ -5,3 +5,4 @@
 {"actor":"komi-hypr","kind":"surface-budget","nonce":"87cb74c7","overflow":false,"schema_version":1,"target":"claude-md","ts":"2026-07-15T22:53:49Z"}
 {"actor":"komi-hypr","kind":"capture","nonce":"5d8e909a","record":"lrn-d5f6b31b","schema_version":1,"scope":"user","source":"teach","ts":"2026-07-15T22:53:51Z"}
 {"actor":"komi-hypr","kind":"surface-budget","nonce":"99fa3ccd","overflow":true,"schema_version":1,"target":"skill-md","ts":"2026-07-15T22:53:54Z","words":211}
+{"actor":"komi-hypr","kind":"surface-budget","nonce":"395339fb","overflow":false,"schema_version":1,"target":"claude-md","ts":"2026-07-15T23:10:18Z","words":69}
