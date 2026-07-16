@@ -10,7 +10,8 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 export XDG_CACHE_HOME="$WORK/cache"
-SENTINEL_DIR="$XDG_CACHE_HOME/claude-skills/self-learn"
+# doc 13 §4.4: the sentinel is GLOBAL — ${XDG_CACHE_HOME}/self-learn/…
+SENTINEL_DIR="$XDG_CACHE_HOME/self-learn"
 mkdir -p "$SENTINEL_DIR"
 
 # Sandbox repo with the sync script installed at bin/, plus a bare remote.
