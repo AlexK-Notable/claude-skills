@@ -261,3 +261,11 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Fix:** TODO tomorrow, test off-hours: try brightness-before-color as two ordered calls, or drop transition for Govee members, or split the tree lamp out of the group ramp. Night hold sends no commands so it stays put after 22:00 — flares are winddown-window only.
 - **Repro / verify:** `watch light.tree_floor_lamp physically during a 20:30-22:00 downramp; compare parent last_updated (tracks ramp) vs segment_00x last_changed (frozen 2026-07-03)`
 - **Tags:** govee, lighting
+
+### 2026-07-17 — Adaptive Lighting main switch entity_id is switch.<name>_adaptive_lighting_<name>, not the documented switch.adaptive_lighting_<name>
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** On this install AL derives the MAIN switch entity_id from the instance friendly name; only the sub-switches (sleep_mode / adapt_color / adapt_brightness) use the documented switch.adaptive_lighting_<name>_adaptive_lighting_<sub>_<name> pattern
+- **Fix:** Add the YAML instance, restart HA, then read the real switch ids from the API (grep switch states for the name) before wiring automations — don't guess the main-switch id
+- **Repro / verify:** `adaptive_lighting: - name: hallway ; restart ; ha-api get states | grep adaptive_lighting_hallway -> main = switch.hallway_adaptive_lighting_hallway`
+- **Tags:** adaptive-lighting
