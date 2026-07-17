@@ -99,6 +99,13 @@ while IFS= read -r hk; do
 done < <(find "$REPO"/plugins/*/hooks -maxdepth 1 -type f -name '*.sh' 2>/dev/null || true)
 say "  (register each per-plugin hook in $SETTINGS with its event — see the plugin's README/SKILL)"
 
+say "== self-learn guard scripts (host canon — 13 §7.3 D1) =="
+# Project/user-scope guards compiled by self-learn land at hooks/self-learn/
+# (M3-7 as amended 2026-07-17): canon of THIS host, not part of any plugin.
+while IFS= read -r hk; do
+  [ -n "$hk" ] && [ -f "$hk" ] && link "$hk" "$HOOKS_DIR/$(basename "$hk")"
+done < <(find "$REPO"/hooks/self-learn -maxdepth 1 -type f -name '*.sh' 2>/dev/null || true)
+
 say "== autosync (systemd --user inotify watcher) =="
 command -v inotifywait >/dev/null || say "  NOTE: install 'inotify-tools' for the watcher to run"
 link "$REPO/systemd/claude-skills-autosync.service" "$UNIT_DIR/claude-skills-autosync.service"
