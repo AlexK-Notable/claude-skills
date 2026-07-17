@@ -20,6 +20,11 @@ bin/claude-skills-sync               autosync action (commit+push when the repo 
 bin/claude-skills-watch              inotify watcher that debounces and calls the sync
 systemd/                             user unit that runs the watcher
 hooks/skill-activation-prompt.*      the activation-suggestion hook, bundled for portability
+hooks/self-learn/                    COMPILED guard scripts (PreToolUse) routed by the self-learn
+                                     system — canon of THIS host, regenerated from its ledger; never
+                                     hand-edit. The self-learn PRODUCT (CLI/skill/specs) lives in its
+                                     own repo (AlexK-Notable/self-learn) since 2026-07-17; its ledger
+                                     is ~/.self-learn. install.sh sweeps this dir into ~/.claude/hooks/.
 docs/specs|plans/                    design history (how this repo came to be)
 ```
 
