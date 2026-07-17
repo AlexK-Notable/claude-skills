@@ -210,6 +210,38 @@ paru -Syua --rebuild              # rebuild all out-of-date AUR packages
 Don't auto-rebuild from this skill without user consent — AUR builds can be
 slow (e.g., webkit-gtk) and may require user attention for build prompts.
 
+## npm ↔ pacman split-brain (root `npm install -g` wrote into pacman territory)
+
+### Symptom
+- `safe-update`/`paru`/`pacman -Syu` fails with `error: failed to commit
+  transaction (conflicting files)` naming files under `/usr/lib/node_modules/`.
+- `/var/log/pacman.log` shows repeated `starting full system upgrade` lines
+  with no `transaction started` after them — updates have been silently
+  aborting, possibly for weeks.
+
+### Root cause
+A root `npm install -g` wrote into pacman-owned territory. npm self-updates
+in place, and files new to that npm version are unowned by any package —
+they collide when the repo's `npm` package catches up.
+
+### Confirm
+Compare the two version claims — a mismatch is the split-brain:
+```bash
+pacman -Q npm
+grep '"version"' /usr/lib/node_modules/npm/package.json
+```
+
+### Fix (user runs — needs root)
+```bash
+sudo rm -rf /usr/lib/node_modules/npm && sudo pacman -Syu
+```
+Overwriting only the *listed* conflicts (`--overwrite`) is the wrong move —
+it leaves hundreds of unowned strays behind (283 in the 2026-07 incident).
+
+### Prevent
+Never `sudo npm install -g` on this machine — use pacman/paru or a user
+prefix. (Enforced by the self-learn PreToolUse guard from lrn-dd9489b2.)
+
 ## When audit reports "everything healthy" but something is still broken
 
 The script's checks are necessarily a subset of what *can* break. If the
