@@ -833,6 +833,25 @@ def _prepare_hook_route(
             "never silent regeneration); re-review the proposal, then "
             f"`self-learn proposal validate {record.id}` restamps it"
         )
+    # m-5 defense-in-depth (review 2026-07-16, accepted follow-up):
+    # record_sha binds the RECORD, not the script bytes — a hand edit of
+    # the stamped script (or its hook block) after `proposal validate`
+    # would otherwise route bytes nobody re-generated. Generation is
+    # deterministic, so re-derive and compare.
+    from .ledger_ops import _generate_hook_script  # same module family
+
+    try:
+        rederived = _generate_hook_script(record, data)
+    except ProposalError as exc:
+        raise VerbError(str(exc)) from exc
+    if rederived != script:
+        raise VerbError(
+            f"stamped script for {record.id} does not match its "
+            "re-derived bytes — the proposal's script or hook block "
+            "changed after validation; re-review the hook block, then "
+            f"`self-learn proposal validate {record.id}` restamps it "
+            "(m-5: what routes is always what the generator produces)"
+        )
 
     spec = _resolve_hook_target(home, record, bucket_dir)
     _replay_hook_examples(script, data["examples"])
@@ -970,15 +989,139 @@ def _compile_set(home: Path, spec: TargetSpec) -> list[Record]:
         return _routed_to(
             _all_bucket_dirs(home), "claude-md", scope_pred=lambda s: s == "user"
         )
-    if spec.scope_kind == "project":
-        return _routed_to(
-            [spec.bucket_dir], "claude-md", scope_pred=lambda s: s == "project"
+    # project / skill-root claude-md: ONE file can serve BOTH roles — a
+    # repo registered as project host AND skills root (the shipped
+    # claude-skills shape). The compile set must be the UNION of every
+    # scope that resolves to this file, or each route of one scope
+    # ERASES the other scope's lines and recompile cannot restore them
+    # (adversarial review 2026-07-17 finding 3; latent since M1). A
+    # single-role host degenerates to exactly the old per-scope set.
+    host = spec.host_repo.resolve() if spec.host_repo is not None else None
+    records: list[Record] = []
+    seen: set[str] = set()
+    for bucket in discover_buckets(home):
+        if bucket.scope != "project":
+            continue
+        project = bucket_project_path(bucket.path)
+        if project is None or host is None:
+            continue
+        if Path(project).resolve() != host:
+            continue
+        for r in _routed_to(
+            [bucket.path], "claude-md", scope_pred=lambda s: s == "project"
+        ):
+            if r.id not in seen:
+                seen.add(r.id)
+                records.append(r)
+    hosts = load_hosts(home)
+    if (
+        hosts.skills_root is not None
+        and host is not None
+        and Path(hosts.skills_root).resolve() == host
+    ):
+        skill_dirs = [
+            b.path for b in discover_buckets(home) if b.scope == "skill"
+        ]
+        for r in _routed_to(
+            skill_dirs, "claude-md", scope_pred=lambda s: s.startswith("skill:")
+        ):
+            if r.id not in seen:
+                seen.add(r.id)
+                records.append(r)
+    return records
+
+
+@dataclass(frozen=True)
+class _Retirement:
+    """Pre-flighted host-side cleanup for a ROUTED record being retired
+    (standalone supersede, supersede-completion-at-route, graduate): the
+    doc target whose compiled entry must drop, or the hook script to
+    remove (M3-4). At most one of the two is set; both None means the
+    record has no host presence to clean (pending, reference-routed —
+    references are append-only)."""
+
+    spec: TargetSpec | None = None
+    removal: tuple[Path, Path, str] | None = None
+
+
+def _retirement_preflight(
+    home: Path,
+    record: Record,
+    bucket_dir: Path,
+    warnings: list[str],
+    *,
+    user_claude_md: Path | str | None = None,
+    chezmoi_bin: str = "chezmoi",
+) -> _Retirement:
+    """Resolve a retiring record's host-side cleanup BEFORE any commit
+    (doc 13 §4 step c — the standalone supersede verb has always done
+    this; route's ``teach --supersedes`` completion and graduate now
+    share it, closing the stale-line gap found live 2026-07-16: a
+    cross-surface supersede left the old advisory in canon with no
+    repair path). Raises (refusal, nothing committed) when the old
+    record's host is unsound."""
+    if record.status != "routed":
+        return _Retirement()
+    routing = record.routing or {}
+    destination = routing.get("destination")
+    if destination in ("skill-md", "claude-md", "new-skill"):
+        return _Retirement(
+            spec=_resolve_target(
+                home,
+                bucket_dir,
+                record.scope,
+                destination,
+                routing.get("new_skill") if destination == "new-skill" else None,
+                user_claude_md=user_claude_md,
+                chezmoi_bin=chezmoi_bin,
+            )
         )
-    # skill-root: every skill bucket's claude-md-routed records
-    skill_dirs = [b.path for b in discover_buckets(home) if b.scope == "skill"]
-    return _routed_to(
-        skill_dirs, "claude-md", scope_pred=lambda s: s.startswith("skill:")
-    )
+    if destination == "hook":
+        return _Retirement(
+            removal=_hook_script_location(home, record, warnings)
+        )
+    return _Retirement()
+
+
+def _retirement_host_phase(
+    home: Path,
+    retirement: _Retirement,
+    record_id: str,
+    *,
+    note: str | None,
+    chezmoi_bin: str,
+    message: str,
+    warnings: list[str],
+    post_notes: list[str],
+    skip_target: Path | None = None,
+    user_push: bool = True,
+) -> tuple[str | None, Path | None]:
+    """HOST phase of a retirement: recompile the doc target (the entry
+    drops — the ledger already committed the resolution) or ``git rm``
+    the hook script. ``skip_target`` short-circuits when the successor's
+    own compile just regenerated the same file (same-target supersede:
+    one compile is the whole story). Returns (host_sha, host_repo)."""
+    if retirement.spec is not None:
+        if skip_target is not None and retirement.spec.target == skip_target:
+            return None, None
+        _, host_sha = _host_phase(
+            home,
+            retirement.spec,
+            record_id,
+            routed_record=None,
+            note=note,
+            chezmoi_bin=chezmoi_bin,
+            message=message,
+            warnings=warnings,
+            user_push=user_push,
+        )
+        return host_sha, retirement.spec.host_repo
+    if retirement.removal is not None:
+        host_sha = _remove_hook_script(
+            home, retirement.removal, record_id, note, warnings, post_notes
+        )
+        return host_sha, retirement.removal[0]
+    return None, None
 
 
 def _apply_target(
@@ -988,6 +1131,7 @@ def _apply_target(
     *,
     chezmoi_bin: str = "chezmoi",
     message: str | None = None,
+    user_push: bool = True,
 ) -> tuple[object, list[Path]]:
     """HOST-phase compile (doc 13 §4 step e): write the target from the
     committed ledger state. Returns (compile_result, host paths to stage —
@@ -1021,6 +1165,7 @@ def _apply_target(
             _compile_set(home, spec),
             chezmoi=chezmoi_bin,
             commit_message=message,
+            push=user_push,
         )
         host_paths = []
     else:
@@ -1142,6 +1287,7 @@ def _host_phase(
     chezmoi_bin: str,
     message: str,
     warnings: list[str],
+    user_push: bool = True,
 ) -> tuple[object | None, str | None]:
     """Steps (e): compile + HOST commit under the sentinel hold. On ANY
     failure after the ledger commit: loud drift warning naming
@@ -1164,7 +1310,12 @@ def _host_phase(
     try:
         with lock:
             compile_result, host_paths = _apply_target(
-                home, spec, routed_record, chezmoi_bin=chezmoi_bin, message=message
+                home,
+                spec,
+                routed_record,
+                chezmoi_bin=chezmoi_bin,
+                message=message,
+                user_push=user_push,
             )
             host_sha = None
             if spec.host_repo is not None and host_paths:
@@ -1250,9 +1401,11 @@ def route(
     _scan_or_refuse([path], note)
     record = Record.from_path(path)
     old_id = record.supersedes
+    old_record: Record | None = None
     if old_id is not None:
         old_path = find_record_path(home, old_id)
         _scan_or_refuse([old_path], None)  # this verb rewrites it too (P2-7)
+        old_record = Record.from_path(old_path)
 
     losers: list[str] = []
     merge_path: Path | None = None
@@ -1289,6 +1442,23 @@ def route(
                 record.scope,
                 destination,
                 ref_name,
+                user_claude_md=user_claude_md,
+                chezmoi_bin=chezmoi_bin,
+            )
+
+        # teach --supersedes completion retires a possibly-ROUTED old
+        # record: its host-side cleanup (doc-target recompile / hook
+        # script removal) pre-flights HERE, same as the standalone
+        # supersede verb's step (c) — a refusal must land before any
+        # commit.
+        warnings: list[str] = []
+        old_retire: _Retirement | None = None
+        if old_record is not None:
+            old_retire = _retirement_preflight(
+                home,
+                old_record,
+                old_path.parent.parent,
+                warnings,
                 user_claude_md=user_claude_md,
                 chezmoi_bin=chezmoi_bin,
             )
@@ -1379,7 +1549,6 @@ def route(
         # commit (pinned apply subject), still under the sentinel hold.
         # Hook routes log the settings.json snippet in the host commit
         # body (M3-11) alongside any --note.
-        warnings: list[str] = []
         host_note = note
         if hook_route is not None:
             snippet_block = f"settings.json snippet:\n{hook_route.snippet}"
@@ -1396,7 +1565,29 @@ def route(
             chezmoi_bin=chezmoi_bin,
             message=message,
             warnings=warnings,
+            user_push=not no_push,
         )
+
+        # (e2) retirement HOST phase for the superseded old record — its
+        # compiled entry drops (or its guard script is removed) in the
+        # same motion; skipped when the successor's own compile just
+        # regenerated the same target.
+        retire_notes: list[str] = []
+        old_host_sha = None
+        old_host_repo = None
+        if old_retire is not None:
+            old_host_sha, old_host_repo = _retirement_host_phase(
+                home,
+                old_retire,
+                old_id,
+                note=note,
+                chezmoi_bin=chezmoi_bin,
+                message=message,
+                warnings=warnings,
+                post_notes=retire_notes,
+                skip_target=spec.target,
+                user_push=not no_push,
+            )
 
         # (f) push ledger, then push host (pinned retry, has_remote-guarded)
         # unless --no-push.
@@ -1404,6 +1595,11 @@ def route(
         host_push = None
         if not no_push and host_sha is not None and spec.host_repo is not None:
             host_push = gitops.push_if_remote(spec.host_repo)
+        if not no_push and old_host_sha is not None and old_host_repo is not None:
+            # possibly the same repo as the successor's — a second push is
+            # a no-op, and skipping it would strand the retirement commit
+            # whenever the successor's own host commit didn't happen.
+            gitops.push_if_remote(old_host_repo)
         return VerbResult(
             action="route",
             record_id=record_id,
@@ -1428,7 +1624,8 @@ def route(
                 if destination == "new-skill"
                 and getattr(compile_result, "scaffolded", False)
                 else []
-            ),
+            )
+            + retire_notes,
             host_commit_sha=host_sha,
             host_push=host_push,
             target=spec.target,
@@ -1506,9 +1703,11 @@ def route_direct(
                 note_hits,
             )
     old_id = record.supersedes
+    old_record: Record | None = None
     if old_id is not None:
         old_path = find_record_path(home, old_id)
         _scan_or_refuse([old_path], None)  # this verb rewrites it too (P2-7)
+        old_record = Record.from_path(old_path)
 
     # (b) sentinel self-hold + heartbeat.
     hold = sentinel.hold()
@@ -1545,6 +1744,20 @@ def route_direct(
                 user_claude_md=user_claude_md,
                 chezmoi_bin=chezmoi_bin,
                 project_path=project_path,
+            )
+
+        # --supersedes completion retires a possibly-ROUTED old record:
+        # host-side cleanup pre-flights before any write (same as route).
+        warnings: list[str] = []
+        old_retire: _Retirement | None = None
+        if old_record is not None:
+            old_retire = _retirement_preflight(
+                home,
+                old_record,
+                old_path.parent.parent,
+                warnings,
+                user_claude_md=user_claude_md,
+                chezmoi_bin=chezmoi_bin,
             )
 
         suffix = f" (supersedes {old_id})" if old_id else ""
@@ -1589,7 +1802,6 @@ def route_direct(
 
         # (e) HOST phase. Hook routes log the settings snippet in the host
         # commit body (M3-11), same as the review-gated path.
-        warnings: list[str] = []
         host_note = note
         if hook_route is not None:
             snippet_block = f"settings.json snippet:\n{hook_route.snippet}"
@@ -1603,6 +1815,7 @@ def route_direct(
             chezmoi_bin=chezmoi_bin,
             message=message,
             warnings=warnings,
+            user_push=not no_push,
         )
         if host_sha is not None and spec.host_repo is not None:
             # the applied-canon half of the printed diff (informational —
@@ -1616,6 +1829,26 @@ def route_direct(
             # applied script bytes lead the printed diff, in full.
             diff = hook_route.script + "\n--- ledger ---\n" + diff
 
+        # (e2) retirement HOST phase for the superseded old record (same
+        # shape as route's; skipped when the successor just regenerated
+        # the same target).
+        old_host_sha = None
+        old_host_repo = None
+        retire_notes: list[str] = []
+        if old_retire is not None:
+            old_host_sha, old_host_repo = _retirement_host_phase(
+                home,
+                old_retire,
+                old_id,
+                note=note,
+                chezmoi_bin=chezmoi_bin,
+                message=message,
+                warnings=warnings,
+                post_notes=retire_notes,
+                skip_target=spec.target,
+                user_push=not no_push,
+            )
+
         post_notes: list[str] = []
         if hook_route is not None:
             post_notes = _hook_manual_steps(hook_route.snippet, spec.target.name)
@@ -1627,12 +1860,18 @@ def route_direct(
                 "./install.sh to symlink it into ~/.claude/skills "
                 "(M3-11); enrich the prose post-hoc whenever you like"
             ]
+        post_notes = post_notes + retire_notes
 
         # (f) push ledger, then push host (both has_remote-guarded).
         push = None if no_push else gitops.push_if_remote(home)
         host_push = None
         if not no_push and host_sha is not None and spec.host_repo is not None:
             host_push = gitops.push_if_remote(spec.host_repo)
+        if not no_push and old_host_sha is not None and old_host_repo is not None:
+            # possibly the same repo — a second push is a no-op; skipping
+            # would strand the retirement commit when the successor's own
+            # host commit didn't happen.
+            gitops.push_if_remote(old_host_repo)
         return VerbResult(
             action="route",
             record_id=record.id,
@@ -1728,12 +1967,19 @@ def graduate(
     *,
     note: str | None = None,
     no_push: bool = False,
+    user_claude_md: Path | str | None = None,
+    chezmoi_bin: str = "chezmoi",
 ) -> VerbResult:
     """Graduate a lesson into authored canon: ``superseded_by: canon``
     (02 §2/§4). Works on a routed record (the hand-weave) or a pending
     already-canon one (the bulk-acknowledge door). Commit: ``self-learn:
-    graduate lrn-…``. Metadata-only — the managed-section line drops at
-    that target's next compile."""
+    graduate lrn-…``. A ROUTED record's host presence is cleaned in the
+    same motion — its managed-section entry drops (or its hook script is
+    removed, M3-4) via the shared retirement host phase. It used to be
+    metadata-only for doc targets ("drops at the next compile"), which
+    stranded the line forever when the graduated record was the target's
+    LAST — recompile enumerates targets off routed records, so an
+    all-retired target was never revisited (found live 2026-07-16)."""
     home = Path(home)
     path = find_record_path(home, record_id)  # pending OR resolved
     _scan_or_refuse([path], note)
@@ -1742,14 +1988,16 @@ def graduate(
     hold = sentinel.hold()
     sentinel.heartbeat()
     try:
-        # M3-4: graduating a hook-routed record also retires its script —
-        # there is no managed section whose next recompile would drop it.
-        removal: tuple[Path, Path, str] | None = None
-        if (
-            record.status == "routed"
-            and (record.routing or {}).get("destination") == "hook"
-        ):
-            removal = _hook_script_location(home, record, warnings)
+        # Pre-flight the host-side cleanup BEFORE the ledger commit
+        # (doc-target recompile or M3-4 hook-script removal).
+        retire = _retirement_preflight(
+            home,
+            record,
+            path.parent.parent,
+            warnings,
+            user_claude_md=user_claude_md,
+            chezmoi_bin=chezmoi_bin,
+        )
 
         message = f"self-learn: graduate {record_id}"
         with _ledger_write(home):
@@ -1758,17 +2006,23 @@ def graduate(
             )
             staged, sha = _stage_and_commit(home, touched, message, note)
 
-        host_sha = None
         post_notes: list[str] = []
-        if removal is not None:
-            host_sha = _remove_hook_script(
-                home, removal, record_id, note, warnings, post_notes
-            )
+        host_sha, host_repo = _retirement_host_phase(
+            home,
+            retire,
+            record_id,
+            note=note,
+            chezmoi_bin=chezmoi_bin,
+            message=message,
+            warnings=warnings,
+            post_notes=post_notes,
+            user_push=not no_push,
+        )
 
         push = _push_ledger(home, no_push)
         host_push = None
-        if not no_push and host_sha is not None and removal is not None:
-            host_push = gitops.push_if_remote(removal[0])
+        if not no_push and host_sha is not None and host_repo is not None:
+            host_push = gitops.push_if_remote(host_repo)
         return VerbResult(
             action="graduate",
             record_id=record_id,
@@ -1857,6 +2111,7 @@ def supersede(
                 chezmoi_bin=chezmoi_bin,
                 message=message,
                 warnings=warnings,
+                user_push=not no_push,
             )
         elif removal is not None:
             host_sha = _remove_hook_script(
@@ -2205,7 +2460,13 @@ class RecompileResult:
         return sum(1 for e in self.entries if e.commit_sha is not None)
 
 
-def recompile(home: Path | str, *, no_push: bool = False) -> RecompileResult:
+def recompile(
+    home: Path | str,
+    *,
+    no_push: bool = False,
+    user_claude_md: Path | str | None = None,
+    chezmoi_bin: str = "chezmoi",
+) -> RecompileResult:
     """The doc-13 drift repair (H-2: recompile is always safe and repairs
     any two-phase interruption). For every ROUTED record, recompute each
     managed target — skill-md files and project/skill-root claude-md files
@@ -2229,11 +2490,17 @@ def recompile(home: Path | str, *, no_push: bool = False) -> RecompileResult:
     home = Path(home)
     result = RecompileResult()
 
-    # Enumerate targets off the routed records (the ledger is the source of
-    # truth — targets are derived, never listed anywhere else).
+    # Enumerate targets off ALL resolved records that ever landed in canon
+    # (the ledger is the source of truth — targets are derived, never
+    # listed anywhere else). RETIRED records (superseded/graduated) still
+    # enumerate their DOC target: the regeneration reads only active
+    # records, so revisiting is exactly what drops a stale line. Skipping
+    # them (the pre-2026-07-17 shape) meant a target whose LAST record
+    # retired was never revisited — the stale advisory lived forever.
     specs: dict[tuple[Path | None, Path | None], TargetSpec] = {}
     ref_work: dict[tuple[Path, Path], tuple[TargetSpec, list[Record]]] = {}
     hook_work: list[tuple[Record, Path, Path, str]] = []  # record, host, abs, rel
+    hook_removals: list[tuple[Record, tuple[Path, Path, str]]] = []  # m-4
     for bucket in discover_buckets(home):
         resolved = bucket.path / "resolved"
         if not resolved.is_dir():
@@ -2243,20 +2510,35 @@ def recompile(home: Path | str, *, no_push: bool = False) -> RecompileResult:
                 record = Record.from_path(path)
             except RecordError:
                 continue
-            if record.status != "routed" or record.superseded_by is not None:
-                continue
             destination = (record.routing or {}).get("destination")
             if destination not in (
                 "skill-md", "claude-md", "reference", "hook", "new-skill"
             ):
                 continue
-            if destination == "claude-md" and record.scope == "user":
-                continue  # chezmoi flow owns the user file — not recompiled
+            retired = (
+                record.status != "routed" or record.superseded_by is not None
+            )
             if destination == "hook":
+                meta = (record.routing or {}).get("hook") or {}
+                if retired:
+                    # m-4: an interrupted (or historically missed) hook
+                    # REMOVAL leaves the retired guard on disk — repair by
+                    # removing it. No script_path recorded → nothing to do.
+                    if not meta.get("script_path"):
+                        continue
+                    try:
+                        removal = _hook_script_location(
+                            home, record, result.warnings
+                        )
+                    except VerbError as exc:
+                        result.warnings.append(f"{record.id}: {exc}")
+                        continue
+                    if removal is not None and removal[1].is_file():
+                        hook_removals.append((record, removal))
+                    continue
                 # H-2 for hooks: re-APPLY the approved bytes from
                 # routing.hook (never a regeneration from new inputs —
                 # M3-2's verbatim rule holds here too).
-                meta = (record.routing or {}).get("hook") or {}
                 if not meta.get("script") or not meta.get("script_path"):
                     result.warnings.append(
                         f"{record.id}: hook-routed but routing.hook carries "
@@ -2273,6 +2555,10 @@ def recompile(home: Path | str, *, no_push: bool = False) -> RecompileResult:
                     hook_work.append((record, host_repo, script_abs, rel))
                 continue
             if destination == "reference":
+                if retired:
+                    # references are append-only history — a retired entry
+                    # stays; there is nothing to regenerate or repair.
+                    continue
                 ref_name = (record.routing or {}).get("reference_file")
             elif destination == "new-skill":
                 ref_name = (record.routing or {}).get("new_skill")
@@ -2285,6 +2571,8 @@ def recompile(home: Path | str, *, no_push: bool = False) -> RecompileResult:
                     record.scope,
                     destination,
                     ref_name,
+                    user_claude_md=user_claude_md,
+                    chezmoi_bin=chezmoi_bin,
                     check_dirty=False,
                 )
             except VerbError as exc:
@@ -2304,6 +2592,42 @@ def recompile(home: Path | str, *, no_push: bool = False) -> RecompileResult:
         for (host_repo, target), spec in sorted(
             specs.items(), key=lambda kv: str(kv[0][1])
         ):
+            if host_repo is None:
+                # The chezmoi-guarded user file (E-17): run the same
+                # drift/dirty preflight the route path uses, and skip
+                # LOUDLY on any refusal — recompile repairs, it never
+                # guesses at a drifted dotfiles state. The apply goes
+                # through _host_phase (compile_user_scope commits its own
+                # repo; there is no host repo of ours to lock or stage).
+                try:
+                    preflight_user_scope(target, chezmoi=chezmoi_bin)
+                except (ChezmoiAbort, ChezmoiError) as exc:
+                    result.entries.append(
+                        RecompileEntry(target=target, changed=False, skipped=str(exc))
+                    )
+                    result.warnings.append(f"{target}: {exc}")
+                    continue
+                compile_result, _ = _host_phase(
+                    home,
+                    spec,
+                    "recompile",
+                    routed_record=None,
+                    note=None,
+                    chezmoi_bin=chezmoi_bin,
+                    message="self-learn: recompile user CLAUDE.md",
+                    warnings=result.warnings,
+                    user_push=not no_push,
+                )
+                result.entries.append(
+                    RecompileEntry(
+                        target=target,
+                        # UserScopeResult reports committed, not changed —
+                        # the dotfiles repo commits itself, no commit_sha
+                        # of ours to show (delta review finding 1)
+                        changed=bool(getattr(compile_result, "committed", False)),
+                    )
+                )
+                continue
             if target.is_file() and gitops.paths_dirty(host_repo, target):
                 result.entries.append(
                     RecompileEntry(target=target, changed=False, skipped="dirty")
@@ -2426,6 +2750,35 @@ def recompile(home: Path | str, *, no_push: bool = False) -> RecompileResult:
                 RecompileEntry(target=script_abs, changed=True, commit_sha=sha)
             )
             if host_repo not in touched_hosts:
+                touched_hosts.append(host_repo)
+
+        # m-4: RETIRED hook records whose script still exists — an
+        # interrupted removal (or a pre-fix retirement) left the guard on
+        # disk. Same removal flow as the verbs; the un-registration
+        # reminder lands in warnings so a repair run is never silent.
+        for record, removal in sorted(
+            hook_removals, key=lambda item: str(item[1][1])
+        ):
+            host_repo, script_abs, rel = removal
+            if gitops.paths_dirty(host_repo, script_abs):
+                result.entries.append(
+                    RecompileEntry(target=script_abs, changed=False, skipped="dirty")
+                )
+                result.warnings.append(
+                    f"{script_abs}: uncommitted changes — commit/stash, then re-run"
+                )
+                continue
+            removal_notes: list[str] = []
+            sha = _remove_hook_script(
+                home, removal, record.id, None, result.warnings, removal_notes
+            )
+            result.warnings.extend(removal_notes)
+            result.entries.append(
+                RecompileEntry(
+                    target=script_abs, changed=sha is not None, commit_sha=sha
+                )
+            )
+            if sha is not None and host_repo not in touched_hosts:
                 touched_hosts.append(host_repo)
 
         if not no_push:
