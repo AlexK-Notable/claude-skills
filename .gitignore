@@ -45,3 +45,7 @@ plugins/home-network/skills/home-network/references/DEVICES.draft.*
 plugins/home-network/skills/home-network/references/DEVICES.local.md
 plugins/cron-claude/run/
 !plugins/cron-claude/logs/.gitkeep
+
+# ephemeral Playwright MCP output (visual iteration screenshots)
+.playwright-mcp/
+*.png
