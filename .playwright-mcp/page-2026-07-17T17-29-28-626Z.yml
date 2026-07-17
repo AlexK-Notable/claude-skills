@@ -1,0 +1,51 @@
+- generic [active] [ref=f2e1]:
+  - banner [ref=f2e2]:
+    - generic [ref=f2e3]:
+      - link "← -tmp-claude-1000--home-komi-repos-claude-skills-f687d7ce-a89a-439a-abb5-b18d8e2f43c9-scratchpad-t-c-env-projhost-e74dd0b3" [ref=f2e4] [cursor=pointer]:
+        - /url: /bucket/project/-tmp-claude-1000--home-komi-repos-claude-skills-f687d7ce-a89a-439a-abb5-b18d8e2f43c9-scratchpad-t-c-env-projhost-e74dd0b3
+      - generic [ref=f2e5]: lrn-a1ecb9cf
+  - main [ref=f2e6]:
+    - generic [ref=f2e7]:
+      - article [ref=f2e8]:
+        - region "finding" [ref=f2e9]:
+          - heading "Finding" [level=2] [ref=f2e10]
+          - paragraph [ref=f2e11]: teach · 1 sighting(s) · created 2026-07-17T17:28:39Z
+          - generic [ref=f2e12]:
+            - heading "Fact" [level=2] [ref=f2e13]
+            - paragraph [ref=f2e14]: "T-browser: SSE live-refresh probe record."
+        - region "change" [ref=f2e15]:
+          - heading "Change" [level=2] [ref=f2e16]
+          - paragraph [ref=f2e17]: "no analysis yet — `i` to analyze now"
+        - region "why" [ref=f2e18]:
+          - heading "Why" [level=2] [ref=f2e19]
+          - paragraph [ref=f2e20]: no analysis yet
+        - generic [ref=f2e22]:
+          - generic [ref=f2e23]:
+            - text: Note
+            - textbox "Note" [ref=f2e24]:
+              - /placeholder: optional resolution note
+          - button "Approve (a)" [ref=f2e25]
+          - button "Deny (d)" [ref=f2e26]
+          - button "Defer (f)" [ref=f2e27]
+          - button "Graduate (g)" [ref=f2e28]
+          - 'button "Destination: (analyst suggestion) (o)" [ref=f2e29]'
+      - button "Iterate (i)" [ref=f2e32]
+  - contentinfo [ref=f2e33]:
+    - navigation "keyboard shortcuts" [ref=f2e34]:
+      - generic [ref=f2e35]: j Move down
+      - generic [ref=f2e36]: k Move up
+      - generic [ref=f2e37]: Enter Open
+      - generic [ref=f2e38]: Escape Back / up a level (interrupts the pane first, if focused)
+      - generic [ref=f2e39]: a Approve
+      - generic [ref=f2e40]: d Deny
+      - generic [ref=f2e41]: f Defer
+      - generic [ref=f2e42]: g Graduate
+      - generic [ref=f2e43]: i Iterate (open agent pane)
+      - generic [ref=f2e44]: o Cycle destination
+      - generic [ref=f2e45]: n Attach / edit note
+      - generic [ref=f2e46]: t Tolerate (confirm-recurrence --tolerate)
+      - generic [ref=f2e47]: c Confirm recurrence
+      - generic [ref=f2e48]: r Retry pane
+      - generic [ref=f2e49]: q Close split (ends the session)
+      - generic [ref=f2e50]: "? Help overlay"
+      - generic [ref=f2e51]: "? full reference"
