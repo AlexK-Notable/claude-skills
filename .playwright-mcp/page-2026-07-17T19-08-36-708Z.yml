@@ -1,0 +1,95 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]: "worker: worker current"
+      - generic [ref=e5]: "pending: 1"
+      - generic [ref=e6]: "follow-ups: 0"
+      - generic [ref=e7]: autosync live
+      - generic [ref=e8]: miner current
+      - link "report" [ref=e9] [cursor=pointer]:
+        - /url: /report
+  - main [ref=e10]:
+    - region "bucket walk" [ref=e11]:
+      - heading "Buckets" [level=1] [ref=e12]
+      - table [ref=e13]:
+        - rowgroup [ref=e14]:
+          - row [ref=e15]:
+            - columnheader "Bucket" [ref=e16]
+            - columnheader "Scope" [ref=e17]
+            - columnheader "Pending" [ref=e18]
+            - columnheader "Oldest" [ref=e19]
+            - columnheader "Unanalyzed" [ref=e20]
+        - rowgroup [ref=e21]:
+          - row [ref=e22]:
+            - cell [ref=e23]:
+              - link "-home-komi-repos-keyboards-zmk-config-offsetkey-b93b4e47" [ref=e24] [cursor=pointer]:
+                - /url: /bucket/project/-home-komi-repos-keyboards-zmk-config-offsetkey-b93b4e47
+            - cell "project" [ref=e25]
+            - cell "1" [ref=e26]
+            - cell "0d" [ref=e27]
+            - cell "1" [ref=e28]
+          - row [ref=e29]:
+            - cell [ref=e30]:
+              - link "chezmoi" [ref=e31] [cursor=pointer]:
+                - /url: /bucket/skill/chezmoi
+            - cell "skill" [ref=e32]
+            - cell "0" [ref=e33]
+            - cell "—" [ref=e34]
+            - cell "0" [ref=e35]
+          - row [ref=e36]:
+            - cell [ref=e37]:
+              - link "home-assistant" [ref=e38] [cursor=pointer]:
+                - /url: /bucket/skill/home-assistant
+            - cell "skill" [ref=e39]
+            - cell "0" [ref=e40]
+            - cell "—" [ref=e41]
+            - cell "0" [ref=e42]
+          - row [ref=e43]:
+            - cell [ref=e44]:
+              - link "hypr-doctor" [ref=e45] [cursor=pointer]:
+                - /url: /bucket/skill/hypr-doctor
+            - cell "skill" [ref=e46]
+            - cell "0" [ref=e47]
+            - cell "—" [ref=e48]
+            - cell "0" [ref=e49]
+          - row [ref=e50]:
+            - cell [ref=e51]:
+              - link "-home-komi-repos-claude-skills-3aaedd49" [ref=e52] [cursor=pointer]:
+                - /url: /bucket/project/-home-komi-repos-claude-skills-3aaedd49
+            - cell "project" [ref=e53]
+            - cell "0" [ref=e54]
+            - cell "—" [ref=e55]
+            - cell "0" [ref=e56]
+          - row [ref=e57]:
+            - cell [ref=e58]:
+              - link "user" [ref=e59] [cursor=pointer]:
+                - /url: /bucket/user/user
+            - cell "user" [ref=e60]
+            - cell "0" [ref=e61]
+            - cell "—" [ref=e62]
+            - cell "0" [ref=e63]
+    - region "miner" [ref=e64]:
+      - heading "Miner" [level=2] [ref=e65]
+      - paragraph [ref=e66]: "last run: 2026-07-17T10:32:13Z — miner current"
+      - group [ref=e67]:
+        - generic "runs" [ref=e68]
+      - button "Force run" [ref=e70]
+  - contentinfo [ref=e71]:
+    - navigation "keyboard shortcuts" [ref=e72]:
+      - generic [ref=e73]: j Move down
+      - generic [ref=e74]: k Move up
+      - generic [ref=e75]: Enter Open
+      - generic [ref=e76]: Escape Back / up a level (interrupts the pane first, if focused)
+      - generic [ref=e77]: a Approve
+      - generic [ref=e78]: d Deny
+      - generic [ref=e79]: f Defer
+      - generic [ref=e80]: g Graduate
+      - generic [ref=e81]: i Iterate (open agent pane)
+      - generic [ref=e82]: o Cycle destination
+      - generic [ref=e83]: n Attach / edit note
+      - generic [ref=e84]: t Tolerate (confirm-recurrence --tolerate)
+      - generic [ref=e85]: c Confirm recurrence
+      - generic [ref=e86]: r Retry pane
+      - generic [ref=e87]: q Close split (ends the session)
+      - generic [ref=e88]: "? Help overlay"
+      - generic [ref=e89]: "? full reference"
