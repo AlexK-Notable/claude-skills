@@ -1,0 +1,55 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]: "worker: worker current — nothing unanalyzed"
+      - generic [ref=e5]: "pending: 0"
+      - generic [ref=e6]: "follow-ups: 0"
+      - generic [ref=e7]: autosync live
+      - generic [ref=e8]: miner current
+      - link "report" [ref=e9] [cursor=pointer]:
+        - /url: /report
+  - main [ref=e10]:
+    - region "bucket walk" [ref=e11]:
+      - heading "Buckets" [level=1] [ref=e12]
+      - table [ref=e13]:
+        - rowgroup [ref=e14]:
+          - row [ref=e15]:
+            - columnheader "Bucket" [ref=e16]
+            - columnheader "Scope" [ref=e17]
+            - columnheader "Pending" [ref=e18]
+            - columnheader "Oldest" [ref=e19]
+            - columnheader "Unanalyzed" [ref=e20]
+        - rowgroup [ref=e21]:
+          - row [ref=e22]:
+            - cell [ref=e23]:
+              - link "-tmp-claude-1000--home-komi-repos-claude-skills-f687d7ce-a89a-439a-abb5-b18d8e2f43c9-scratchpad-t-c-env-projhost-e74dd0b3" [ref=e24] [cursor=pointer]:
+                - /url: /bucket/project/-tmp-claude-1000--home-komi-repos-claude-skills-f687d7ce-a89a-439a-abb5-b18d8e2f43c9-scratchpad-t-c-env-projhost-e74dd0b3
+            - cell "project" [ref=e25]
+            - cell "0" [ref=e26]
+            - cell "—" [ref=e27]
+            - cell "0" [ref=e28]
+    - region "miner" [ref=e29]:
+      - heading "Miner" [level=2] [ref=e30]
+      - paragraph [ref=e31]: "last run: 2026-07-17T17:22:01Z — miner current"
+      - group [ref=e32]:
+        - generic "runs" [ref=e33]
+      - button "Force run" [ref=e35]
+  - contentinfo [ref=e36]:
+    - navigation "keyboard shortcuts" [ref=e37]:
+      - generic [ref=e38]: j Move down
+      - generic [ref=e39]: k Move up
+      - generic [ref=e40]: Enter Open
+      - generic [ref=e41]: Escape Back / up a level (interrupts the pane first, if focused)
+      - generic [ref=e42]: a Approve
+      - generic [ref=e43]: d Deny
+      - generic [ref=e44]: f Defer
+      - generic [ref=e45]: g Graduate
+      - generic [ref=e46]: i Iterate (open agent pane)
+      - generic [ref=e47]: o Cycle destination
+      - generic [ref=e48]: n Attach / edit note
+      - generic [ref=e49]: t Tolerate (confirm-recurrence --tolerate)
+      - generic [ref=e50]: c Confirm recurrence
+      - generic [ref=e51]: r Retry pane
+      - generic [ref=e52]: q Close split (ends the session)
+      - generic [ref=e53]: "? Help overlay"
+      - generic [ref=e54]: "? full reference"
