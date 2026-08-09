@@ -1,6 +1,6 @@
 {
   "name": "agentic-engineering",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Evidence-based guide to prompt, context, agent, and loop engineering for frontier LLM agents — theory (why context degrades, why multi-agent systems fail) and practice (orchestrator-worker patterns, tool design, cache-aware prompting, progressive disclosure).",
   "author": {
     "name": "Alex Kechichian",
@@ -13,5 +13,14 @@
     "url": "https://github.com/AlexK-Notable/claude-skills.git"
   },
   "license": "MIT",
-  "keywords": ["agents", "prompt-engineering", "context-engineering", "multi-agent", "tool-design", "llm", "caching", "orchestration"]
+  "keywords": [
+    "agents",
+    "prompt-engineering",
+    "context-engineering",
+    "multi-agent",
+    "tool-design",
+    "llm",
+    "caching",
+    "orchestration"
+  ]
 }

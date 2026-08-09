@@ -6,14 +6,14 @@
     "url": "https://github.com/AlexK-Notable"
   },
   "metadata": {
-    "description": "Personal Claude Code skills — daily-driver tooling for desktop maintenance, dotfiles, home LAN, secrets, and post-update repair. A live, directory-source marketplace.",
+    "description": "Personal Claude Code skills \u2014 daily-driver tooling for desktop maintenance, dotfiles, home LAN, secrets, and post-update repair. A live, directory-source marketplace.",
     "version": "1.0.0"
   },
   "plugins": [
     {
       "name": "bitwarden-cli",
       "source": "./plugins/bitwarden-cli",
-      "description": "Bitwarden workflows for both CLIs — bw (vault: secure notes, SSH keys) and bws (Secrets Manager: machine tokens, projects, runtime injection).",
+      "description": "Bitwarden workflows for both CLIs \u2014 bw (vault: secure notes, SSH keys) and bws (Secrets Manager: machine tokens, projects, runtime injection).",
       "version": "1.0.0"
     },
     {
@@ -25,7 +25,7 @@
     {
       "name": "home-assistant",
       "source": "./plugins/home-assistant",
-      "description": "Operate self-hosted Home Assistant safely — safe-mutation discipline, a secret-safe inventory snapshot with drift detection (ha-inventory), and append-only gotcha capture (ha-note).",
+      "description": "Operate self-hosted Home Assistant safely \u2014 safe-mutation discipline, a secret-safe inventory snapshot with drift detection (ha-inventory), and append-only gotcha capture (ha-note).",
       "version": "0.1.0"
     },
     {
@@ -43,7 +43,7 @@
     {
       "name": "chezmoi",
       "source": "./plugins/chezmoi",
-      "description": "Dotfiles management with chezmoi — apply/diff, templating, age encryption.",
+      "description": "Dotfiles management with chezmoi \u2014 apply/diff, templating, age encryption.",
       "version": "1.0.0"
     },
     {
@@ -55,19 +55,19 @@
     {
       "name": "agentic-engineering",
       "source": "./plugins/agentic-engineering",
-      "description": "Evidence-based guide to prompt, context, agent, and loop engineering for frontier LLM agents — theory plus orchestrator-worker, tool-design, and caching practice.",
-      "version": "1.0.0"
+      "description": "Evidence-based guide to prompt, context, agent, and loop engineering for frontier LLM agents \u2014 theory plus orchestrator-worker, tool-design, and caching practice.",
+      "version": "2.0.0"
     },
     {
       "name": "wow-addon-management",
       "source": "./plugins/wow-addon-management",
-      "description": "Manage World of Warcraft retail addons on Linux — GitHub-release + CurseForge downloads with a Firecrawl reconciliation guard, relative-symlink management, library fetching, BugGrabber analysis, and gamescope display setup. Drives the tooling in ~/repos/WoW.",
+      "description": "Manage World of Warcraft retail addons on Linux \u2014 GitHub-release + CurseForge downloads with a Firecrawl reconciliation guard, relative-symlink management, library fetching, BugGrabber analysis, and gamescope display setup. Drives the tooling in ~/repos/WoW.",
       "version": "1.0.0"
     },
     {
       "name": "solakaka-sm809pro",
       "source": "./plugins/solakaka-sm809pro",
-      "description": "Configure the Solakaka SM809Pro gaming mouse (Yuandaxin/Elan) on Linux — HID/udev access, decode/edit the WebHID Onboard_Config.json (buttons, DPI, lighting, sensor tuning), the 3-byte action-code convention, and direct hidraw onboard access. Ships sm809-codec.",
+      "description": "Configure the Solakaka SM809Pro gaming mouse (Yuandaxin/Elan) on Linux \u2014 HID/udev access, decode/edit the WebHID Onboard_Config.json (buttons, DPI, lighting, sensor tuning), the 3-byte action-code convention, and direct hidraw onboard access. Ships sm809-codec.",
       "version": "1.0.0"
     },
     {
