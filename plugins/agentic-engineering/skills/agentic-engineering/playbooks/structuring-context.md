@@ -87,7 +87,7 @@ Why: → ../references/caching-and-knowledge-delivery.md T6.3
 
 Preserve verbatim: architectural decisions, unresolved bugs, exact constraints, identifiers. Discard raw and redundant tool outputs. Tune the compaction prompt for recall first, precision second `[VENDOR-DOC — one vendor's design advice]`.
 
-**Compaction is lossy and unaudited.** Anything that must survive exactly — IDs, contracts, ratified decisions — goes to a file or a re-injected anchor, never to trust in a summary. Three failure modes: **stop-signal erasure** (summarized trajectories ran 13–15% longer), **self-conditioning** (summarizing context holding the model's own errors compounds them; not fixed by scaling, though reasoning models largely avoid it), and the **accuracy tax** (~35-point drop on LoCoMo for ~90% token reduction). Verify a summary with atomic-claim faithfulness, not ROUGE overlap.
+**Compaction is lossy and unaudited.** Anything that must survive exactly — IDs, contracts, ratified decisions — goes to a file or a re-injected anchor, never to trust in a summary. Three failure modes: **stop-signal erasure** (summarized trajectories ran 13–15% longer), **self-conditioning** (summarizing context holding the model's own errors compounds them; not fixed by scaling, though reasoning models largely avoid it), and the **accuracy tax** (~35-point drop on LoCoMo for ~90% token reduction — the accuracy figure traces to a contested benchmark and the reduction figure is vendor-asserted `[MEDIUM]`). Verify a summary with atomic-claim faithfulness, not ROUGE overlap.
 
 Why: → ../references/caching-and-knowledge-delivery.md T6.4
 

@@ -37,9 +37,9 @@ Every substantive claim in the reference files carries one of:
 | Task | Playbook (in `playbooks/`) | Evidence behind its steps |
 |---|---|---|
 | Workflow vs agent vs multi-agent | `designing-an-agent-system.md` | foundations T1.1/T1.3 · multi-agent P3.1/T4.1/T5.1/T5.2 |
-| Writing a subagent / worker prompt | `writing-a-dispatch-prompt.md` | tool-design P3.2 · prompt-mechanics T3.1–T3.3/P1.1 · loops P4.7 |
-| Choosing or designing tools | `designing-a-tool-surface.md` | tool-design P3.3/P3.2, catalog costs, surface choice · data-formats P2.3 |
-| Authoring a skill or knowledge package | `building-a-skill.md` | caching T6.2/T6.3 · context-degradation T2.2 |
+| Writing a subagent / worker prompt | `writing-a-dispatch-prompt.md` | tool-design P3.2 · prompt-mechanics T3.1–T3.3/P1.1 · loops P4.1/P4.7 |
+| Choosing or designing tools | `designing-a-tool-surface.md` | tool-design P3.3, catalog costs, surface choice · data-formats P2.3 · caching T6.2 |
+| Authoring a skill or knowledge package | `building-a-skill.md` | caching T6.2/T6.3 · context-degradation T2.2 · loops P4.7 |
 | Laying out context, caching, memory | `structuring-context.md` | caching T6.1/T6.3/T6.4 · context-degradation T2.2–T2.4 |
 | Bounding a loop / verifying output | `closing-the-loop.md` | loops P4.1/P4.7 · multi-agent T5.1 |
 | Doing any of this in Claude Code | `claude-code.md` | the rows above, mapped onto CC surfaces |

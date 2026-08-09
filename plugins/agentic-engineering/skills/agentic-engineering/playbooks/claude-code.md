@@ -14,7 +14,7 @@ Why: → ../references/context-degradation.md T2.2, ../references/caching-and-kn
 
 ## 2. `skill-rules.fragment.json` is the machine-readable half of the same gate
 
-This plugin ships `plugins/agentic-engineering/skill-rules.fragment.json` — the worked example. `install.sh` merges every `plugins/*/skill-rules.fragment.json` via `jq -s 'add'` into `~/.claude/skills/skill-rules.json` under `.skills`; the `UserPromptSubmit` hook `skill-activation-prompt.sh` matches each prompt against it.
+This plugin ships `plugins/agentic-engineering/skill-rules.fragment.json` — the worked example. `install.sh` merges every `plugins/*/skill-rules.fragment.json` via `jq -s 'add // {}'` into `~/.claude/skills/skill-rules.json` under `.skills`; the `UserPromptSubmit` hook `skill-activation-prompt.sh` matches each prompt against it.
 
 The matcher is literally lexical, so author for it (verified in `hooks/skill-activation-prompt.ts`):
 
@@ -36,7 +36,7 @@ Harness-specific additions:
 - **One worker owns one file.** Parallelize reads, single-thread writes: fan out for search, audit, survey; converge to one context for the mutation.
 - **Send independent dispatches in one message** so they run concurrently — that parallelism is why isolated windows beat one overstuffed one.
 
-Why: → ../references/tool-design.md P3.2 (model tiering: item 6; single-threaded writes: ../references/multi-agent.md, "The synthesis")
+Why: → ../references/tool-design.md P3.2 (model tiering: item 6; single-threaded writes: ../references/multi-agent.md T5.2, "Synthesis — 2026")
 
 ## 4. Workflow scripts: `pipeline()` streams, `parallel()` gathers, barriers are a choice
 

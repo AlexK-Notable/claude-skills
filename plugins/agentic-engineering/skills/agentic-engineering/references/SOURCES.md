@@ -76,10 +76,10 @@ probe and this audit.
 
 ## Bibliography
 
-**Coverage as of 2026-08-08:** 53 unique arXiv IDs are cited across the eight reference files; all 53
+**Coverage as of 2026-08-09:** 54 unique arXiv IDs are cited across the eight reference files; all 54
 have a row below. Ten further papers are cited by name without an ID in the prose (MAST, NoLiMa, RULER,
 HELMET, LongMemEval, Levy et al., CodeAct, Let Me Speak Freely, the JetBrains masking paper, and Liu et
-al.) and are given rows with their IDs restored — 63 arXiv rows in total, plus the named non-arXiv
+al.) and are given rows with their IDs restored — 64 arXiv rows in total, plus the named non-arXiv
 sources. Where a source is cited in two files, it appears once, filed under its primary site, with both
 citation sites listed.
 
@@ -358,8 +358,7 @@ Recorded here rather than silently fixed, because they sit outside this ledger's
   `caching-and-knowledge-delivery.md`) and arXiv:2601.22047 (`prompt-mechanics.md`). Per the rubric a
   single unreplicated preprint should not reach `[HIGH]`; several of these are also vendor-affiliated.
   Tier-2 residue — resolved.
-- **`loops-and-stop-conditions.md` still asserts** that every finding in the guide survived independent
-  refutation-framed verification panels with majority-kill rules. That is true of the June `[HIGH]` /
-  `[MEDIUM]` batches, not of `[CORROBORATED*]` sections, and the sentence reads as corpus-wide.
-- **The archive README** at `~/notes/agentic-engineering-research/README.md` repeats the old
-  arXiv:2508.07479-revises-Liu-et-al. misattribution corrected here.
+- **`loops-and-stop-conditions.md` panel-claim sentence — resolved 2026-08-09:** rewritten to scope the
+  June panels to their own batch, with the 2026-08-08 re-audit named as the second layer.
+- **The archive README misattribution — resolved 2026-08-09:** now credits Veseli et al. as a different
+  group revising Liu et al.'s finding, not their paper.

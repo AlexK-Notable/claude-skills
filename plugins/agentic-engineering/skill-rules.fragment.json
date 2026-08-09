@@ -29,7 +29,6 @@
         "subagent prompt",
         "skill description",
         "SKILL.md",
-        "playbook",
         "cache layout",
         "cache hit rate",
         "verify agent output",

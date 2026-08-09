@@ -25,7 +25,7 @@ Why: → ../references/tool-design.md P3.2 (failure category: ../references/mult
 
 ## 2. Spend the first 3–5 constraints on what actually matters
 
-Constraint count does not degrade *compliance* — it degrades the *task*. In the measured sweep, constraint satisfaction stayed near ceiling (>94% average) while task success fell (~84% SustainScore), and most of the damage lands inside the first ~5 constraints `[HIGH]`. So rank your constraints, keep the top three-to-five load-bearing ones, and delete the self-evident ones the worker's unconstrained output would already satisfy.
+Constraint count does not degrade *compliance* — it degrades the *task*. In the measured sweep, constraint satisfaction stayed near ceiling (>94% average) while task success fell (~84% SustainScore), and most of the damage lands inside the first ~5 constraints `[MEDIUM — arXiv:2601.22047]`. So rank your constraints, keep the top three-to-five load-bearing ones, and delete the self-evident ones the worker's unconstrained output would already satisfy.
 
 - **Format constraints count against the budget.** The sharpest measured conflict is not a semantic twin: −0.531 between a token-count requirement and respond-in-JSON `[HIGH]`. "Return JSON" plus "under 200 words" is a fight, not two instructions.
 - **Don't stack opposed pairs** ("avoid X" alongside "use Y"): they degrade each other silently.
@@ -70,7 +70,7 @@ Why: → ../references/tool-design.md P3.2 and ../references/prompt-mechanics.md
 
 ## 6. Require evidence; keep the verdict on your side
 
-Do not ask the worker to self-assess. Post-completion self-assessment is the weakest moment for calibration, not the strongest (AUROC 0.55 after the work vs 0.64 before) `[MEDIUM]`, and over-reporting is directionally biased toward false success — overconfident on 62% of failing tasks against underconfident on 11% of passing ones `[MEDIUM]`. Instead: require each claim to cite a tool result from this session, ask for the command and its literal output, and run the pass/fail judgment in your own gate. Evidence-before-assertion is a filter, not a gate `[VENDOR-DOC]`.
+Do not ask the worker to self-assess. Post-completion self-assessment is the weakest moment for calibration, not the strongest (AUROC 0.55 after the work vs 0.64 before; CIs overlap — read the cross-model consistency, not the deltas) `[MEDIUM]`, and over-reporting is directionally biased toward false success — overconfident on 62% of failing tasks against underconfident on 11% of passing ones `[MEDIUM]`. Instead: require each claim to cite a tool result from this session, ask for the command and its literal output, and run the pass/fail judgment in your own gate. Evidence-before-assertion is a filter, not a gate `[VENDOR-DOC]`.
 
 Why: → ../references/loops-and-stop-conditions.md P4.7
 

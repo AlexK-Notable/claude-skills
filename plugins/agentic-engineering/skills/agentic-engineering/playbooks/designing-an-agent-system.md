@@ -65,7 +65,7 @@ Why: → ../references/multi-agent.md P3.1, T4.1 (equal-budget evidence), T5.2
 1. **Parallelize reads, single-thread writes.** Fan out for gathering, exploring, reviewing, verifying — where worker output is *input to a synthesis*. One context decides and mutates. If two workers must both write, they must not write the same artifact.
 2. **3–5 parallel workers, each with an isolated context window**, results synthesized by the lead. `[VENDOR-DOC]`
 3. **Isolation is the point, so protect it.** A clean window is the mechanism by which multi-agent beats one overstuffed context; do not forward the orchestrator's full history "just in case" — package what the contract needs.
-4. **Verify centrally and structurally.** Nothing enters the synthesis on a worker's say-so: run the test, read the artifact, diff the result. Agent self-report is directionally biased toward false success, and rhetorical judging loses to structural signal measured on the same traces. `[CORROBORATED*]`
+4. **Verify centrally and structurally.** Nothing enters the synthesis on a worker's say-so: run the test, read the artifact, diff the result. Agent self-report is directionally biased toward false success `[MEDIUM]`, and rhetorical judging loses to structural signal measured on the same traces `[CORROBORATED*]`. (Both: ../references/loops-and-stop-conditions.md P4.7)
 5. **Workers return data, not narration** — structured returns kill a parse-failure class.
 6. **Match model tier to subtask**; the lead/synthesis role concentrates judgment and belongs on the strongest model.
 7. **Write the worker contracts** — objective, output format, IN/OUT scope, undiscoverable context: → ./writing-a-dispatch-prompt.md
@@ -78,7 +78,7 @@ Why: → ../references/tool-design.md P3.2
 |---|---|---|---|
 | **1. System design** (~44%, the largest) | flawed specs, role/responsibility confusion, broken termination logic — baked in before any message is exchanged | specs, roles, topology, stop conditions | prompt wording |
 | **2. Inter-agent misalignment** (32.3%) | divergent task understanding, withheld/distorted context, conflicting implicit decisions | sharing fuller context (full traces over lone messages), or removing parallelism over shared state | more workers |
-| **3. Task verification** | unverified work accepted, premature success declarations, weak checking | structural gates on actual output | asking the agent to double-check itself — post-hoc self-assessment does not improve discrimination |
+| **3. Task verification** | unverified work accepted, premature success declarations, weak checking | structural gates on actual output | asking the agent to double-check itself — post-hoc self-assessment does not improve discrimination (../references/loops-and-stop-conditions.md P4.7) |
 
 `[HIGH — peer-reviewed]` for the taxonomy. Classify first: a category-1 failure re-prompted as if it were category-2 just costs another run.
 

@@ -12,7 +12,7 @@ Key properties of the degradation:
 
 - It is not a cliff at the context limit — it accumulates well inside nominal capacity.
 - It is task-difficulty-dependent: simple lexical-match retrieval survives long contexts far better than ambiguous or inference-requiring retrieval. This is why **vanilla needle-in-a-haystack scores systematically overstate robustness** for realistic queries.
-- Source caveat: Chroma is a retrieval vendor with a commercial stake in the "context engineering > big windows" narrative (provenance: SOURCES.md); its similarity-dependence finding is independently corroborated by peer-reviewed work (NoLiMa, below).
+- Source caveat: Chroma is a retrieval vendor with a commercial stake in the "context engineering > big windows" narrative, and the report is a non-peer-reviewed technical report on mostly synthetic tasks; its similarity-dependence finding is independently corroborated by peer-reviewed work (NoLiMa, below).
 
 **Design consequence:** budget context as a depreciating asset. Tokens late in a large window buy less reliable attention than the same tokens in a small window. "It fits in context" is not the bar; "it will be *found* in context" is.
 
@@ -42,7 +42,7 @@ The third is the uncomfortable one, because it bounds what curation can buy: **a
 
 The 2023/24 lost-in-the-middle finding (U-shaped accuracy by position: strong at start and end, weak in the middle) was substantially revised in 2025 (COLM 2025, arXiv:2508.07479): measured by input length **relative to each model's context window**, the U-shape is strongest when inputs occupy up to ~50% of the window. Beyond ~50% occupancy, primacy bias (the frontloading advantage) weakens while recency bias stays stable — the U-curve dissolves into a distance-based bias favoring information near the end. The paper attributes prior contradictory LiM replications to studies using absolute rather than relative input lengths; the ~50% threshold held across all six models tested.
 
-**Why only MEDIUM:** single paper; open-source models only (Llama-3.x 70B, Mistral-Small-24B, Qwen-2.5-32B, Gemma-2-27B; 8K–128K windows); largely synthetic tasks; no closed-source model tested, not merely Claude and GPT — the open-weight choice was cost-driven (provenance: SOURCES.md). **Transfer to Claude-family 200K–1M windows is an untested extrapolation — flag it whenever you apply this.**
+**Why only MEDIUM:** single paper; open-source models only (Llama-3.x 70B, Mistral-Small-24B, Qwen-2.5-32B, Gemma-2-27B; 8K–128K windows); largely synthetic tasks; no closed-source model tested, not merely Claude and GPT — the open-weight choice was cost-driven (the authors put their full experiment set at ~US$10,000 on GPT-4 Turbo vs ~24 hours on four H100s for Llama 3.1 70B). **Transfer to Claude-family 200K–1M windows is an untested extrapolation — flag it whenever you apply this.**
 
 **Design consequence:** "frontload the important content" is *conditional* advice. At low window occupancy (the common case for well-curated agent contexts) frontloading exploits intact primacy bias. At high occupancy, primacy decays — the end of the window becomes the only reliably privileged position, which is one reason recency-anchored patterns (instructions repeated near the end, freshest tool results last) survive in practice. If you operate near window capacity, do not assume your system-prompt-position content is being attended to.
 
