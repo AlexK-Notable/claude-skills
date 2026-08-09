@@ -49,7 +49,7 @@ Require of every gate:
 - **A positive control** — one check known to fail, asserted to fail. If it passes, the harness is not observing the target and every other verdict in the report is void.
 - **Unpiped exit status.** Read the gate's own pass/fail line or capture status directly; a status read downstream of a pipe reports the wrong process.
 
-`Why: → ../references/multi-agent.md T5.1`
+`Why: → ../references/loops-and-stop-conditions.md P4.7 (the failure class this guards: ../references/multi-agent.md T5.1, category 3)`
 
 ## Quick reference — failure smell → mechanism
 

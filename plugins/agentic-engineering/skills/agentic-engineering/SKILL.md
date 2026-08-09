@@ -1,6 +1,6 @@
 ---
 name: agentic-engineering
-description: Evidence-based guide to prompt, context, agent, and loop engineering for frontier LLM agents (mid-2026). Use when designing agent systems, deciding single vs multi-agent, writing dispatch prompts, managing context windows, designing tools for agents, setting stop conditions, structuring caching, or evaluating why an agent system is failing. Covers theory (why context degrades, why multi-agent systems fail, attention mechanics) and practice (orchestrator-worker patterns, tool design, cache-aware prompt structure, progressive disclosure).
+description: Action-first playbooks over an evidence corpus, for prompt, context, agent, and loop engineering with frontier LLM agents (mid-2026). Routes by task: designing agent systems, deciding single vs multi-agent, writing dispatch prompts (subagent/worker prompts), designing tools for agents (tool catalogs, MCP vs CLI), building skills (SKILL.md descriptions, progressive disclosure), structuring context and caching (prompt caching, cache hit rate, memory files), setting stop conditions, verifying agent output when an agent says it is done, and why an agent system is failing. References carry the evidence — context degradation, multi-agent failure modes, attention and cache mechanics — under per-claim confidence labels.
 ---
 
 # Agentic Engineering: Theory and Practice
@@ -25,29 +25,40 @@ Every substantive claim in the reference files carries one of:
 - `[VENDOR-DOC]` — current official platform documentation (authoritative for mechanics, not independently validated for effectiveness claims)
 - `[ATTRIBUTION]` — accurately attributed position statement, not an empirical finding
 - `[SYNTHESIS]` — this corpus's own framework or inference; no external source claims it. Judge it on the reasoning shown, and never cite it as though a vendor or paper said it
-- `[ANECDOTAL]` — validated locally in practice but not corroborated by any external source; defined here for later passes, not yet carried by any section
-- `[PENDING]` — section awaiting a dedicated research pass; treat any content there as provisional. `[HELD BACK]` is different: content deliberately withheld per source policy, not a gap
+- `[ANECDOTAL]` — validated locally in practice but not corroborated by any external source; carried by `prompt-mechanics.md` P1.1–P1.3 (unlocked 2026-08-08) and by operator-rule notes in the playbooks
+- `[PENDING]` — section awaiting a dedicated research pass; treat any content there as provisional. `[HELD BACK]` (withheld per source policy, not a gap) stays defined but is currently unused
 
 **As-of convention:** figures quoted from live sources — pricing tables, TTLs, repo READMEs and version numbers, preprint figures that move between revisions — carry an `as of YYYY-MM-DD` date where they are used, and must be re-checked before anything depends on them. Treat an undated live-source figure as expired.
 
 **Recency caveat (applies globally):** most empirical degradation work here tests 2023–mid-2025 model generations, so read magnitudes as snapshots and mechanisms as the durable content. The mid-2026 frontier is no longer unmeasured — ATLAS profiles 26 models on an 8K–1M grid and finds decay is capability-specific rather than one failure mode (`references/context-degradation.md`).
 
-## Reading map
+## Start here
 
-| File | Pillar | Status |
-|------|--------|--------|
-| `references/foundations.md` | Theory: the discipline, workflows vs agents, simplest-viable-design | **Complete** |
-| `references/context-degradation.md` | Theory: context rot, lexical matching, lost-in-the-middle revised | **Complete** |
-| `references/multi-agent.md` | Theory: economics, equal-budget evidence, MAST failure modes, the Anthropic–Cognition dialectic, A2A footnote | **Complete** |
-| `references/tool-design.md` | Practice: ACI design, tool-catalog costs, CLI vs MCP vs code-execution, orchestrator-worker implementation | **Complete** |
-| `references/caching-and-knowledge-delivery.md` | Theory+Practice: cache mechanics, progressive disclosure, JIT retrieval, memory architecture, summarization | **Complete** |
-| `references/data-formats.md` | Practice: token-efficient serialization (shape × tier × direction) | **Complete** |
-| `references/loops-and-stop-conditions.md` | Practice: stop conditions, budget pressure, trust calibration (flagship) | **Mostly complete** — HITL gates / self-correction (P4.5/P4.6) not yet researched |
-| `references/prompt-mechanics.md` | Theory+Practice: serial position, instruction-following, structured output | **Complete** (researched); local dispatch patterns held back per source policy |
-| `references/SOURCES.md` | Provenance: bibliography (with source URLs), per-claim evidence ledger, refuted claims | **Complete** |
+| Task | Playbook (in `playbooks/`) | Evidence behind its steps |
+|---|---|---|
+| Workflow vs agent vs multi-agent | `designing-an-agent-system.md` | foundations T1.1/T1.3 · multi-agent P3.1/T4.1/T5.1/T5.2 |
+| Writing a subagent / worker prompt | `writing-a-dispatch-prompt.md` | tool-design P3.2 · prompt-mechanics T3.1–T3.3/P1.1 · loops P4.7 |
+| Choosing or designing tools | `designing-a-tool-surface.md` | tool-design P3.3/P3.2, catalog costs, surface choice · data-formats P2.3 |
+| Authoring a skill or knowledge package | `building-a-skill.md` | caching T6.2/T6.3 · context-degradation T2.2 |
+| Laying out context, caching, memory | `structuring-context.md` | caching T6.1/T6.3/T6.4 · context-degradation T2.2–T2.4 |
+| Bounding a loop / verifying output | `closing-the-loop.md` | loops P4.1/P4.7 · multi-agent T5.1 |
+| Doing any of this in Claude Code | `claude-code.md` | the rows above, mapped onto CC surfaces |
+| *Diagnose:* agent underperforms | `designing-an-agent-system.md` Step 4 | foundations T1.3 (what was in the window?) · multi-agent T5.1 |
+| *Diagnose:* cache hit rate zero, cost drift | `structuring-context.md` steps 2–3 | caching T6.1 |
+| *Diagnose:* agent claims done, artifact wrong | `closing-the-loop.md` steps 2–4 | loops P4.7 |
 
-## How to use this skill
+## References — the evidence layer
 
-For a **design decision** (single vs multi-agent, tool surface choice, context budget): read the relevant theory file first — the practice patterns assume its mental model. For a **failure diagnosis**: start with `multi-agent.md` (MAST categories) and `context-degradation.md` (length/distractor effects). For **building**: `tool-design.md` and `caching-and-knowledge-delivery.md` are self-contained. To **trace a claim** to its source, confidence label, or the underlying paper: `SOURCES.md` is the bibliography + evidence ledger.
+All under `references/`, all **complete** except as noted:
 
-Pending sections name the research pass that will fill them. Do not improvise content for pending sections from training data — the gaps exist because available evidence was checked and found insufficient or refuted.
+- `foundations.md` — workflows vs agents; the context-first diagnostic
+- `context-degradation.md` — context rot, lexical matching, occupancy, distractors
+- `multi-agent.md` — economics, equal-budget evidence, MAST taxonomy, the Anthropic–Cognition dialectic
+- `tool-design.md` — ACI, bash-vs-tool promotion, catalog costs, transport choice, orchestrator-worker
+- `caching-and-knowledge-delivery.md` — cache mechanics and economics, progressive disclosure, memory, summarization
+- `data-formats.md` — serialization by shape × model × direction
+- `loops-and-stop-conditions.md` — stop conditions; trust calibration. **Mostly complete** — P4.5/P4.6 `[PENDING]`
+- `prompt-mechanics.md` — serial position, instruction-following, structured output, local dispatch practice
+- `SOURCES.md` — bibliography, per-claim evidence ledger, refuted claims
+
+Never improvise content for `[PENDING]` sections from training data — those gaps exist because the available evidence was checked and found insufficient or refuted.

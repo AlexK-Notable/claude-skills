@@ -80,7 +80,7 @@ Why: → ../references/loops-and-stop-conditions.md P4.7
 - **Restate only must-survive lines near the end, and only when the prompt is long or the window runs hot.** Repetition is not free: one 2×2 study measured a *negative* interaction (−27.4pp) from putting the same framing in both the system and user slots, and re-injecting a constraint the model already knows does not fix an enforcement-time drop.
 - **Match vocabulary to the moment of need.** Lexical overlap with how the worker will encounter the requirement matters more than position; paraphrase-heavy context actively damages retrievability. Repeat IDs, paths, and symbol names verbatim instead of describing them.
 
-Why: → ../references/prompt-mechanics.md T3.1 and ../references/context-degradation.md T2.2
+Why: → ../references/prompt-mechanics.md T3.1 (the −27.4pp both-slots interaction: T3.2, placement paragraph) and ../references/context-degradation.md T2.2
 
 ## Pre-send checklist `[SYNTHESIS]`
 

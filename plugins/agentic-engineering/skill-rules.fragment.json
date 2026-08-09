@@ -24,7 +24,17 @@
         "progressive disclosure",
         "prompt caching",
         "agent loop",
-        "single vs multi-agent"
+        "single vs multi-agent",
+        "worker prompt",
+        "subagent prompt",
+        "skill description",
+        "SKILL.md",
+        "playbook",
+        "cache layout",
+        "cache hit rate",
+        "verify agent output",
+        "agent says done",
+        "tool catalog"
       ],
       "intentPatterns": [
         "(design|build|architect|structure).*?(agent|multi-?agent|subagent|agentic).*?(system|workflow|pipeline|loop)",
@@ -36,7 +46,16 @@
         "why.*?(agent|multi-?agent).*?(fail|failing|degrad|broke|broken)",
         "(prompt|context)\\s*(cach|caching)",
         "progressive disclosure",
-        "(design|build).*?tools?\\s+for.*?(agent|llm|model)"
+        "(design|build).*?tools?\\s+for.*?(agent|llm|model)",
+        "(worker|subagent|sub-agent|dispatch)\\s+prompt",
+        "prompt\\s+for\\s+(a|my|the|each)?\\s*(worker|sub-?agent|orchestrator)",
+        "(writ|author|build|creat|updat)\\w*\\s+(a\\s+)?(skill|plugin|llms\\.txt|knowledge package)",
+        "skill\\s*(description|frontmatter)|frontmatter\\s+description",
+        "(verify|verifying|validate|check).{0,20}(agent|subagent|worker).{0,20}(output|result|work|claim|report)",
+        "agent\\s+(says|claims|reports|thinks).{0,20}(done|complete|finished|succeeded|passing)",
+        "cache\\s*(layout|hit rate|prefix|breakpoint|invalidat)",
+        "(tool|function)\\s+catalog",
+        "(how many|too many)\\s+tools"
       ]
     },
     "fileTriggers": {

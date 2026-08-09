@@ -60,11 +60,12 @@ Same scale used throughout the reference files:
 - `[ATTRIBUTION]` — accurately attributed position statement, not an empirical finding
 - `[SYNTHESIS]` — corpus-original framework or inference; no external source claims it. Judge it on the
   reasoning shown, not on provenance, and never cite it as though a vendor or paper said it.
-- `[ANECDOTAL]` — locally validated in practice but not externally corroborated. Defined here for use
-  by later passes; no section carries it yet.
+- `[ANECDOTAL]` — locally validated in practice but not externally corroborated. Carried by
+  `prompt-mechanics.md` P1.1–P1.3 (unlocked 2026-08-08) and by operator-rule notes in the playbooks.
 
 Two status markers are not confidence labels: `[PENDING]` (section awaiting a research pass — treat any
-content as provisional) and `[HELD BACK]` (content deliberately withheld per source policy, not a gap).
+content as provisional) and `[HELD BACK]` (content deliberately withheld per source policy, not a gap;
+stays defined but is currently unused — P1.1–P1.3, its last carrier, moved to `[ANECDOTAL]` 2026-08-08).
 
 **As-of convention.** Figures quoted from live sources — provider pricing tables and TTLs, repo READMEs
 and version numbers, preprint numbers that move between revisions — carry an **as of YYYY-MM-DD** date at
@@ -133,7 +134,7 @@ and `multi-agent.md` (T5.1/MAST) rather than from a source of its own.
 | AAIF — **project proposals** (AAIF membership for A2A is an open proposal, #37) | <https://github.com/aaif/project-proposals> | A2A footnote | section |
 | LangChain — **A2A server endpoint** (`/a2a/{assistant_id}`) | <https://docs.langchain.com/langsmith/server-a2a> | A2A footnote — the first-party SDK support that falsifies the claim that no major SDK ships A2A | section |
 
-The decision framework (P3.1) is labelled `[HIGH/MEDIUM synthesis]`: it composes the equal-budget,
+The decision framework (P3.1) is labelled `[SYNTHESIS]`: it composes the equal-budget,
 MAST and economics rows above into a rule none of them states.
 
 ### tool-design.md
@@ -176,16 +177,16 @@ carried as `[ATTRIBUTION]` with no URL captured in this ledger — see the flags
 | **Learning to Rewrite Tool Descriptions for Reliable LLM-Agent Tool Use** — Guo et al.; preprint | arXiv:2602.20426 · <https://arxiv.org/abs/2602.20426> | T6.2 — +11pp multi-step success, ~29% less degradation at 150+ tools | `[CORROBORATED*]` |
 | **LOCA-bench** — Zeng et al.; preprint | arXiv:2602.07962 · <https://arxiv.org/abs/2602.07962> | T6.2 — context-pressured agents stop after partial retrieval (closest direct evidence for the knowledge-action trade-off) | `[MEDIUM]` |
 | **LM Agents May Fail to Act on Their Own Risk Knowledge** — Tang et al.; preprint | arXiv:2508.13465 · <https://arxiv.org/abs/2508.13465> | T6.2 — flagged explicitly as an *adjacent* domain (risk knowledge vs safe execution: >98% vs <26%), not a measurement of skipped fetches; also `loops-and-stop-conditions.md` P4.7 | `[MEDIUM]` here; `[CORROBORATED*]` in loops |
-| **LongMemEval** — Wu et al.; ICLR 2025 | arXiv:2410.10813 · <https://arxiv.org/abs/2410.10813> | P2.1 (focused ~300-token vs full ~113K-token prompts, via Chroma); memory architecture (LongMemEval-M) | `[MEDIUM]` / `[HIGH but vendor-affiliated]` |
-| **Beyond the Context Window** (fact-based memory vs long context) — Pollertlam & Kornsuwannawit; preprint | arXiv:2603.04814 · <https://arxiv.org/abs/2603.04814> | memory architecture — GPT-5-mini long-context beat Mem0 by ~35 points on LoCoMo | `[HIGH for the accuracy gap; contested benchmark]` |
-| **Anatomy of Agentic Memory** — Jiang et al.; preprint | arXiv:2602.19320 · <https://arxiv.org/abs/2602.19320> | memory architecture — "Context Saturation Gap"; four structural types that *re-cut* rather than reject episodic/semantic | section `[HIGH/MEDIUM]` |
-| **Hindsight is 20/20** (HINDSIGHT) — Latimer et al.; preprint | arXiv:2512.12818 · <https://arxiv.org/abs/2512.12818> | memory architecture — 83.6% vs 39.0% full-context on LongMemEval-M | `[HIGH but vendor-affiliated]` |
-| **Memory in the LLM Era** (12-method benchmark) — Wu et al.; preprint, v3 as of 2026-08-08 | arXiv:2604.01707 · <https://arxiv.org/abs/2604.01707> | memory architecture — tree > graph; 9B → 27B backbone lifts multi-session >1.6× | `[HIGH]` |
+| **LongMemEval** — Wu et al.; ICLR 2025 | arXiv:2410.10813 · <https://arxiv.org/abs/2410.10813> | P2.1 (focused ~300-token vs full ~113K-token prompts, via Chroma); memory architecture (LongMemEval-M) | `[MEDIUM]` / `[MEDIUM but vendor-affiliated]` |
+| **Beyond the Context Window** (fact-based memory vs long context) — Pollertlam & Kornsuwannawit; preprint | arXiv:2603.04814 · <https://arxiv.org/abs/2603.04814> | memory architecture — GPT-5-mini long-context beat Mem0 by ~35 points on LoCoMo | `[MEDIUM for the accuracy gap; contested benchmark]` |
+| **Anatomy of Agentic Memory** — Jiang et al.; preprint | arXiv:2602.19320 · <https://arxiv.org/abs/2602.19320> | memory architecture — "Context Saturation Gap"; four structural types that *re-cut* rather than reject episodic/semantic | section `[MEDIUM]` |
+| **Hindsight is 20/20** (HINDSIGHT) — Latimer et al.; preprint | arXiv:2512.12818 · <https://arxiv.org/abs/2512.12818> | memory architecture — 83.6% vs 39.0% full-context on LongMemEval-M | `[MEDIUM but vendor-affiliated]` |
+| **Memory in the LLM Era** (12-method benchmark) — Wu et al.; preprint, v3 as of 2026-08-08 | arXiv:2604.01707 · <https://arxiv.org/abs/2604.01707> | memory architecture — tree > graph; 9B → 27B backbone lifts multi-session >1.6× | `[MEDIUM]` |
 | **Governing Evolving Memory in LLM Agents** (SSGM) — Lam et al.; preprint | arXiv:2603.11768 · <https://arxiv.org/abs/2603.11768> | memory architecture — pollution → drift → conflict; O(T) vs O(N) bounds; write gate *and* read gate, no dominance claim | `[MEDIUM — theoretical bounds]` |
 | **The Complexity Trap: Simple Observation Masking…** (JetBrains) — Lindenbauer et al.; DL4C workshop @ NeurIPS 2025 (camera-ready), public repo | arXiv:2508.21433 · <https://arxiv.org/abs/2508.21433> | T6.4 — masking cuts cost 52% / +2.6% solve rate; hybrid ~11% cheaper; summarized trajectories run 13–15% longer | `[HIGH]` |
-| **Chain of Summaries** — Brach et al.; preprint | arXiv:2511.15719 · <https://arxiv.org/abs/2511.15719> | T6.4 — query-aware summaries beat generic by 9.6% F1 and beat the source document (0.80 vs 0.76) | `[HIGH]` |
-| **ReSum** — Wu et al.; preprint | arXiv:2509.13313 · <https://arxiv.org/abs/2509.13313> | T6.4 — +~4.5% over append-everything ReAct, ~8.2% with a tuned summarizer | `[HIGH]` |
-| **Memory as Action** (MemAct) — Zhang et al.; preprint | arXiv:2510.12635 · <https://arxiv.org/abs/2510.12635> | T6.4 — 14B learned curator beats a summarization baseline ~9pp | `[HIGH]` |
+| **Chain of Summaries** — Brach et al.; preprint | arXiv:2511.15719 · <https://arxiv.org/abs/2511.15719> | T6.4 — query-aware summaries beat generic by 9.6% F1 and beat the source document (0.80 vs 0.76) | `[MEDIUM]` |
+| **ReSum** — Wu et al.; preprint | arXiv:2509.13313 · <https://arxiv.org/abs/2509.13313> | T6.4 — +~4.5% over append-everything ReAct, ~8.2% with a tuned summarizer | `[MEDIUM]` |
+| **Memory as Action** (MemAct) — Zhang et al.; preprint | arXiv:2510.12635 · <https://arxiv.org/abs/2510.12635> | T6.4 — 14B learned curator beats a summarization baseline ~9pp | `[MEDIUM]` |
 | **The Illusion of Diminishing Returns** — Sinha et al.; ICLR 2026 | arXiv:2509.09677 · <https://arxiv.org/abs/2509.09677> | T6.4 — self-conditioning; not fixed by scale, largely avoided by reasoning models | `[HIGH]` |
 | Anthropic — memory tool, context editing, compaction docs | platform docs, read **as of 2026-08-08** | T6.3 (the API now injects the memory protocol when the memory tool is present — hand-written "check your memory file first" triggers are obsolete); T6.4 preserve-verbatim / recall-first guidance, which is **Anthropic alone** — JetBrains takes no position | `[VENDOR-DOC — as of 2026-08-08]` / `[VENDOR-DOC]` |
 
@@ -235,7 +236,7 @@ vendor-documented harness practice. Not yet scoped to a research pass.
 | Source | ID · link | Cited at | Label there |
 |---|---|---|---|
 | **Models Recall What They Violate** — Kruthof (single author); preprint | arXiv:2604.28031 · <https://arxiv.org/abs/2604.28031> | T3.2 — knows-but-violates 8–99% across seven models (no correlation test run: the does-not-track-tier reading is the corpus's own, filed by the paper as open); 74% of multi-turn drift first violates by turn 2 | `[MEDIUM]` |
-| **On the Paradoxical Interference between Instruction-Following and Task Solving** — Qi et al.; preprint | arXiv:2601.22047 · <https://arxiv.org/abs/2601.22047> | T3.2 — compliance flat >94% while SustainScore falls to ~84%; damage front-loaded in the first ~5 constraints; the 8-model × 1–16-constraint sweep is a measurement design, not a recommended ceiling | `[HIGH]` |
+| **On the Paradoxical Interference between Instruction-Following and Task Solving** — Qi et al.; preprint | arXiv:2601.22047 · <https://arxiv.org/abs/2601.22047> | T3.2 — compliance flat >94% while SustainScore falls to ~84%; damage front-loaded in the first ~5 constraints; the 8-model × 1–16-constraint sweep is a measurement design, not a recommended ceiling | `[MEDIUM]` |
 | **IFScale** (How Many Instructions Can LLMs Follow at Once?) — Jaroslawicz et al.; preprint | arXiv:2507.11538 · <https://arxiv.org/abs/2507.11538> | T3.2 — curve taxonomy (threshold / linear / exponential by tier); cite the taxonomy, not the absolute scores | `[MEDIUM]` |
 | Arize — **IFScale replication** (12 May 2026) | <https://arize.com/blog/llm-instruction-following-benchmark-2026/> | T3.2 — 2026 frontier models pinned at 100% at N=500; vocabulary widened 500 → 10,000 words to reinduce degradation; breaking point ~200–300 → ~2,000 constraints | `[CORROBORATED*]` |
 | **MOSAIC** (Deconstructing Instruction-Following) — Purpura et al.; EACL 2026 | arXiv:2601.18554 · <https://arxiv.org/abs/2601.18554> | T3.2 — inter-constraint correlations: readability × keywords −0.28 to −0.34; avoid-X / use-X twins −0.32 to −0.44; sharpest is token-count × respond-in-JSON at −0.531 | `[HIGH]` |
@@ -281,7 +282,7 @@ or added after the June pass, and therefore have no finding note behind them.
 | Equal-budget evidence | `[HIGH]` | arXiv:2604.02460 (verified in primary, not via probe) + replications 2601.12307, 2606.13003 | `mYS8aXuNJpVFj74rFCax8` |
 | Equal-budget counter-nuance (Kim et al.) | `[MEDIUM]` | arXiv:2512.08296 | — |
 | Equal-budget sign flip (Wunderlich et al.) | `[CORROBORATED*]` | arXiv:2605.01566 | — |
-| P3.1 — The decision framework | `[HIGH/MEDIUM synthesis]` | composes the rows above | — |
+| P3.1 — The decision framework | `[SYNTHESIS]` | composes the rows above | — |
 | Footnote — agent-to-agent protocols | `[CORROBORATED* — probe 2026-06-12]` | LF press releases; AAIF proposals #37; LangChain server-a2a; Anthropic harness post | `y1fKbrMDjtYxcvx99j034` |
 | **tool-design.md** | | | |
 | P3.3 — The agent-computer interface | `[HIGH — vendor-endorsed practice]`; two additions `[VENDOR-DOC]` | Anthropic BEA + Writing Tools | `0hN0aQsob4wpMbUOK-c-6` |
@@ -298,20 +299,20 @@ or added after the June pass, and therefore have no finding note behind them.
 | — TTL coupling and the Mar 2026 regression | `[CORROBORATED*]` | claude-code#46829 | — |
 | — silent invalidators / known subtleties | `[VENDOR-DOC + community anti-pattern reports]`; floors `[VENDOR-DOC — as of 2026-08-08]`; model-scoping `[SYNTHESIS]` | vendor docs | — |
 | T6.2 — Progressive disclosure | `[CORROBORATED* — cross-ecosystem]`; index-vs-body `[CORROBORATED*]`; knowledge-action gap `[MEDIUM]` | arXiv:2504.06188; 2603.29919; 2603.22455; 2602.20426; 2512.17052; 2602.07962; 2508.13465 | `vs3qkoXqSAVbgtMQuIJ6e` |
-| P2.1 — JIT retrieval vs preloading | `[MEDIUM/CORROBORATED* — probe 2026-06-12]` | Chroma on LongMemEval; Amazon Science AAAI 2026; Anthropic JIT guidance | `aYIWi1Ylbqe_0iZdjLUJy` |
+| P2.1 — JIT retrieval vs preloading | `[MEDIUM]` | Chroma on LongMemEval; Amazon Science AAAI 2026; Anthropic JIT guidance | `aYIWi1Ylbqe_0iZdjLUJy` |
 | T6.3 — Memory surfaces | `[VENDOR-DOC + Opus probe 2026-06-13]`; memory-trigger obsolescence `[VENDOR-DOC — as of 2026-08-08]` | Anthropic memory/context-editing/compaction docs | — |
-| — Memory architecture: pick by history length | `[HIGH/MEDIUM — Opus probe 2026-06-13]` (per-bullet: 2603.04814 `[HIGH for the accuracy gap; contested benchmark]`, 2512.12818 `[HIGH but vendor-affiliated]`, 2604.01707 `[HIGH]`, 2603.11768 `[MEDIUM — theoretical bounds]`, consolidation `[MEDIUM/aspirational]`, Letta/Mem0 `[CORROBORATED* / vendor-only on specific numbers]`) | arXiv:2603.04814; 2602.19320; 2512.12818; 2604.01707; 2603.11768; LoCoMo dispute posts | `lyYMAPQqBX_pAQW2xD2YO` |
-| T6.4 — Summarization strategy and failure modes | `[HIGH/CORROBORATED* — Opus probe 2026-06-13]`; preserve-verbatim guidance `[VENDOR-DOC]` (Anthropic alone, not a two-vendor convergence) | arXiv:2508.21433; 2511.15719; 2509.13313; 2510.12635; 2509.09677; Anthropic compaction docs | `E22xkuYTWfqIu8h2-r3Gi` |
+| — Memory architecture: pick by history length | `[MEDIUM]` (per-bullet: 2603.04814 `[MEDIUM for the accuracy gap; contested benchmark]`, 2512.12818 `[MEDIUM but vendor-affiliated]`, 2604.01707 `[MEDIUM]`, 2603.11768 `[MEDIUM — theoretical bounds]`, consolidation `[MEDIUM/aspirational]`, Letta/Mem0 `[CORROBORATED* / vendor-only on specific numbers]`) | arXiv:2603.04814; 2602.19320; 2512.12818; 2604.01707; 2603.11768; LoCoMo dispute posts | `lyYMAPQqBX_pAQW2xD2YO` |
+| T6.4 — Summarization strategy and failure modes | `[MEDIUM]`; preserve-verbatim guidance `[VENDOR-DOC]` (Anthropic alone, not a two-vendor convergence) | arXiv:2508.21433; 2511.15719; 2509.13313; 2510.12635; 2509.09677; Anthropic compaction docs | `E22xkuYTWfqIu8h2-r3Gi` |
 | **data-formats.md** | | | |
 | Token-efficient formats: shape × model × direction | `[CORROBORATED* — Opus probe 2026-06-12; live-repo figures re-checked 2026-08-08]`; tokenizer caveat `[MEDIUM]` | arXiv:2603.03306; 2601.12014; 2605.29676; improvingagents; TOON repo (v4.1 as of 2026-08-08) | `f0iaOnJo10Lzd7bS1Atyj` |
 | **loops-and-stop-conditions.md** | | | |
 | P4.1 — Stop conditions and budget pressure | `[HIGH + ecosystem practice]` | Anthropic BEA; harness flags verified in both major SDKs | `DauD7ii04d2SsF9S_Cm3Y` |
-| P4.7 — Trust calibration (flagship) | `[MEDIUM/HIGH — adversarial batch 2026-06-13]` | arXiv:2602.06948; 2603.25764; 2410.09724; 2310.13548; 2603.16643; 2509.16533; 2604.22891; 2606.09863; 2604.00478; 2508.13465; MAST | `_dmmMabxH2qLRZbLn9q8e` |
+| P4.7 — Trust calibration (flagship) | `[MEDIUM]` | arXiv:2602.06948; 2603.25764; 2410.09724; 2310.13548; 2603.16643; 2509.16533; 2604.22891; 2606.09863; 2604.00478; 2508.13465; MAST | `_dmmMabxH2qLRZbLn9q8e` |
 | P4.5 / P4.6 — HITL gates, self-correction | `[PENDING]` | none — vendor-practice scaffolding only | — |
 | **prompt-mechanics.md** | | | |
 | T3.1 — Serial position and frontloading | `[MEDIUM]` | via T2.2 / T2.3 | — |
-| T3.2 — Instruction-following mechanics | `[HIGH/MEDIUM — adversarial batch 2026-06-13]` | arXiv:2604.28031; 2601.22047; 2507.11538 + Arize replication; 2601.18554; 2601.08070; 2606.09662; 2603.25056 | `u86WuFg3N_RNFeiRCEBQ4` |
-| T3.3 / P1.5 — Structured output | `[CORROBORATED*/HIGH — Opus probe 2026-06-13]` | arXiv:2408.02442 + dottxt rebuttal; 2501.10868; Anthropic structured-output docs | `tjDOt1eWxtguMuOMXD6b4` |
+| T3.2 — Instruction-following mechanics | `[MEDIUM — adversarial batch 2026-06-13]` | arXiv:2604.28031; 2601.22047; 2507.11538 + Arize replication; 2601.18554; 2601.08070; 2606.09662; 2603.25056 | `u86WuFg3N_RNFeiRCEBQ4` |
+| T3.3 / P1.5 — Structured output | `[CORROBORATED* — Opus probe 2026-06-13]` | arXiv:2408.02442 + dottxt rebuttal; 2501.10868; Anthropic structured-output docs | `tjDOt1eWxtguMuOMXD6b4` |
 | P1.1–P1.3 — Dispatch anatomy, purpose-first exploration, compaction anchors | `[ANECDOTAL]` (unlocked 2026-08-08) | locally validated only; no external corroboration found | — |
 
 ## Refuted / do not use
@@ -352,10 +353,11 @@ Recorded here rather than silently fixed, because they sit outside this ledger's
   Markdown-Table / CSV / XML accuracy figures; Amazon Science's AAAI 2026 agentic-search result; the
   Mem0 / Zep LoCoMo dispute posts; Cloudflare's Code Mode; the Agent Skills marketplace adoption
   figures. Each is load-bearing somewhere and none can currently be traced from this file alone.
-- **Single preprints still carrying `[HIGH]`** after the label pass: arXiv:2511.15719, 2509.13313,
-  2510.12635, 2603.04814, 2512.12818, 2604.01707 (all in `caching-and-knowledge-delivery.md`) and
-  arXiv:2601.22047 (`prompt-mechanics.md`). Per the rubric a single unreplicated preprint should not
-  reach `[HIGH]`; several of these are also vendor-affiliated. Tier-2 residue, not yet resolved.
+- **Single preprints downgraded from `[HIGH]` to `[MEDIUM]`** in the 2026-08-09 compression pass:
+  arXiv:2511.15719, 2509.13313, 2510.12635, 2603.04814, 2512.12818, 2604.01707 (all in
+  `caching-and-knowledge-delivery.md`) and arXiv:2601.22047 (`prompt-mechanics.md`). Per the rubric a
+  single unreplicated preprint should not reach `[HIGH]`; several of these are also vendor-affiliated.
+  Tier-2 residue — resolved.
 - **`loops-and-stop-conditions.md` still asserts** that every finding in the guide survived independent
   refutation-framed verification panels with majority-kill rules. That is true of the June `[HIGH]` /
   `[MEDIUM]` batches, not of `[CORROBORATED*]` sections, and the sentence reads as corpus-wide.
