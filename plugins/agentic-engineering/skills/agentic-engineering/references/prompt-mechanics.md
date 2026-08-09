@@ -7,7 +7,7 @@ Theory pillar T3 + Practice P1. Status: **complete** (researched content) — se
 The honest version of "put important things first":
 
 - Primacy and recency biases are real and measured, but the U-shaped lost-in-the-middle effect is **conditional on window occupancy** — strong up to ~50% occupancy, dissolving into recency-dominance beyond it (full treatment: `context-degradation.md` T2.3; open-source models only, Claude-family transfer untested).
-- Position effects are **second-order to lexical matching** (T2.2): a fact phrased in the query's vocabulary in the middle of the window is more findable than a paraphrased fact at the front.
+- Position is **one of three established degradation mechanisms** — lexical matching and length itself are the others, and the ranking among them is open (T2.2). The practical asymmetry stands: a fact phrased in the query's vocabulary in the middle of the window is often more findable than a paraphrased fact at the front, and neither placement nor phrasing makes a long window free.
 
 Defensible practice: frontload instructions and identity-critical content *when operating at low occupancy* (the usual case for curated agent prompts); anchor must-survive instructions near the end as well when windows run hot; never rely on position to rescue content that lacks lexical overlap with how it will be queried.
 
