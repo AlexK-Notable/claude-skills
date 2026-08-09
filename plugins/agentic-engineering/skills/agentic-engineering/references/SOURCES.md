@@ -3,8 +3,9 @@
 The bibliography behind this skill, plus the full provenance of how each claim was verified.
 
 Every arXiv ID cited anywhere in the eight reference files has a row here, grouped by the file that
-cites it, with the evidence label it carries at that site. The reference files carry no URLs of their
-own — this is the only link surface. Bibliographic metadata (title, first author, venue) was read off
+cites it, with the evidence label it carries at that site. The reference files carry almost no URLs of
+their own — a handful of Sources lines added in the 2026-08-08 correction pass are the exception — so
+this file remains the primary link surface. Bibliographic metadata (title, first author, venue) was read off
 the arXiv abstract pages on 2026-08-08; venues are recorded only where a source states one.
 
 ## How this skill was produced
@@ -244,6 +245,7 @@ vendor-documented harness practice. Not yet scoped to a research pass.
 | **Let Me Speak Freely?** — Tam et al.; EMNLP 2024 Industry Track (<https://aclanthology.org/2024.emnlp-industry.91/>) | arXiv:2408.02442 · <https://arxiv.org/abs/2408.02442> | T3.3 — the 2024 alarm; tested no frontier reasoning models, used different prompts per condition | `[CORROBORATED*]` (section) |
 | dottxt — **Say What You Mean** (rebuttal) | <https://blog.dottxt.ai/say-what-you-mean.html> (blog.dottxt.co 301s here) | T3.3 — same-prompt rerun: 0.77 vs 0.73 (JSON prompt), 0.68 vs 0.65 (NL prompt); the ~12-point gap is a cross-condition pairing error | `[CORROBORATED*, vendor-interested on both sides]` |
 | **JSONSchemaBench** — Geng et al.; preprint (arXiv page lists no venue) | arXiv:2501.10868 · <https://arxiv.org/abs/2501.10868> | T3.3 — ~1–4 point accuracy gains; downstream experiments run on one model (Llama-3.1-8B-Instruct), and the paper makes no small-model claim | `[MEDIUM]` |
+| **XGrammar** — Dong et al. (MLC/CMU); MLSys 2025 | arXiv:2411.15100 · <https://arxiv.org/abs/2411.15100> | T3.3 — constrained-decoding per-token overhead in the tens of microseconds; grammar-compilation as the one-time cost | `[HIGH]` (with vendor docs + SGLang corroborating) |
 | Anthropic — structured outputs / strict tool schemas docs | platform docs | T3.3 — schema-valid JSON guarantee, ~24h schema-compilation cache, **required properties emit before optional ones regardless of declaration order** (so a `reasoning` field must be *required*, not merely first), grammar-state reset for thinking models, `stop_reason: "refusal"` escape | `[VENDOR-DOC]` |
 
 T3.1 is `[MEDIUM]` and rests on `context-degradation.md` T2.3 (arXiv:2508.07479) plus the three-mechanism
@@ -349,9 +351,6 @@ Recorded here rather than silently fixed, because they sit outside this ledger's
   Markdown-Table / CSV / XML accuracy figures; Amazon Science's AAAI 2026 agentic-search result; the
   Mem0 / Zep LoCoMo dispute posts; Cloudflare's Code Mode; the Agent Skills marketplace adoption
   figures. Each is load-bearing somewhere and none can currently be traced from this file alone.
-- **`caching-and-knowledge-delivery.md` names the JetBrains venue as the "NeurIPS 2025 DL4Code workshop".**
-  The arXiv page for arXiv:2508.21433 names it **DL4C** (4th DL4C workshop, co-located with NeurIPS '25).
-  Single-letter difference, wrong workshop name.
 - **Single preprints still carrying `[HIGH]`** after the label pass: arXiv:2511.15719, 2509.13313,
   2510.12635, 2603.04814, 2512.12818, 2604.01707 (all in `caching-and-knowledge-delivery.md`) and
   arXiv:2601.22047 (`prompt-mechanics.md`). Per the rubric a single unreplicated preprint should not
