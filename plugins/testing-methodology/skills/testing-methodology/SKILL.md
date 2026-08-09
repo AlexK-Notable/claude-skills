@@ -1,6 +1,6 @@
 ---
 name: testing-methodology
-description: "Use when: About to build a seeded corpus, test fixture, or sandbox for exercising a real system end to end. Scaffolded by self-learn from routed lessons; enrich the prose post-hoc (plugin-dev optional)."
+description: "Use when designing or trusting empirical checks: building a seeded corpus, test fixture, or sandbox for exercising a real system end to end; writing a guard test, invariant, or lint meant to catch a CLASS of defect; interpreting a failing or intermittent timing-sensitive result (browser tests, benchmarks, a suite that failed once) or manufacturing system load in a subagent; or verifying that a rebuilt/reinstalled GUI or graphics application actually works. Scaffolded by self-learn from routed lessons."
 ---
 
 # testing-methodology
