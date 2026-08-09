@@ -1,0 +1,5 @@
+{
+  "name": "testing-methodology",
+  "version": "0.1.0",
+  "description": "Use when: About to build a seeded corpus, test fixture, or sandbox for exercising a real system end to end. Scaffolded by self-learn from routed lessons; enrich the prose post-hoc (plugin-dev optional)."
+}

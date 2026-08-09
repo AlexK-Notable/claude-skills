@@ -69,6 +69,12 @@
       "source": "./plugins/solakaka-sm809pro",
       "description": "Configure the Solakaka SM809Pro gaming mouse (Yuandaxin/Elan) on Linux — HID/udev access, decode/edit the WebHID Onboard_Config.json (buttons, DPI, lighting, sensor tuning), the 3-byte action-code convention, and direct hidraw onboard access. Ships sm809-codec.",
       "version": "1.0.0"
+    },
+    {
+      "name": "testing-methodology",
+      "source": "./plugins/testing-methodology",
+      "description": "Use when: About to build a seeded corpus, test fixture, or sandbox for exercising a real system end to end. Scaffolded by self-learn from routed lessons; enrich the prose post-hoc (plugin-dev optional).",
+      "version": "0.1.0"
     }
   ]
 }
