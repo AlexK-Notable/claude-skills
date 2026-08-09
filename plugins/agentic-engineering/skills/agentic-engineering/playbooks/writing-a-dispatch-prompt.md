@@ -21,7 +21,7 @@ Checks: the objective names one deliverable, not a theme. OUT OF SCOPE is non-em
 
 `DONE WHEN` extends the four documented contract elements with a verifiable exit condition, because "the worker says done" is the weakest exit available.
 
-Why: → ../references/tool-design.md P3.2 (failure category: ../references/multi-agent.md T5.1; exit condition: ../references/loops-and-stop-conditions.md P4.1)
+Why: → ../references/tool-design.md P3.2 (failure category: ../references/multi-agent.md T5.1; exit condition: ../references/loops-and-stop-conditions.md P4.1; prompt-level anatomy: ../references/prompt-mechanics.md P1.1 `[ANECDOTAL]`)
 
 ## 2. Spend the first 3–5 constraints on what actually matters
 

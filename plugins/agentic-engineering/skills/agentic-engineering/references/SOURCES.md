@@ -249,8 +249,9 @@ vendor-documented harness practice. Not yet scoped to a research pass.
 | Anthropic — structured outputs / strict tool schemas docs | platform docs | T3.3 — schema-valid JSON guarantee, ~24h schema-compilation cache, **required properties emit before optional ones regardless of declaration order** (so a `reasoning` field must be *required*, not merely first), grammar-state reset for thinking models, `stop_reason: "refusal"` escape | `[VENDOR-DOC]` |
 
 T3.1 is `[MEDIUM]` and rests on `context-degradation.md` T2.3 (arXiv:2508.07479) plus the three-mechanism
-framing in T2.2. P1.1–P1.3 are `[HELD BACK — source policy]`: locally validated dispatch patterns kept
-out of the guide because no external corroboration was found — a deliberate hold, not a research gap.
+framing in T2.2. P1.1–P1.3 are carried under `[ANECDOTAL]` as of 2026-08-08: locally validated dispatch
+patterns (contract anatomy, purpose-first exploration, compaction-resilient anchors), previously held back
+for lack of external corroboration — the label now carries that caveat instead of exclusion doing it.
 The externally-supported subset lives in `tool-design.md` P3.2.
 
 ## Findings ledger
@@ -311,7 +312,7 @@ or added after the June pass, and therefore have no finding note behind them.
 | T3.1 — Serial position and frontloading | `[MEDIUM]` | via T2.2 / T2.3 | — |
 | T3.2 — Instruction-following mechanics | `[HIGH/MEDIUM — adversarial batch 2026-06-13]` | arXiv:2604.28031; 2601.22047; 2507.11538 + Arize replication; 2601.18554; 2601.08070; 2606.09662; 2603.25056 | `u86WuFg3N_RNFeiRCEBQ4` |
 | T3.3 / P1.5 — Structured output | `[CORROBORATED*/HIGH — Opus probe 2026-06-13]` | arXiv:2408.02442 + dottxt rebuttal; 2501.10868; Anthropic structured-output docs | `tjDOt1eWxtguMuOMXD6b4` |
-| P1.1–P1.3 — Dispatch anatomy, purpose-first exploration, compaction anchors | `[HELD BACK — source policy]` | locally validated only; no external corroboration found | — |
+| P1.1–P1.3 — Dispatch anatomy, purpose-first exploration, compaction anchors | `[ANECDOTAL]` (unlocked 2026-08-08) | locally validated only; no external corroboration found | — |
 
 ## Refuted / do not use
 
