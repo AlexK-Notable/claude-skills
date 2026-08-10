@@ -57,3 +57,12 @@ cron-claude tui                 # interactive (needs `uv sync --extra tui`)
 - Prompts directory: `~/repos/claude-skills/plugins/cron-claude/prompts/`
 - Underlying unit files: `~/.config/systemd/user/cron-claude-<name>.{service,timer}`
 - Raw logs: `journalctl --user-unit cron-claude-<name>.service` (also via `cron-claude logs`)
+
+<!-- self-learn:pointers:begin (do not hand-edit inside; managed by self-learn) -->
+## Reference material (self-learn)
+
+Captured lessons that are NOT loaded into this context. Read the file whose
+subject matches what you are about to do, before you start.
+
+- `references/LEARNINGS.md` — captured lessons for this skill
+<!-- self-learn:pointers:end -->
