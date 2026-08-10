@@ -169,3 +169,12 @@ HA-specific values live.
 - [ASSIST.md](references/ASSIST.md) — voice pipeline, sentence triggers, exposed entities.
 - [GOTCHAS.md](references/GOTCHAS.md) — curated hard-won lessons.
 - [INVENTORY.generated.md](references/INVENTORY.generated.md) — generated snapshot (do not hand-edit).
+
+<!-- self-learn:pointers:begin (do not hand-edit inside; managed by self-learn) -->
+## Reference material (self-learn)
+
+Captured lessons that are NOT loaded into this context. Read the file whose
+subject matches what you are about to do, before you start.
+
+- `references/LEARNINGS.md` — captured lessons for this skill
+<!-- self-learn:pointers:end -->
