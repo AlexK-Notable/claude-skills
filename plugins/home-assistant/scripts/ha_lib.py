@@ -59,7 +59,8 @@ def get_token():
         if m:
             env["BWS_ACCESS_TOKEN"] = m.group(1)
     try:
-        out = subprocess.run(["bws", "secret", "get", HA_TOKEN_BWS_ID],
+        # --color no: bws colorizes JSON output even when piped, which breaks json.loads
+        out = subprocess.run(["bws", "--color", "no", "secret", "get", HA_TOKEN_BWS_ID],
                              capture_output=True, text=True, env=env, timeout=30)
     except FileNotFoundError:
         raise SystemExit("ha_lib: `bws` not found — set $HA_LLAT or install bws")
