@@ -20,10 +20,11 @@ for corrections.
 | MAC (eth) | 9c:6b:00:3c:5f:2d |
 | Interface | enp4s0 |
 | Hostname | komi-hypr |
-| Role | Workstation; Sunshine streaming host; Weylus screen-input target |
+| Role | Workstation; Sunshine streaming host; Weylus screen-input target; Jellyfin media server |
 | OS | CachyOS (Arch-based) |
 | SSH | enabled, port 22 |
 | UFW allows | Sunshine 47984-48010, Weylus 1701 (LAN-only), mDNS 5353 |
+| Services | **Jellyfin** `:8096` (deployed 2026-08-10) — Docker container `jellyfin`, image `jellyfin/jellyfin:latest` (10.11.11), `--restart unless-stopped`, `docker.service` enabled at boot; streams UHD rips to the iPad. LAN-only (no port forward / remote access). Verified 2026-08-10: `/health` returns "Healthy" from KOMI *and* from the pi. ⚠ Reachable LAN-wide **despite no ufw rule for 8096** — Docker `-p` published ports bypass ufw INPUT filtering entirely; see [FIREWALL.md — Docker published ports bypass UFW](FIREWALL.md#docker-published-ports-bypass-ufw). |
 | Notes | The UFW *allows* listed above are the firewall policy. Whether the corresponding daemons are actually listening at any moment depends on whether you've started Sunshine / Weylus. Check with `ss -tulpen \| grep LISTEN`. Hyprland desktop — see `~/.config/CLAUDE.md` for full setup. |
 
 ### indiedroid nova (bredOS)
