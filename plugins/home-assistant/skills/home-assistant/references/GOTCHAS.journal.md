@@ -269,3 +269,18 @@ place (provenance). `unverified` entries must be re-checked before you act on th
 - **Fix:** Add the YAML instance, restart HA, then read the real switch ids from the API (grep switch states for the name) before wiring automations — don't guess the main-switch id
 - **Repro / verify:** `adaptive_lighting: - name: hallway ; restart ; ha-api get states | grep adaptive_lighting_hallway -> main = switch.hallway_adaptive_lighting_hallway`
 - **Tags:** adaptive-lighting
+
+### 2026-08-11 — check_config reports ZHA device-trigger automations as failed ('Device X has no config entry from domain zha') while still exiting 0 — false alarm
+- **Status:** verified
+- **HA version:** 2026.5.4
+- **Cause:** check_config loads config in a limited environment without ZHA set up, so device triggers cannot resolve their config entry; live HA sets them up fine
+- **Fix:** trust rc=0, ignore these specific errors for automations known to use ZHA device triggers; verify live after reload (automation state 'on' + replay the recorded zha_event payload via POST /api/events/zha_event)
+- **Repro / verify:** `check_config on a config with ZHA device triggers: pre-existing working bedroom SNZB-01P automations flagged identically; new kitchen automation flagged, then proven working by event replay`
+- **Tags:** zha, check_config
+
+### 2026-08-11 — ha-api token fetch crashed: bws emits ANSI-colorized JSON even when piped, breaking json.loads
+- **Status:** verified
+- **Cause:** a bws update changed color behavior — stdout colorized even when not a TTY
+- **Fix:** ha_lib.py now passes 'bws --color no' (committed via claude-skills autosync 1da374b, 2026-08-10); any other script parsing bws output needs the same flag or NO_COLOR
+- **Repro / verify:** `bws secret get <id> | python3 -c 'import json,sys; json.loads(sys.stdin.read())' — fails without --color no`
+- **Tags:** tooling, bws
