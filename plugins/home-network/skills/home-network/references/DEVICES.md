@@ -41,6 +41,8 @@ for corrections.
 | OS / kernel | Armbian vendor, Debian 13 Trixie, `6.1.115-vendor-rk35xx`, running from eMMC |
 | mDNS | does **NOT** resolve on this flash — IP-pin required |
 
+**Freshness 2026-08-10 (live-verified from KOMI):** alive on wired **`.232`** — ARP `REACHABLE`, MAC matches inventory (`66:02:35:01:cc:21`), port 22 + HA `:8123` both OPEN. **Wi-Fi fallback `.229` is currently DOWN** (no ARP, ping and `:8123` fail) — the Nova is effectively single-homed on ethernet right now; canonical table above still lists `.229` as the *configured* fallback. `.228` remains dead. ⚠ **Stale-config gotcha (caused a false "nova offline" report 2026-08-10):** both local-side configs point at dead IPs — `~/.ssh/config` `nova`/`zbred` alias → `.229` (down Wi-Fi) and `~/.config/ssh-mcp/servers.json` nova → `.228` (dead since the 2026-05-31 reflash). `ssh nova` / ssh-MCP therefore fail with EHOSTUNREACH while the device is up. Probe `192.168.1.232` directly; consider repointing both configs to `.232`.
+
 **⚠ Status 2026-06-08: DUAL-HOMED again — wired Ethernet is BACK and is now the PREFERRED route. Live-verified over SSH from KOMI 2026-06-08.** The Nova picked up a **wired Ethernet** lease and is now dual-homed: eth `enP4p65s0` **`192.168.1.232`** (metric 100 — preferred default route) + Wi-Fi `wlan0` **`192.168.1.229`** (metric 600 — fallback), *both* UP and both carrying a default route via `.254`. The `.229 → .232` "IP change" was simply the eth NIC coming back online (different interface = different MAC = different DHCP lease), **not** lease instability. Hostname `indiedroid-nova`, kernel `6.1.115-vendor-rk35xx` — same OS as the 2026-05-31 block below, **but now running from eMMC** (`/dev/mmcblk0p1`; `mmcblk0boot0`/`boot1` present ⇒ eMMC, not SD) — migrated off the microSD. **This supersedes the "single-homed Wi-Fi `.229`, running from SD, eMMC removed" state in the 2026-05-31 block below.**
   - **Ethernet identity (live-verified from KOMI 2026-06-08):**
     - `enP4p65s0` = Realtek RTL8111/8168 PCIe Gigabit NIC, driver **`r8168`** (8.051.02-NAPI), bus `platform-fe190000.pcie-pci-0004:41:00.0`.
@@ -131,6 +133,7 @@ for corrections.
 | Services | **Piper TTS** `:10200` (Wyoming, Docker) — verified live OPEN from KOMI 2026-05-31; serves the Home Assistant voice stack (STT + wakeword run on the Nova). Per session narrative, this Pi also hosts a RustDesk relay (hbbs/hbbr) — not independently re-verified here. |
 | mDNS services | `_smb._tcp` + `_ssh._tcp` + `_device-info._tcp` |
 | Notes | Device's actual system hostname is `komi` (not `komi-2`); mDNS responder publishes `komi-2.local`. This was previously (incorrectly) listed as "KOMI second adapter" — it's actually the Raspberry Pi. |
+| Freshness 2026-08-10 | Live-verified from KOMI: ARP `REACHABLE` (MAC matches inventory), port 22 OPEN, key-auth SSH OK (ran a command over SSH). Lease `.165` still holding. |
 
 ### BIGTREETECH CB2 (3D printer host — Klipper / Moonraker)
 
@@ -274,7 +277,7 @@ when you want a verified entry.**
 | Field | Value |
 |-------|-------|
 | Host | Nova — wired **`192.168.1.232:8123`** (preferred) + Wi-Fi `192.168.1.229:8123` fallback; Docker host-network binds both interfaces (dual-homed since 2026-06-08) |
-| Web UI | `:8123` — verified OPEN live on **BOTH** `.232` and `.229` from KOMI 2026-06-08 (was `.229`-only 2026-05-31) |
+| Web UI | `:8123` — verified OPEN live on **BOTH** `.232` and `.229` from KOMI 2026-06-08 (was `.229`-only 2026-05-31). **2026-08-10: `.232` OPEN, `.229` unreachable** (Nova Wi-Fi down — see the nova freshness note); use `.232`. |
 | Voice (Wyoming) | STT on the Nova `:10300` (SenseVoice/NPU, mDNS `_wyoming._tcp` as `sensevoice-rknn`); openWakeWord on the Nova `:10400`; **Piper TTS on the Pi 5 `192.168.1.165:10200`** — all three verified OPEN live 2026-05-31 |
 | Integrations | Zigbee via ZHA (SONOFF MG24 dongle on the Nova — see the nova block); Govee LAN light (`govee_light_local`) |
 | mDNS | expected `homeassistant.local` |
