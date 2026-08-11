@@ -110,6 +110,41 @@ that's a firewalled-but-running service — usually fine, often the goal.
 
 If UFW allows a port nothing listens on, the rule is a no-op. Delete it.
 
+## Docker published ports bypass UFW
+
+**A Docker `-p`-published port is LAN-reachable even under default-deny with
+NO ufw allow rule — and `ufw deny` cannot block it.**
+
+Mechanism: `docker run -p 8096:8096` inserts iptables DNAT + FORWARD rules
+(the `DOCKER` chain) that route the traffic to the container *before* it
+would reach the host's INPUT chain, which is where ufw filters. The packets
+never traverse ufw's rules at all, so ufw is silent in both directions:
+it neither blocks the port nor shows it as open.
+
+Empirically verified 2026-08-10 on KOMI: Jellyfin container published
+`0.0.0.0:8096->8096/tcp`, ufw ACTIVE with no rule for 8096, yet
+`curl http://192.168.1.139:8096/health` from the pi (192.168.1.165)
+returned "Healthy" (re-confirmed same result on a later re-probe).
+
+**To scope a container port, bind the publish address — don't reach for ufw:**
+
+```bash
+# LAN-facing on one interface only (still bypasses ufw, but binds narrowly)
+docker run -p 192.168.1.139:8096:8096 ...
+
+# host-only (container reachable from this machine, invisible to the LAN)
+docker run -p 127.0.0.1:8096:8096 ...
+```
+
+Heavier alternative if per-source filtering is ever needed: add rules to the
+iptables `DOCKER-USER` chain (which Docker evaluates before its own DNAT and
+leaves alone). Not needed for current LAN-only services.
+
+**Audit implication:** the "Currently open ports" table below and
+`ufw status` only describe ufw policy — **Docker-published ports are an
+invisible second inventory.** Enumerate them with
+`docker ps --format '{{.Names}} {{.Ports}}'` when auditing exposure.
+
 ## Currently open ports on this machine
 
 (See `~/.config/CLAUDE.md` "Currently Open Ports" table — authoritative
