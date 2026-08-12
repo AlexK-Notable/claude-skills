@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Claude Code UserPromptSubmit hook -> Herdr sidebar metadata.
+# Reads the hook JSON on stdin, reports a truncated prompt summary (and the
+# model, when ANTHROPIC_MODEL is set) as display-only pane metadata.
+#
+# Display-only by contract: report-metadata, never report-agent (which would
+# seize lifecycle authority from Herdr's screen detection).
+# Limits: values cap at 80 chars; <=32 token keys/pane; <=32 --source slots
+# per pane LIFETIME (never freed) -> keep this single stable source id.
+set -u
+[ "${HERDR_ENV:-}" = 1 ] || exit 0
+command -v herdr >/dev/null 2>&1 || exit 0
+
+summary=$(jq -r '.prompt // empty' 2>/dev/null | tr '\n\t' '  ' | sed 's/  */ /g' | cut -c1-72)
+[ -n "$summary" ] || exit 0
+
+args=(pane report-metadata "$HERDR_PANE_ID" --source user:cc-meta --agent claude
+      --token "summary=$summary" --ttl-ms 86400000)
+[ -n "${ANTHROPIC_MODEL:-}" ] && args+=(--token "model=$ANTHROPIC_MODEL")
+herdr "${args[@]}" >/dev/null 2>&1 || true
+exit 0
