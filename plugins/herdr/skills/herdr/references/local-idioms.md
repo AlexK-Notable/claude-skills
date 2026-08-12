@@ -38,6 +38,17 @@ Seeded 2026-08-11 from a deep research pass (source-verified against herdr @ 3f7
 - **`herdr-cc-meta`**: Claude Code `UserPromptSubmit` hook (registered async in `~/.claude/settings.json`) reporting the prompt as a `summary` token via `pane report-metadata`. Verified: tokens surface in `PaneInfo.tokens` (`herdr pane get <id> | jq .result.pane.tokens`).
 - Herdr's own integration hook (`~/.claude/hooks/herdr-agent-state.sh`, SessionStart, managed by herdr) handles session identity — leave it alone; custom hooks live beside it.
 
+## Plugin vetting — what to check before installing
+
+Plugins are unsandboxed; pre-install review IS the security model. Lessons from vetting 15 repos (2026-08-11, full reports in `~/repos/herdr-research/vetting-*.md`):
+
+- **Read `herdr-plugin.toml` first, then every executable it names.** `[[build]]` runs at install time — scrutinize hardest. `curl|bash` install steps mean the vendor can change the payload after you review it.
+- **The dominant risk class is repo-supplied config, not malware.** Several plugins (herdr-plus, herdr-sessionizer) load executable configuration from *whatever repo you're sitting in* — `<repo>/.herdr-plus/quick-actions/*.toml`, `<repo>/.sessionizer/config.toml`. Sessionizer's runs automatically on workspace open with no trust prompt. Habit: keep untrusted clones outside any configured project root.
+- **A plugin can ship Claude Code skills that the manifest never mentions.** Observed live: cloning a repo for review registered its `.claude/skills/*/SKILL.md` as an invocable skill in the reviewing session. Cloning a repo and pointing an agent at it is an instruction-loading event; read `AGENTS.md`/`CLAUDE.md`/`skills/` alongside the entrypoints, and delete review clones when done.
+- **Check for silent config rewrites.** terminal-browser rewrites `~/.config/herdr/config.toml` (forcing `kitty_graphics = true`) inside a try/catch that swallows errors.
+- **Focus discipline is easy to audit**: grep for `hyprctl`/`xdotool`/`wmctrl`/`swaymsg`, plus herdr's own `pane focus`/`agent focus`/`workspace switch` and splits missing `--no-focus`. Most plugins pass; `xdg-open` in an action is the sneaky one (raises a window).
+- Prefer plugins that fetch prebuilts with a **pinned version + SHA-256 + source fallback** (herdr-file-viewer does this) over `latest`-tag unverified downloads.
+
 ## Licensing / versioning
 
 - Apache-2.0 since 0.8.0 (relicensed from AGPL — older blog posts are stale on this).
