@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Optional notification hook for herdr-agent-watch.
+# argv: pane_id old_status new_status agent cwd title
+#
+# NOT wired into the systemd unit by default: herdr's own [ui.toast]
+# delivery = "terminal" already notifies on blocked/finished, and this
+# would duplicate it. Use this as the hook when you want notifications
+# for states the built-in path doesn't cover, or custom text/actions:
+#   herdr-agent-watch ~/bin/herdr-agent-alert
+pane=$1; new=$3; agent=$4; cwd=$5; title=$6
+case "$new" in
+  blocked) urg=critical; verb="needs input" ;;
+  done)    urg=normal;   verb="finished"   ;;
+  *) exit 0 ;;
+esac
+# finite -t; no -A action buttons -> never blocks (swaync lesson lrn-c9044f8c)
+notify-send -t 8000 -u "$urg" -a herdr \
+  "$agent $verb — ${cwd##*/}" "$pane · ${title:-no title}"

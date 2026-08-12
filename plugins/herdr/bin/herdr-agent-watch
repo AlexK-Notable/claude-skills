@@ -1,0 +1,77 @@
+#!/usr/bin/env python3
+"""Watch every Herdr pane's agent status; log transitions, keep a state
+snapshot, and optionally run a hook per transition.
+
+usage: herdr-agent-watch [command...]
+  command receives: <pane_id> <old_status> <new_status> <agent> <cwd> <title>
+
+Transitions are printed to stdout (journal, under systemd) as TSV.
+A JSON snapshot of current per-pane agent state is maintained at
+$XDG_RUNTIME_DIR/herdr-agent-watch.json (fallback /tmp) for consumers
+like a waybar module.
+
+Wire gotchas (verified live, see claude-skills plugins/herdr references):
+- subscribe with dot names, but pushed frames carry snake_case types
+- pane.agent_status_changed has no global form; diff pane.updated instead
+"""
+import json, os, socket, subprocess, sys, tempfile, time
+
+SOCK = os.environ.get("HERDR_SOCKET_PATH") or os.path.expanduser(
+    "~/.config/herdr/herdr.sock")
+HOOK = sys.argv[1:]
+STATE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", tempfile.gettempdir()),
+                     "herdr-agent-watch.json")
+
+def write_state(last, panes):
+    snap = {pid: {"status": st, "agent": panes[pid].get("agent", ""),
+                  "cwd": panes[pid].get("cwd", ""), "ts": int(time.time())}
+            for pid, st in last.items() if pid in panes}
+    tmp = STATE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(snap, f)
+    os.replace(tmp, STATE)
+
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.connect(SOCK)
+s.sendall((json.dumps({
+    "id": "watch",
+    "method": "events.subscribe",
+    "params": {"subscriptions": [
+        {"type": "pane.updated"},
+        {"type": "pane.agent_detected"},
+        {"type": "pane.closed"},
+    ]},
+}) + "\n").encode())
+
+last, panes, buf = {}, {}, b""
+for chunk in iter(lambda: s.recv(65536), b""):
+    buf += chunk
+    while b"\n" in buf:
+        line, buf = buf.split(b"\n", 1)
+        if not line.strip():
+            continue
+        msg = json.loads(line)
+        data = msg.get("data") or {}
+        if data.get("type") == "pane_closed":
+            pid = data.get("pane_id")
+            if last.pop(pid, None) is not None:
+                panes.pop(pid, None)
+                write_state(last, panes)
+            continue
+        pane = data.get("pane")
+        if not pane:
+            continue
+        pid, new = pane["pane_id"], pane.get("agent_status")
+        if not pane.get("agent") or new is None:
+            continue
+        panes[pid] = pane
+        old = last.get(pid)
+        if old == new:
+            continue
+        last[pid] = new
+        write_state(last, panes)
+        args = [pid, old or "none", new, pane.get("agent", ""),
+                pane.get("cwd", ""), pane.get("terminal_title_stripped", "")]
+        print("\t".join(args), flush=True)
+        if HOOK:
+            subprocess.Popen(HOOK + args)
