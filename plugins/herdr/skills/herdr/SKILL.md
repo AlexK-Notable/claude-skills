@@ -193,3 +193,22 @@ After that failed read, ask the agent to write its complete response as Markdown
 - Never run `herdr server stop` from an active session unless the user explicitly intends to stop the server and its pane processes.
 - Never kill the main Herdr process. Use named test sessions for experiments that need an isolated server.
 - CLI server errors are JSON on stderr with exit status 1. CLI syntax errors exit with status 2.
+
+<!-- ============================================================
+     LOCAL ADDITIONS BELOW — everything ABOVE this marker (except
+     one amended clause in the frontmatter description) is the
+     upstream skill, verbatim.
+
+     Provenance: github.com/herdrdev/herdr skills/herdr/SKILL.md
+       @ commit 3f752a72 (2026-08-11); byte-identical to
+       `herdr --skill` of herdr 0.8.0-preview.2026-08-04.
+
+     To update from upstream:
+       herdr --skill | diff - <(sed '/LOCAL ADDITIONS BELOW/,$d' SKILL.md)
+     then merge upstream changes above the marker, keep everything
+     below, and re-check the frontmatter description clause.
+     ============================================================ -->
+
+## Local idioms
+
+The `HERDR_ENV=1` gate above applies to **controlling the current session from inside a pane**. Host-level work — editing config, installing plugins, debugging agent detection, building automation around the socket/CLI — is legitimate from any terminal. For those tasks read [references/local-idioms.md](references/local-idioms.md): notification delivery setup, agent-detection maintenance, sidebar metadata from Claude Code hooks, event-subscription patterns, worktree flow, and plugin-authoring notes.
