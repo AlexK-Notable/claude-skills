@@ -75,6 +75,12 @@
       "source": "./plugins/testing-methodology",
       "description": "Use when: About to build a seeded corpus, test fixture, or sandbox for exercising a real system end to end. Scaffolded by self-learn from routed lessons; enrich the prose post-hoc (plugin-dev optional).",
       "version": "0.1.0"
+    },
+    {
+      "name": "herdr",
+      "source": "./plugins/herdr",
+      "description": "Drive the Herdr agent multiplexer — upstream in-pane control skill (provenance-tracked) plus a personal idioms layer: config, notifications, agent-detection maintenance, socket/CLI automation, plugin authoring.",
+      "version": "0.1.0"
     }
   ]
 }
