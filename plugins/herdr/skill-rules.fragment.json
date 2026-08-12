@@ -1,0 +1,20 @@
+{
+  "herdr": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "high",
+    "description": "Herdr agent multiplexer — in-pane control, config, notifications, agent detection, plugins, automation",
+    "promptTriggers": {
+      "keywords": [
+        "herdr",
+        "agent multiplexer",
+        "herdr pane",
+        "herdr workspace",
+        "herdr plugin",
+        "herdr worktree",
+        "agent sidebar",
+        "agent detection"
+      ]
+    }
+  }
+}

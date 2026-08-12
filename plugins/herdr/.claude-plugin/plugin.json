@@ -1,0 +1,17 @@
+{
+  "name": "herdr",
+  "version": "0.1.0",
+  "description": "Drive the Herdr agent multiplexer: upstream in-pane control skill (verbatim, provenance-tracked) plus a personal idioms layer — config, notifications, agent-detection maintenance, socket/CLI automation, plugin authoring.",
+  "author": {
+    "name": "Alex Kechichian",
+    "email": "alexkechichian1@gmail.com",
+    "url": "https://github.com/AlexK-Notable"
+  },
+  "homepage": "https://github.com/AlexK-Notable/claude-skills",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AlexK-Notable/claude-skills.git"
+  },
+  "license": "Apache-2.0",
+  "keywords": ["herdr", "terminal-multiplexer", "coding-agents", "tmux", "automation", "claude"]
+}
