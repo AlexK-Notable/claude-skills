@@ -41,7 +41,7 @@ docs/specs|plans/                    design history (how this repo came to be)
 
 ## Why one repo (the "hub" model)
 
-The user's personal skills used to be scattered across separate GitHub repos plus loose dirs in `~/.claude/skills`. Consolidating into ONE repo means: `git clone … && ./install.sh` reconstitutes the whole skill set on a new machine; one place to version everything; one autosync keeps the remote current. **Third-party skills the user did not write are deliberately excluded** — this repo is unambiguously "mine," so cloning it carries no foreign baggage. Skills with their own prior repos (home-network, cron-claude, hypr-doctor) were merged in with `git subtree`, so `git log --follow` on any merged file still shows its full provenance.
+The user's personal skills used to be scattered across separate GitHub repos plus loose dirs in `~/.claude/skills`. Consolidating into ONE repo means: `git clone … && ./install.sh` reconstitutes the whole skill set on a new machine; one place to version everything; one autosync keeps the remote current. **Third-party skills the user did not write are deliberately excluded** — this repo is unambiguously "mine," so cloning it carries no foreign baggage. (One tracked-upstream exception: `herdr` — its SKILL.md body is the upstream skill verbatim above a `LOCAL ADDITIONS` marker, personalized below it; the marker comment records provenance and the update procedure.) Skills with their own prior repos (home-network, cron-claude, hypr-doctor) were merged in with `git subtree`, so `git log --follow` on any merged file still shows its full provenance.
 
 ## Skills
 
@@ -55,6 +55,7 @@ The user's personal skills used to be scattered across separate GitHub repos plu
 | `chezmoi` | dotfiles management (apply/diff, templating, age encryption) | — |
 | `universal-directory-organizer` | interactive directory cleanup with safety hooks | — |
 | `agentic-engineering` | evidence-based reference for prompt/context/agent/loop engineering (theory + orchestrator-worker, tool-design, caching practice) | — |
+| `herdr` | drive the Herdr agent multiplexer — upstream in-pane control skill + local idioms layer (config, notifications, detection maintenance, automation, plugin authoring) | — |
 
 ## Activation
 
