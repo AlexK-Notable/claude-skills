@@ -31,6 +31,13 @@ Seeded 2026-08-11 from a deep research pass (source-verified against herdr @ 3f7
 - Local development: `herdr plugin link <path>`; install is GitHub-shorthand-only (`herdr plugin install owner/repo[/subdir]`). Zero sandboxing by design — review before installing. Marketplace (herdr.dev/plugins) is an unreviewed auto-index of the `herdr-plugin` GitHub topic.
 - Community plugins worth remembering: `herdr-spreader` (declarative YAML layouts with `wait_for` predicates), `cloudmanic/herdr-plus` (workspace/worktree launcher from TOML), `AltanS/collie` (remote control PWA).
 
+## Installed automation (this host, 2026-08-11)
+
+- **Config applied** (`~/.config/herdr/config.toml`, backup at `config.toml.bak-20260811`): toast `delivery = "terminal"` + `delay_seconds = 3`; sidebar rows rendering `$summary`/`$model` tokens; agent-nav keybindings; `[worktrees] directory`; `manifest_check = true`.
+- **`herdr-agent-watch`** (this plugin's `bin/`, systemd user unit in `systemd/`): subscribes `pane.updated`, logs transitions to the journal, maintains `$XDG_RUNTIME_DIR/herdr-agent-watch.json` for consumers (future waybar module). Runs WITHOUT a notify hook — built-in toasts cover blocked/finished; `herdr-agent-alert` is the optional hook for custom cases.
+- **`herdr-cc-meta`**: Claude Code `UserPromptSubmit` hook (registered async in `~/.claude/settings.json`) reporting the prompt as a `summary` token via `pane report-metadata`. Verified: tokens surface in `PaneInfo.tokens` (`herdr pane get <id> | jq .result.pane.tokens`).
+- Herdr's own integration hook (`~/.claude/hooks/herdr-agent-state.sh`, SessionStart, managed by herdr) handles session identity — leave it alone; custom hooks live beside it.
+
 ## Licensing / versioning
 
 - Apache-2.0 since 0.8.0 (relicensed from AGPL — older blog posts are stale on this).

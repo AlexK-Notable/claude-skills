@@ -55,7 +55,7 @@ The user's personal skills used to be scattered across separate GitHub repos plu
 | `chezmoi` | dotfiles management (apply/diff, templating, age encryption) | — |
 | `universal-directory-organizer` | interactive directory cleanup with safety hooks | — |
 | `agentic-engineering` | evidence-based reference for prompt/context/agent/loop engineering (theory + orchestrator-worker, tool-design, caching practice) | — |
-| `herdr` | drive the Herdr agent multiplexer — upstream in-pane control skill + local idioms layer (config, notifications, detection maintenance, automation, plugin authoring) | — |
+| `herdr` | drive the Herdr agent multiplexer — upstream in-pane control skill + local idioms layer (config, notifications, detection maintenance, automation, plugin authoring) | `herdr-agent-watch` (+ systemd unit), `herdr-agent-alert`, `herdr-cc-meta` |
 | `wow-addon-management` | manage WoW retail addons on Linux — GitHub-release + CurseForge downloads with reconciliation guard, symlink management, library fetching, BugGrabber analysis, gamescope display setup (drives `~/repos/WoW`) | — |
 | `solakaka-sm809pro` | configure the Solakaka SM809Pro gaming mouse on Linux — HID/udev access, Onboard_Config.json decode/edit, direct hidraw onboard access | `sm809-codec` |
 | `testing-methodology` | designing trustworthy empirical checks — seeded corpora, guard tests, timing-sensitive result interpretation (self-learn scaffolded) | — |
