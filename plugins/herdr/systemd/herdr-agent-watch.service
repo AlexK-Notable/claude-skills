@@ -2,14 +2,14 @@
 Description=Watch Herdr agent-state transitions (log + state snapshot for consumers)
 # No hard dependency: the herdr server is user-launched, not a unit.
 # Restart=always polls until the socket exists and survives server restarts.
+# connect() failing before herdr is up is expected; retry forever.
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
 ExecStart=%h/bin/herdr-agent-watch
 Restart=always
 RestartSec=15
-# connect() failing before herdr is up is expected; keep retrying forever
-StartLimitIntervalSec=0
 
 [Install]
 WantedBy=default.target
