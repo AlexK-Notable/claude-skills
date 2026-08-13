@@ -38,6 +38,38 @@ Seeded 2026-08-11 from a deep research pass (source-verified against herdr @ 3f7
 - **`herdr-cc-meta`**: Claude Code `UserPromptSubmit` hook (registered async in `~/.claude/settings.json`) reporting the prompt as a `summary` token via `pane report-metadata`. Verified: tokens surface in `PaneInfo.tokens` (`herdr pane get <id> | jq .result.pane.tokens`).
 - Herdr's own integration hook (`~/.claude/hooks/herdr-agent-state.sh`, SessionStart, managed by herdr) handles session identity — leave it alone; custom hooks live beside it.
 
+### Installed plugins (2026-08-12)
+
+`houser.claude-usage` (plan Session%/Week% gauges on space rows) · `official.browser` ·
+`herdr-file-viewer` · `herdr-automatic-rename`. Per-plugin hardening: `focusOnOpen: false`,
+`update_check = false`, and auto-rename installed without its zshrc hook. The usage plugin
+needs a `[ui.sidebar.spaces] rows` block to render — it reports one of four severity token
+variants (`$cu`, `$cu_warn`, `$cu_hot`, `$cu_out`) per space, and rows whose token is absent
+are skipped, so unaffected spaces stay compact.
+
+## Installing plugins — mechanics worth remembering
+
+- **`herdr plugin install` pins to a commit** and prints a full preview (every action, event,
+  pane, and build command) before it proceeds. Read the preview: it is the complete list of
+  what the plugin can run. The pin means an upstream force-push cannot silently change what
+  executes — updating requires a reinstall.
+- Checkouts land in `~/.config/herdr/plugins/github/<id>-<hash>/`; config in
+  `~/.config/herdr/plugins/config/<id>/`, exported to the plugin as `$HERDR_PLUGIN_CONFIG_DIR`.
+  herdr creates the config dir **empty** — it never seeds defaults, so there is no example file
+  to copy.
+- **Find the config *filename* in the plugin's source, never guess it.** It varies
+  (`browser.json` vs `config.toml`) and a file written under the wrong name is silently ignored.
+  Grep for `HERDR_PLUGIN_CONFIG_DIR` to find the join.
+- **Writing a config file is not evidence the setting took effect.** Plugins commonly parse
+  with "malformed → fall back to defaults" (herdr-file-viewer: `Err(e) => (Config::default(),
+  LoadOutcome::Malformed(..))`), so a typo silently restores the default you were trying to
+  turn off. Parse the file yourself (`python3 -c 'import tomllib,...'` / `jq`) and confirm the
+  key resolves to the value you intended — with a deliberately broken file to prove the check
+  can fail.
+- A plugin shipping `skills/<name>/SKILL.md` at the repo root is offering an agent-facing skill
+  (herdr-browser and herdr-file-viewer both do). That is different from `.claude/skills/`, which
+  auto-registers just from being cloned into an agent's view.
+
 ## Plugin vetting — what to check before installing
 
 Plugins are unsandboxed; pre-install review IS the security model. Lessons from vetting 15 repos (2026-08-11, full reports in `~/repos/herdr-research/vetting-*.md`):
