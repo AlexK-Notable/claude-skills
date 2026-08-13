@@ -70,6 +70,33 @@ are skipped, so unaffected spaces stay compact.
   (herdr-browser and herdr-file-viewer both do). That is different from `.claude/skills/`, which
   auto-registers just from being cloned into an agent's view.
 
+### Reaching a plugin after you install it
+
+**Installing a plugin binds nothing.** herdr has no action-picker key and no command palette,
+so a freshly installed plugin is reachable only via `herdr plugin action invoke <id> --plugin
+<p>` or `herdr plugin pane open --plugin <p> --entrypoint <e>` from a shell. Budget a config
+edit as part of every install:
+
+- `[[keys.command]]` with `type = "plugin_action"` takes a **qualified** id
+  (`<plugin_id>.<action_id>`, e.g. `herdr-file-viewer.open-file-viewer`).
+- **`[[panes]]` entrypoints have no `plugin_action` equivalent** — bind them with
+  `type = "shell"` running `"$HERDR_BIN_PATH" plugin pane open --plugin … --entrypoint …`.
+- `description = "…"` replaces the generic `custom command` label in the `prefix+?` help panel.
+- Check the key against the defaults before trusting a README: herdr-browser's README suggests
+  `prefix+b`, which is already `toggle_sidebar`.
+- `herdr plugin action list` enumerates everything invokable, qualified ids included.
+
+**herdr-browser needs `[experimental] kitty_graphics = true`** — it paints Chromium into the
+pane over the Kitty graphics protocol, and without the flag the pane simply doesn't draw. It
+asks rather than setting it for you (unlike terminal-browser, which rewrites your config
+silently). Also needs Bun and a Chrome/Chromium binary. Its link handler makes **Ctrl+click on a
+`localhost` / `127.0.0.1` / `[::1]` URL** in any pane open that page in a browser pane — a plain
+click stays terminal input.
+
+**Reading a plugin pane's contents over the CLI usually returns empty** — TUI plugins paint on
+the alternate screen, which never enters herdr's host scrollback. Verify such an action by its
+exit status plus a `pane list` diff, not by `pane read`.
+
 ## Plugin vetting — what to check before installing
 
 Plugins are unsandboxed; pre-install review IS the security model. Lessons from vetting 15 repos (2026-08-11, full reports in `~/repos/herdr-research/vetting-*.md`):
