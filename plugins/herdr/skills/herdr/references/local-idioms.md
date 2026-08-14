@@ -148,6 +148,25 @@ hyprctl dispatch exec /path/to/probe    # probe writes $PATH + `command -v` resu
 swallows stderr. Give any guarded script a `*_DEBUG=1` env that logs its exit reason to
 `$XDG_RUNTIME_DIR`, or the next "it doesn't work" report has no evidence attached.
 
+## Patching an installed plugin
+
+`herdr plugin install` replaces the entire managed directory, so local edits die on
+reinstall — keep the diff in `plugins/herdr/patches/` (see its README) rather than only
+in the live tree. There is no auto-update and installs are commit-pinned, so a patch
+survives until *you* reinstall.
+
+**A plugin running a daemon caches its code.** Editing the file changes nothing until the
+daemon restarts: `herdr plugin action invoke stop --plugin <id>` then `start`. Verify
+against the reported token, not the file.
+
+**Sidebar bar-glyph gotcha, learned by screenshot.** `■`/`□` are small geometric shapes
+that do not fill their character cell, so a bar built from them reads as separated squares.
+`█` and `░` fill the cell edge to edge and render as one continuous bar. Eighth-block
+glyphs (`▏▎▍▌▋▊▉█`) buy sub-cell precision — 80 steps instead of 10 — but a partial block
+sits at the LEFT of its cell, leaving the rest of that cell blank with no track behind it,
+which opens a visible gap between fill and track. A sidebar row is drawn in one fg colour,
+so the fill and the track must be distinguished by glyph density, not colour.
+
 ## Plugin vetting — what to check before installing
 
 Plugins are unsandboxed; pre-install review IS the security model. Lessons from vetting 15 repos (2026-08-11, full reports in `~/repos/herdr-research/vetting-*.md`):
