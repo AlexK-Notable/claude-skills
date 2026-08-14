@@ -141,8 +141,32 @@ def render(feeds: list[dict], width: int) -> list[str]:
     return lines
 
 
+def one_line(feeds: list[dict]) -> str:
+    """Compact single line for herdr's `[ui] tab_bar_right` status area.
+
+    That area takes the LAST line of the command's output, so this prints
+    exactly one line. Deliberately PLAIN — no ANSI. herdr styles the status
+    area itself, and it is unclear whether escape sequences are stripped or
+    rendered raw; a corrupted status bar is worse than an uncoloured one.
+    """
+    if not feeds:
+        return "usage: no collectors"
+    parts = []
+    now = time.time()
+    for f in sorted(feeds, key=lambda d: d.get("label") or ""):
+        label = f.get("label") or f.get("provider") or "?"
+        s = f.get("session_pct")
+        stale = (now - float(f.get("updated") or 0)) > STALE_S
+        shown = "?" if s is None else f"{int(s)}%"
+        parts.append(f"{label} {bar(s, 6)} {shown}{'~' if stale else ''}")
+    return " · ".join(parts)
+
+
 def main() -> None:
     once = "--once" in sys.argv
+    if "--line" in sys.argv:
+        print(one_line(load()))
+        return
     while True:
         width = shutil.get_terminal_size((80, 24)).columns
         lines = render(load(), width)
