@@ -1,0 +1,16 @@
+id = "komi.usage-panel"
+name = "Usage Panel"
+version = "0.1.0"
+min_herdr_version = "0.7.4"
+description = "One usage bar per provider in a thin pane. De-duplicates the per-workspace usage token, which repeats an account-wide number on every space row."
+platforms = ["linux", "macos"]
+
+# No [[build]], no [[startup]], no [[events]] — this plugin only offers a pane to
+# render an existing feed. It holds no credentials and makes no network calls;
+# collectors (currently the patched houser.claude-usage) own all of that.
+
+[[panes]]
+id = "usage"
+title = "usage"
+placement = "split"
+command = ["bash", "run.sh"]
