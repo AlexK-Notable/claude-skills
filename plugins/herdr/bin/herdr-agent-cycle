@@ -28,8 +28,17 @@ case "$dir" in
   *) echo "usage: $(basename "$0") next|prev" >&2; exit 2 ;;
 esac
 
-command -v herdr >/dev/null 2>&1 || exit 0
-command -v jq >/dev/null 2>&1 || exit 0
+# HERDR_AGENT_CYCLE_DEBUG=1 appends the reason for every exit to
+# ${XDG_RUNTIME_DIR}/herdr-agent-cycle.log. A guarded script that no-ops is
+# indistinguishable from a broken one, and a compositor bind swallows stderr,
+# so without this "nothing happened" has no diagnosis.
+_dbg() {
+  [ "${HERDR_AGENT_CYCLE_DEBUG:-}" = 1 ] || return 0
+  printf '%s %s\n' "$(date +%T)" "$*" >> "${XDG_RUNTIME_DIR:-/tmp}/herdr-agent-cycle.log"
+}
+
+command -v herdr >/dev/null 2>&1 || { _dbg "abort: herdr not on PATH ($PATH)"; exit 0; }
+command -v jq >/dev/null 2>&1 || { _dbg "abort: jq not on PATH"; exit 0; }
 
 # ── guard: only act when the focused window hosts herdr ──────────────────────
 # HERDR_AGENT_CYCLE_FORCE=1 skips the guard. Needed to test the cycling logic
@@ -64,8 +73,11 @@ if [ "${HERDR_AGENT_CYCLE_FORCE:-}" != 1 ] && command -v hyprctl >/dev/null 2>&1
   done
 
   case " $hosts " in
-    *" $active_pid "*) ;;
-    *) exit 0 ;;
+    *" $active_pid "*) _dbg "guard OK: focused pid $active_pid hosts herdr" ;;
+    *)
+      _dbg "guard BLOCKED: focused pid $active_pid ($(ps -o comm= -p "$active_pid" 2>/dev/null | tr -d ' ')) is not a herdr host (hosts:$hosts)"
+      exit 0
+      ;;
   esac
 fi
 
