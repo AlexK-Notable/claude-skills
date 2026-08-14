@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Launch the locally-built herdr (target/release) in an isolated named session.
+#
+# Exists so trying an unreleased feature never risks the live session. The dev
+# build gets its own config (HERDR_CONFIG_PATH) and its own session directory +
+# socket under ~/.config/herdr/sessions/<name>/, so the `default` session and
+# the stable binary at ~/.local/bin/herdr are untouched.
+#
+#   herdr-dev              launch/attach session "dev"
+#   herdr-dev <name>       use a different session name
+#   herdr-dev --stop       stop the session
+#   herdr-dev --build      rebuild from source first, then launch
+#
+# Env: HERDR_DEV_REPO, HERDR_DEV_CONFIG
+set -uo pipefail
+
+REPO="${HERDR_DEV_REPO:-$HOME/repos/herdr}"
+CONFIG="${HERDR_DEV_CONFIG:-$HOME/.config/herdr/config.tabbar-test.toml}"
+BIN="$REPO/target/release/herdr"
+# herdr vendors libghostty-vt, whose build.zig hard-requires this exact zig and
+# rejects newer releases too. The system zig is a different version on purpose.
+ZIG_PIN="$HOME/.local/share/zig/zig-x86_64-linux-0.15.2/zig"
+
+session="dev"
+do_build=0
+stop=0
+for a in "$@"; do
+  case "$a" in
+    --build) do_build=1 ;;
+    --stop) stop=1 ;;
+    -h | --help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -*) echo "unknown flag: $a" >&2; exit 2 ;;
+    *) session="$a" ;;
+  esac
+done
+
+if [ "$stop" = 1 ]; then
+  exec "${BIN:-herdr}" session stop "$session"
+fi
+
+if [ "$do_build" = 1 ] || [ ! -x "$BIN" ]; then
+  echo "building herdr from $REPO (branch: $(git -C "$REPO" rev-parse --abbrev-ref HEAD 2>/dev/null))..."
+  zig_env=()
+  [ -x "$ZIG_PIN" ] && zig_env=(ZIG="$ZIG_PIN")
+  if ! env "${zig_env[@]}" cargo build --release --manifest-path "$REPO/Cargo.toml"; then
+    echo >&2
+    echo "build failed. If it died in the zig stage, the vendored libghostty-vt" >&2
+    echo "needs zig 0.15.2 exactly — install it under $HOME/.local/share/zig/ or" >&2
+    echo "point ZIG at it." >&2
+    exit 1
+  fi
+fi
+
+[ -x "$BIN" ] || { echo "no dev build at $BIN" >&2; exit 1; }
+[ -r "$CONFIG" ] || { echo "no config at $CONFIG" >&2; exit 1; }
+
+echo "herdr $("$BIN" --version | awk '{print $2}') (dev)  ·  session: $session  ·  config: ${CONFIG/#$HOME/\~}"
+echo "stable binary and the 'default' session are untouched. exit: prefix+q (detach) or prefix+shift+d"
+exec env HERDR_CONFIG_PATH="$CONFIG" "$BIN" --session "$session"
