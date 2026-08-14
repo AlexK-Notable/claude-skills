@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+"""One usage bar per PROVIDER, for a thin pane at the bottom of a herdr layout.
+
+WHY THIS EXISTS
+---------------
+herdr metadata has exactly two scopes, `workspace` and `pane`. There is no
+account-level or global scope. Plan usage is an account-wide fact, so a plugin
+that publishes it as a workspace token necessarily repeats the identical number
+on every space row — N workspaces, N copies. That is a scope mismatch, not a
+plugin bug, and no plugin config fixes it.
+
+herdr's sidebar cannot host a dedicated region either: `expanded_sidebar_sections()`
+returns exactly two rects (spaces, agents), the 1-row footer is hardcoded chrome,
+and plugins cannot draw to the sidebar at all. A pane is the only surface a
+non-duplicated panel can occupy today. (herdr main has an unreleased
+`[ui] tab_bar_right` status area with `type = "command"` that would do this as
+real chrome — revisit when it reaches a tagged preview.)
+
+DATA MODEL
+----------
+Reads every ``*.json`` in ``~/.local/state/herdr-usage`` (override with
+$HERDR_USAGE_FEED_DIR). Each file is one provider:
+
+    {"provider": "anthropic", "label": "anthropic",
+     "session_pct": 11, "week_pct": 3,
+     "session_resets_at": "...", "week_resets_at": "...",
+     "updated": 1786...}
+
+Collectors own the credentials and the polling; this only renders. Adding Codex
+or Gemini means adding a collector that writes the same shape — no change here.
+"""
+from __future__ import annotations
+
+import glob
+import json
+import os
+import shutil
+import sys
+import time
+from datetime import datetime, timezone
+
+FEED_DIR = os.environ.get("HERDR_USAGE_FEED_DIR") or os.path.expanduser(
+    "~/.local/state/herdr-usage"
+)
+REDRAW_S = float(os.environ.get("HERDR_USAGE_PANEL_REDRAW", "20"))
+# A feed older than this is shown dimmed with an age marker rather than silently
+# presented as current — a stale number that looks live is worse than no number.
+STALE_S = float(os.environ.get("HERDR_USAGE_PANEL_STALE", "900"))
+
+WARN_PCT, HOT_PCT = 70, 90
+TRACK = "░"
+RESET, DIM, BOLD = "\033[0m", "\033[2m", "\033[1m"
+GREEN, YELLOW, RED, GREY = "\033[32m", "\033[33m", "\033[31m", "\033[90m"
+
+
+def tint(pct: float | None) -> str:
+    if pct is None:
+        return GREY
+    if pct >= HOT_PCT:
+        return RED
+    if pct >= WARN_PCT:
+        return YELLOW
+    return GREEN
+
+
+def bar(pct: float | None, cells: int) -> str:
+    """Continuous bar. █ and ░ both fill their cell edge to edge, so the bar is
+    unbroken; ■/□ do not, which is why the sidebar version read as segments."""
+    if cells <= 0:
+        return ""
+    if pct is None:
+        return TRACK * cells
+    pct = max(0.0, min(100.0, float(pct)))
+    filled = min(cells, round(cells * pct / 100))
+    return "█" * filled + TRACK * (cells - filled)
+
+
+def human_age(seconds: float) -> str:
+    if seconds < 90:
+        return f"{int(seconds)}s"
+    if seconds < 5400:
+        return f"{int(seconds // 60)}m"
+    return f"{int(seconds // 3600)}h"
+
+
+def resets_in(iso: str | None) -> str:
+    if not iso:
+        return ""
+    try:
+        dt = datetime.fromisoformat(iso)
+    except ValueError:
+        return ""
+    left = (dt - datetime.now(timezone.utc)).total_seconds()
+    return f"resets {human_age(left)}" if left > 0 else "resetting"
+
+
+def load() -> list[dict]:
+    out = []
+    for path in sorted(glob.glob(os.path.join(FEED_DIR, "*.json"))):
+        try:
+            with open(path, encoding="utf-8") as f:
+                out.append(json.load(f))
+        except Exception:
+            continue  # a collector mid-write; skip this tick rather than crash
+    return out
+
+
+def render(feeds: list[dict], width: int) -> list[str]:
+    if not feeds:
+        return [
+            f"{DIM}no usage collectors reporting{RESET}",
+            f"{DIM}feed dir: {FEED_DIR}{RESET}",
+        ]
+
+    label_w = max(len(f.get("label") or f.get("provider") or "?") for f in feeds)
+    label_w = min(label_w, 14)
+    # width - label - two "NNN%" - two gap runs - the reset note
+    cells = max(6, (width - label_w - 34) // 2)
+    cells = min(cells, 28)
+
+    lines = []
+    now = time.time()
+    for f in sorted(feeds, key=lambda d: d.get("label") or ""):
+        label = (f.get("label") or f.get("provider") or "?")[:label_w]
+        s, w = f.get("session_pct"), f.get("week_pct")
+        age = now - float(f.get("updated") or 0)
+        stale = age > STALE_S
+
+        def seg(pct, note):
+            c = GREY if stale else tint(pct)
+            shown = "  ?" if pct is None else f"{int(pct):>3}"
+            return f"{c}{bar(pct, cells)}{RESET} {c}{shown}%{RESET} {DIM}{note}{RESET}"
+
+        row = (
+            f"{BOLD if not stale else DIM}{label:<{label_w}}{RESET}  "
+            f"{seg(s, 'session')}  {seg(w, 'week')}"
+        )
+        if stale:
+            row += f"  {GREY}(stale {human_age(age)}){RESET}"
+        lines.append(row)
+    return lines
+
+
+def main() -> None:
+    once = "--once" in sys.argv
+    while True:
+        width = shutil.get_terminal_size((80, 24)).columns
+        lines = render(load(), width)
+        if once:
+            print("\n".join(lines))
+            return
+        # Home + clear-to-end, not a full wipe: avoids the flash a \033[2J causes
+        sys.stdout.write("\033[H\033[J" + "\n".join(lines) + "\n")
+        sys.stdout.flush()
+        time.sleep(REDRAW_S)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
