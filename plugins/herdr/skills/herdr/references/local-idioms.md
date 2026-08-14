@@ -159,6 +159,32 @@ survives until *you* reinstall.
 daemon restarts: `herdr plugin action invoke stop --plugin <id>` then `start`. Verify
 against the reported token, not the file.
 
+## Per-provider usage sources (surveyed 2026-08-13)
+
+The usage feed lives in `~/.local/state/herdr-usage/`, one JSON file per provider.
+`bin/herdr-usage-panel` runs every executable named **`herdr-usage-collect-*`** found beside
+it or on PATH before rendering, so adding a provider is dropping in one file.
+
+| Provider | Source | Credentials? |
+|---|---|---|
+| Anthropic | patched `houser.claude-usage` daemon → OAuth endpoint | yes — keep it the ONLY poller |
+| Codex (OpenAI) | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`, `payload.rate_limits` | **none** — local files |
+| Antigravity (`agy`) | **none found** | — |
+
+- **Codex limits are account-wide**, like Anthropic's: every session records the same
+  primary/secondary window, snapshotted at that session's last `token_count`. Read the
+  freshest snapshot across *all* rollouts; resolving per-directory shows a stale lower number
+  for whichever pane idled longer. `primary` → session, `secondary` → week, each with
+  `used_percent` and a `resets_at` expressed as **seconds from now**, not an absolute time.
+- `rate_limits` is `null` until an API response actually carries limits, so a fresh install
+  reports nothing legitimately. Publish the feed anyway with null percentages — "set up but
+  silent" (`?`) must stay distinguishable from "not installed" (no feed file).
+- **Antigravity has no usage surface.** `agy` offers only agent/models/plugin/update/changelog
+  — no usage, quota, or status subcommand; no local quota cache (`~/.gemini/antigravity-cli/`
+  holds only an opaque OAuth token, conversations, and logs); and `senna-lang/herdr-agent-usage`
+  implements claude/codex/grok/omp/opencode with no gemini provider to copy. Anything here
+  would be a reverse-engineered undocumented endpoint. Re-check when `agy` grows a status command.
+
 ## Building herdr from source (verified 2026-08-13)
 
 Default branch is **`master`**, not `main`. Build:

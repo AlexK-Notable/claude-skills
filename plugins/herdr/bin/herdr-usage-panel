@@ -35,6 +35,7 @@ import glob
 import json
 import os
 import shutil
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -194,10 +195,14 @@ def one_line(feeds: list[dict]) -> str:
 
 def main() -> None:
     once = "--once" in sys.argv
+    if "--no-collect" not in sys.argv:
+        collect()
     if "--line" in sys.argv:
         print(one_line(load()))
         return
     while True:
+        if "--no-collect" not in sys.argv:
+            collect()
         width = shutil.get_terminal_size((80, 24)).columns
         lines = render(load(), width)
         if once:
