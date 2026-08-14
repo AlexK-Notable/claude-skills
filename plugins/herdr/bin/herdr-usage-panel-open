@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Toggle a thin usage strip along the bottom of the current tab.
+#
+# Uses `pane split --ratio` rather than `plugin pane open`, because plugin pane
+# open has no size control at all (`--width`/`--height` are rejected for any
+# placement except popup) and `pane resize --amount` is an unclear nudge.
+# --ratio is exact and lands the strip at the right height on the first try.
+#
+# Invoked from a herdr [[keys.command]], which injects HERDR_ACTIVE_PANE_ID and
+# HERDR_ACTIVE_TAB_ID. NOTE: this splits the ACTIVE pane, so in a multi-pane tab
+# the strip sits under that pane rather than spanning the full width.
+set -uo pipefail
+
+LABEL="usage"
+RATIO="${HERDR_USAGE_PANEL_RATIO:-0.16}"
+HERDR="${HERDR_BIN_PATH:-herdr}"
+
+command -v "$HERDR" >/dev/null 2>&1 || { echo "herdr not found" >&2; exit 0; }
+command -v jq >/dev/null 2>&1 || { echo "jq not found" >&2; exit 0; }
+
+ws="${HERDR_ACTIVE_WORKSPACE_ID:-${HERDR_WORKSPACE_ID:-}}"
+tab="${HERDR_ACTIVE_TAB_ID:-${HERDR_TAB_ID:-}}"
+src="${HERDR_ACTIVE_PANE_ID:-${HERDR_PANE_ID:-}}"
+
+# Fall back to whatever the UI has focused (see local-idioms: `pane current`
+# returns the CALLER's pane, so it is useless from a keybind).
+if [ -z "$src" ]; then
+  src=$("$HERDR" pane list 2>/dev/null | jq -r '.result.panes[]|select(.focused)|.pane_id' | head -1)
+fi
+[ -n "$src" ] || { echo "no pane to split" >&2; exit 0; }
+
+# ── toggle: already open in this tab? close it ───────────────────────────────
+existing=$("$HERDR" pane list ${ws:+--workspace "$ws"} 2>/dev/null \
+  | jq -r --arg t "$tab" --arg l "$LABEL" \
+      '.result.panes[] | select(.label == $l) | select($t == "" or .tab_id == $t) | .pane_id' \
+  | head -1)
+
+if [ -n "$existing" ]; then
+  "$HERDR" pane close "$existing" >/dev/null 2>&1
+  exit 0
+fi
+
+# ── open ─────────────────────────────────────────────────────────────────────
+new=$("$HERDR" pane split "$src" --direction down --ratio "$RATIO" --no-focus 2>/dev/null \
+  | jq -r '.result.pane.pane_id // empty')
+[ -n "$new" ] || { echo "split failed" >&2; exit 0; }
+
+"$HERDR" pane rename "$new" "$LABEL" >/dev/null 2>&1
+
+# Resolve the renderer explicitly — a herdr command inherits the SERVER's
+# environment, which need not carry ~/bin.
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+panel=""
+for cand in "$here/herdr-usage-panel" "$HOME/bin/herdr-usage-panel" "$HOME/.local/bin/herdr-usage-panel"; do
+  [ -x "$cand" ] && { panel="$cand"; break; }
+done
+[ -n "$panel" ] || panel="herdr-usage-panel"
+
+"$HERDR" pane run "$new" "exec $panel" >/dev/null 2>&1
+exit 0
