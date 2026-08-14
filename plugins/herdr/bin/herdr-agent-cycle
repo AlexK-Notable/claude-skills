@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# herdr-agent-cycle next|prev
+#
+# Move herdr's focus to the next/previous live agent pane.
+#
+# WHY THIS EXISTS: herdr cannot bind a mouse wheel. Its keybind parser
+# (src/config/keybinds.rs) resolves every binding to a crossterm KeyCode and
+# returns None for anything it does not recognise — there is no mouse/wheel/
+# button token. herdr consumes the wheel for scrollback and selection only.
+# So wheel-to-cycle has to be driven from the compositor, which CAN bind
+# `mouse_up`/`mouse_down`, calling this script.
+#
+# THE GUARD IS THE POINT: a Hyprland wheel bind is global. Without a guard,
+# scrolling in a browser, a game, or any other window would silently retarget
+# agents in the background. This exits 0 and does nothing unless the currently
+# FOCUSED window is the terminal actually hosting a herdr client, found by
+# walking each herdr process's ancestry up to its terminal emulator rather
+# than hardcoding a pid (which changes on every restart).
+#
+# It never raises, activates, or moves a window: `herdr agent focus` only
+# changes herdr's own internal view, and the guard means herdr is already the
+# focused window before anything happens.
+set -uo pipefail
+
+dir="${1:-next}"
+case "$dir" in
+  next | prev) ;;
+  *) echo "usage: $(basename "$0") next|prev" >&2; exit 2 ;;
+esac
+
+command -v herdr >/dev/null 2>&1 || exit 0
+command -v jq >/dev/null 2>&1 || exit 0
+
+# ── guard: only act when the focused window hosts herdr ──────────────────────
+if command -v hyprctl >/dev/null 2>&1; then
+  active_pid=$(hyprctl -j activewindow 2>/dev/null | jq -r '.pid // empty')
+  [ -n "$active_pid" ] || exit 0
+
+  # Terminal emulators that could be hosting a herdr client.
+  is_terminal() {
+    case "$1" in
+      ghostty | kitty | alacritty | wezterm-gui | foot | konsole | xterm | st | wezterm)
+        return 0 ;;
+      *) return 1 ;;
+    esac
+  }
+
+  hosts=""
+  for hp in $(pgrep -x herdr 2>/dev/null); do
+    p=$hp
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      p=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')
+      [ -n "$p" ] && [ "$p" != "0" ] && [ "$p" != "1" ] || break
+      comm=$(ps -o comm= -p "$p" 2>/dev/null | tr -d ' ')
+      if is_terminal "$comm"; then
+        hosts="$hosts $p"
+        break
+      fi
+    done
+  done
+
+  case " $hosts " in
+    *" $active_pid "*) ;;
+    *) exit 0 ;;
+  esac
+fi
+
+# ── collect agent panes, in herdr's own list order ───────────────────────────
+mapfile -t panes < <(herdr agent list 2>/dev/null | jq -r '.result.agents[].pane_id')
+n=${#panes[@]}
+[ "$n" -gt 1 ] || exit 0   # nothing to cycle between
+
+cur=$(herdr pane current 2>/dev/null | jq -r '.result.pane.pane_id // empty')
+
+idx=-1
+for i in "${!panes[@]}"; do
+  if [ "${panes[$i]}" = "$cur" ]; then idx=$i; break; fi
+done
+
+if [ "$idx" -lt 0 ]; then
+  # Focused pane hosts no agent (a plain shell, a plugin pane): start at the top
+  # rather than guessing a neighbour.
+  target="${panes[0]}"
+elif [ "$dir" = next ]; then
+  target="${panes[$(((idx + 1) % n))]}"
+else
+  target="${panes[$(((idx - 1 + n) % n))]}"
+fi
+
+herdr agent focus "$target" >/dev/null 2>&1
+exit 0
