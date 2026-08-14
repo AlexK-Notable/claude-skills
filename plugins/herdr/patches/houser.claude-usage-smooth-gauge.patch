@@ -1,0 +1,41 @@
+--- a/monitor.py
++++ b/monitor.py
+@@ -51,6 +51,20 @@
+ TTL_MS = POLL_S * 4 * 1000  # tokens outlive a few failed fetches, then expire on their own
+ REFRESH_S = 240  # re-report unchanged tokens well before the TTL expires
+ GAUGE_CELLS = 10
++# LOCAL PATCH (komi, 2026-08-13): smooth gauge instead of ■/□ segments.
++# Eighth-block glyphs give 8 sub-steps per cell = 80 steps across the bar,
++# vs 10 for the segmented version. That is not just cosmetic: at 10 cells,
++# 3% and 7% both rendered identically, and 7% rounded up to a FULL square,
++# overstating it as 10%.
++GAUGE_BLOCKS = "▏▎▍▌▋▊▉█"  # 1/8 .. 8/8 of a cell
++GAUGE_TRACK = "░"          # unfilled remainder; same fg, reads as a lighter track
++# GAUGE_SUBCELL trades continuity for precision, and it is a real trade:
++#   True  — 80 steps, but a partial cell like ▏ sits at the LEFT of its cell and
++#           leaves the rest of that cell blank, so a visible gap opens between
++#           the fill and the track. Precision at the cost of a broken-looking bar.
++#   False — 10 steps, but █ and ░ both fill their cell edge to edge, so the bar
++#           is perfectly continuous. This is what "smooth bar" actually looks like.
++GAUGE_SUBCELL = False
+ WARN_PCT, HOT_PCT = 70, 90
+ VARIANTS = ("cu", "cu_warn", "cu_hot", "cu_out")  # each styled by its own sidebar row
+ 
+@@ -250,8 +264,15 @@
+         return "cu_out", "⏳ limit reached"
+     worst = max(session["pct"] or 0, week["pct"] or 0)
+     variant = "cu_hot" if worst >= HOT_PCT else "cu_warn" if worst >= WARN_PCT else "cu"
+-    filled = min(GAUGE_CELLS, round(GAUGE_CELLS * (session["pct"] or 0) / 100))
+-    gauge = "■" * filled + "□" * (GAUGE_CELLS - filled)
++    # LOCAL PATCH: smooth gauge (see GAUGE_BLOCKS above).
++    pct = max(0.0, min(100.0, float(session["pct"] or 0)))
++    if GAUGE_SUBCELL:
++        eighths = round(GAUGE_CELLS * 8 * pct / 100)
++        whole, rem = divmod(eighths, 8)
++        gauge = "█" * whole + (GAUGE_BLOCKS[rem - 1] if rem else "")
++    else:
++        gauge = "█" * min(GAUGE_CELLS, round(GAUGE_CELLS * pct / 100))
++    gauge += GAUGE_TRACK * (GAUGE_CELLS - len(gauge))
+     week_pct = "?" if week["pct"] is None else week["pct"]
+     return variant, f"{gauge} {session['pct']}/{week_pct}"
+ 
