@@ -70,7 +70,13 @@ mapfile -t panes < <(herdr agent list 2>/dev/null | jq -r '.result.agents[].pane
 n=${#panes[@]}
 [ "$n" -gt 1 ] || exit 0   # nothing to cycle between
 
-cur=$(herdr pane current 2>/dev/null | jq -r '.result.pane.pane_id // empty')
+# The UI-focused pane MUST come from the `focused` flag in a global `pane list`.
+# Do NOT use `herdr pane current`: it resolves the CALLER's inherited
+# HERDR_PANE_ID, so inside a pane it returns that pane no matter what the UI is
+# actually showing, and launched from a compositor bind (no herdr context at
+# all) it is meaningless. Verified live: with w6:p1 genuinely focused,
+# `pane current` still reported the caller's w4:p1.
+cur=$(herdr pane list 2>/dev/null | jq -r '.result.panes[]|select(.focused)|.pane_id' | head -1)
 
 idx=-1
 for i in "${!panes[@]}"; do
