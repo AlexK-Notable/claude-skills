@@ -159,6 +159,33 @@ survives until *you* reinstall.
 daemon restarts: `herdr plugin action invoke stop --plugin <id>` then `start`. Verify
 against the reported token, not the file.
 
+## Account-wide values duplicate across the sidebar — by design
+
+**Metadata has exactly two scopes: `workspace` and `pane`.** There is no account or global
+scope. Anything account-wide (plan quota, a subscription meter) published as a workspace
+token therefore repeats identically on every space row. No plugin setting fixes this; the
+value has to leave the token system.
+
+**The sidebar cannot host a dedicated region either.** `expanded_sidebar_sections()` returns
+exactly two rects — spaces and agents. The 1-row footer inside the spaces area is hardcoded
+chrome (`new` / `menu` buttons), and plugins cannot draw to the sidebar at all; they can only
+report tokens into `[ui.sidebar.agents]` / `[ui.sidebar.spaces]` rows. So "a dedicated panel
+below the agents list" is not expressible.
+
+Two ways out:
+
+- **A pane.** `bin/herdr-usage-panel` + `bin/herdr-usage-panel-open` render one bar per
+  provider in a thin bottom strip, fed by JSON files in `~/.local/state/herdr-usage/`.
+  Gotcha: **`pane split --ratio` sets the size of the ORIGINAL pane, not the new one** —
+  `--ratio 0.16` yields a new pane taking ~84%. Invert it. `plugin pane open` has no size
+  control at all (`--width`/`--height` are rejected unless placement is `popup`), which is
+  why driving `pane split` directly beats a plugin `[[panes]]` entrypoint when size matters.
+- **`[ui] tab_bar_right`** with `type = "command"` — a tmux-style status area that runs a
+  command on an interval and renders its last line once, no workspace scoping. Fully
+  implemented in `src/app/tab_bar_status.rs` but **unreleased**: 82 commits past
+  `preview-2026-08-04-d78e3d3b5126`, which is the newest tag. Pair with the already-shipped
+  `tab_bar_position = "bottom"` for a bottom-right status strip. Revisit when it tags.
+
 **Sidebar bar-glyph gotcha, learned by screenshot.** `■`/`□` are small geometric shapes
 that do not fill their character cell, so a bar built from them reads as separated squares.
 `█` and `░` fill the cell edge to edge and render as one continuous bar. Eighth-block
