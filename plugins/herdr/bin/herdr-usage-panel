@@ -94,6 +94,36 @@ def resets_in(iso: str | None) -> str:
     return f"resets {human_age(left)}" if left > 0 else "resetting"
 
 
+def collect() -> None:
+    """Run every `herdr-usage-collect-*` executable found beside this script or
+    on PATH, so adding a provider is dropping in a file — no edit here.
+
+    Collectors are expected to be cheap and local (the Codex one reads rollout
+    files; nothing network-bound belongs on a render tick). Failures and hangs
+    are swallowed: a broken collector must not take the panel down with it.
+    """
+    seen, cmds = set(), []
+    dirs = [os.path.dirname(os.path.abspath(__file__))]
+    dirs += [d for d in os.environ.get("PATH", "").split(os.pathsep) if d]
+    for d in dirs:
+        try:
+            names = os.listdir(d)
+        except OSError:
+            continue
+        for name in names:
+            if not name.startswith("herdr-usage-collect-") or name in seen:
+                continue
+            p = os.path.join(d, name)
+            if os.access(p, os.X_OK) and not os.path.isdir(p):
+                seen.add(name)
+                cmds.append(p)
+    for cmd in cmds:
+        try:
+            subprocess.run([cmd], timeout=10, capture_output=True)
+        except Exception:
+            continue
+
+
 def load() -> list[dict]:
     out = []
     for path in sorted(glob.glob(os.path.join(FEED_DIR, "*.json"))):
