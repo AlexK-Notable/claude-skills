@@ -212,3 +212,15 @@ After that failed read, ask the agent to write its complete response as Markdown
 ## Local idioms
 
 The `HERDR_ENV=1` gate above applies to **controlling the current session from inside a pane**. Host-level work — editing config, installing plugins, debugging agent detection, building automation around the socket/CLI — is legitimate from any terminal. For those tasks read [references/local-idioms.md](references/local-idioms.md): notification delivery setup, agent-detection maintenance, sidebar metadata from Claude Code hooks, event-subscription patterns, worktree flow, and plugin-authoring notes.
+
+## Setting this up on a new machine
+
+To reproduce this whole configuration — sidebar layout, the four pinned plugins and their
+keybinds, the multi-provider usage feed, and the optional Hyprland and source-build
+extras — follow [references/replicate-setup.md](references/replicate-setup.md). It is an
+ordered runbook with a verification step after anything that can fail silently, plus a
+portability table marking which pieces assume Hyprland/Wayland and which are host-neutral.
+
+Use it whenever the user asks to set up, replicate, or migrate herdr to another host.
+Prefer it over reconstructing the setup from `local-idioms.md`, which is organised as
+reference material rather than as an install order.
