@@ -3,7 +3,7 @@
     "type": "domain",
     "enforcement": "suggest",
     "priority": "high",
-    "description": "Herdr agent multiplexer — in-pane control, config, notifications, agent detection, plugins, automation",
+    "description": "Herdr agent multiplexer — in-pane control, config, notifications, agent detection, plugins, automation, and replicating the full setup on a new machine",
     "promptTriggers": {
       "keywords": [
         "herdr",
