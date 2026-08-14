@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""Publish Codex plan usage to the shared usage feed.
+
+SOURCE: Codex records rate-limit snapshots into its own rollout transcripts at
+``~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl``, as ``payload.rate_limits``
+on ``token_count`` events. Reading those means **no credentials and no network**
+— unlike the Anthropic collector, which must call an OAuth endpoint.
+
+ACCOUNT-WIDE: every Codex session records the same primary/secondary window,
+each snapshotted at that session's last token_count. So the freshest snapshot
+across ALL sessions is the correct read; picking a per-directory session shows
+a stale, lower number for whichever pane has been idle longer.
+
+``rate_limits`` is ``null`` until an API response actually carries limits, so a
+fresh install legitimately has nothing to report. That is published as a feed
+with null percentages (rendered "?") rather than no feed at all, so the panel
+can distinguish "Codex is set up but hasn't reported yet" from "not installed".
+"""
+from __future__ import annotations
+
+import json
+import os
+import time
+from collections import deque
+
+FEED_DIR = os.environ.get("HERDR_USAGE_FEED_DIR") or os.path.expanduser(
+    "~/.local/state/herdr-usage"
+)
+CODEX_HOME = os.environ.get("CODEX_HOME") or os.path.expanduser("~/.codex")
+# Newest-first scan bound. Limits are account-wide, so the freshest file almost
+# always wins immediately; this only caps the walk on a very large history.
+MAX_FILES = int(os.environ.get("HERDR_USAGE_CODEX_MAX_FILES", "25"))
+TAIL_LINES = 400  # rate_limits ride on token_count events near the end
+
+
+def rollout_paths() -> list[str]:
+    root = os.path.join(CODEX_HOME, "sessions")
+    found: list[tuple[float, str]] = []
+    for dirpath, _dirnames, filenames in os.walk(root):
+        for name in filenames:
+            if name.endswith(".jsonl"):
+                p = os.path.join(dirpath, name)
+                try:
+                    found.append((os.path.getmtime(p), p))
+                except OSError:
+                    continue
+    found.sort(reverse=True)
+    return [p for _, p in found[:MAX_FILES]]
+
+
+def newest_rate_limits() -> dict | None:
+    for path in rollout_paths():
+        try:
+            with open(path, encoding="utf-8", errors="replace") as f:
+                lines = deque(f, maxlen=TAIL_LINES)
+        except OSError:
+            continue
+        for line in reversed(lines):
+            if '"rate_limits"' not in line:
+                continue
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue
+            rl = (rec.get("payload") or {}).get("rate_limits")
+            if isinstance(rl, dict) and rl:
+                return rl
+    return None
+
+
+def window(raw) -> tuple[float | None, str | None]:
+    """-> (used_percent, resets_at_iso). resets_at is seconds-from-now."""
+    if not isinstance(raw, dict):
+        return None, None
+    pct = raw.get("used_percent")
+    pct = float(pct) if isinstance(pct, (int, float)) else None
+    resets = raw.get("resets_at")
+    iso = None
+    if isinstance(resets, (int, float)):
+        # Codex reports seconds until reset, not an absolute timestamp.
+        iso = time.strftime(
+            "%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(time.time() + float(resets))
+        )
+    return pct, iso
+
+
+def main() -> None:
+    if not os.path.isdir(os.path.join(CODEX_HOME, "sessions")):
+        return  # codex not installed / never run: publish nothing at all
+    rl = newest_rate_limits() or {}
+    s_pct, s_reset = window(rl.get("primary"))
+    w_pct, w_reset = window(rl.get("secondary"))
+    payload = {
+        "provider": "openai",
+        "label": "codex",
+        "session_pct": s_pct,
+        "week_pct": w_pct,
+        "session_resets_at": s_reset,
+        "week_resets_at": w_reset,
+        "plan": rl.get("plan_type"),
+        "updated": time.time(),
+    }
+    os.makedirs(FEED_DIR, exist_ok=True)
+    path = os.path.join(FEED_DIR, "codex.json")
+    tmp = f"{path}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(payload, f)
+    os.replace(tmp, path)  # atomic: the panel may be mid-read
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception:
+        pass  # display-only; never let a collector failure break anything
