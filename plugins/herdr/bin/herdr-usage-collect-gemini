@@ -1,0 +1,229 @@
+#!/usr/bin/env python3
+"""Publish Antigravity (Gemini) plan usage to the shared usage feed.
+
+SOURCE: ``agy -p "/usage"``. The slash command is handled client-side by the
+Antigravity CLI, which owns the OAuth token and its refresh — so this collector
+holds no credentials, exactly like the Codex one. Output is TSV::
+
+    Gemini Models          Weekly Limit Remaining      99%   2026-08-21T05:10:51Z
+    Gemini Models          Five Hour Limit Remaining   97%   2026-08-14T10:10:51Z
+    Claude and GPT models  Weekly Limit Remaining     100%   2026-08-21T05:37:02Z
+    Claude and GPT models  Five Hour Limit Remaining  100%   2026-08-14T10:37:02Z
+
+Percentages are REMAINING, so the feed stores ``100 - remaining``.
+
+WHY NOT THE cloudcode-pa QUOTA ENDPOINT
+---------------------------------------
+``https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota`` is real,
+returns HTTP 200, and is genuinely called by the agy binary — but it reports
+buckets for gemini-2.5-flash / -flash-lite / -pro / gemini-3.1-flash-lite, and
+``agy models`` offers *none* of those (it serves gemini-3.7/3.6/3.5-flash,
+gemini-3.1-pro, claude-sonnet-4-6, claude-opus-4-6-thinking, gpt-oss-120b).
+Zero overlap. A live agy request moved nothing there, and ``v1internal:
+loadCodeAssist`` lists that tier under ``ineligibleTiers`` with reasonCode
+UNSUPPORTED_CLIENT. Every fraction sits at a pristine 1.0 and ``resetTime``
+just tracks now+24h, i.e. a window that has never started. Building on it
+would render a permanently-full bar that never moves — worse than no bar.
+Verified 2026-08-14; do not "restore" that endpoint.
+
+COST / SCHEDULING
+-----------------
+An agy spawn costs ~3.3s and a network round trip. ``herdr-usage-panel`` runs
+every collector on each render tick (20s) with a 10s subprocess timeout, so
+refreshing inline would be both wasteful and liable to truncation. Instead:
+a fresh feed short-circuits immediately, and a stale one hands off to a
+DETACHED child so the panel never waits on us at all. Data lands one tick late;
+that is invisible at a 20s redraw.
+
+``/usage`` creates no conversation record (verified: db count unchanged), and
+--log-file keeps agy from dropping a new timestamped log per poll.
+"""
+from __future__ import annotations
+
+import errno
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+
+FEED_DIR = os.environ.get("HERDR_USAGE_FEED_DIR") or os.path.expanduser(
+    "~/.local/state/herdr-usage"
+)
+# One agy call per this many seconds. The plan windows are 5-hour and weekly,
+# so polling faster than a few minutes buys nothing.
+TTL_S = float(os.environ.get("HERDR_USAGE_GEMINI_TTL", "300"))
+# A refresh that outlives this is presumed dead and its lock is reclaimed.
+LOCK_STALE_S = 180.0
+AGY_TIMEOUT_S = 60.0
+
+RUNTIME = os.environ.get("XDG_RUNTIME_DIR") or "/tmp"
+LOCK_PATH = os.path.join(RUNTIME, "herdr-usage-collect-gemini.lock")
+AGY_LOG = os.path.join(RUNTIME, "herdr-usage-collect-gemini.agy.log")
+
+# family substring -> (feed filename, label). Set HERDR_USAGE_GEMINI_FAMILIES
+# to a comma-separated list of feed keys to publish a subset, e.g. "gemini".
+FAMILIES = {
+    "gemini models": ("gemini", "antigravity", "agy gemini"),
+    "claude and gpt models": ("claude-gpt", "antigravity", "agy cld/gpt"),
+}
+WINDOWS = {"weekly": "week", "five hour": "session"}
+
+
+def agy_path() -> str | None:
+    return shutil.which("agy") or next(
+        (p for p in (os.path.expanduser("~/.local/bin/agy"),) if os.access(p, os.X_OK)),
+        None,
+    )
+
+
+def wanted() -> set[str]:
+    raw = os.environ.get("HERDR_USAGE_GEMINI_FAMILIES", "").strip()
+    if not raw:
+        return {k for _, (k, _, _) in FAMILIES.items()}
+    return {p.strip() for p in raw.split(",") if p.strip()}
+
+
+def feed_path(key: str) -> str:
+    return os.path.join(FEED_DIR, f"antigravity-{key}.json")
+
+
+def fresh_enough() -> bool:
+    """True when every feed we intend to publish is younger than the TTL."""
+    now = time.time()
+    for key in wanted():
+        try:
+            if now - os.path.getmtime(feed_path(key)) > TTL_S:
+                return False
+        except OSError:
+            return False
+    return True
+
+
+def parse(text: str) -> dict[str, dict]:
+    """TSV -> {feed_key: {"session"|"week": (used_pct, iso)}}. Unknown rows are
+    ignored rather than guessed at, so a format change degrades to 'no data'
+    instead of a confidently wrong number."""
+    out: dict[str, dict] = {}
+    for line in text.splitlines():
+        parts = [p.strip() for p in line.split("\t") if p.strip()]
+        if len(parts) < 3:
+            continue
+        family, window, pct = parts[0].lower(), parts[1].lower(), parts[2]
+        reset = parts[3] if len(parts) > 3 else None
+
+        key = next((v[0] for k, v in FAMILIES.items() if k in family), None)
+        slot = next((v for k, v in WINDOWS.items() if k in window), None)
+        if not key or not slot:
+            continue
+        try:
+            remaining = float(pct.rstrip("%"))
+        except ValueError:
+            continue
+        # The CLI reports REMAINING; the feed schema stores USED.
+        used = max(0.0, min(100.0, 100.0 - remaining))
+        if reset and reset.endswith("Z"):  # match the codex collector's shape
+            reset = reset[:-1] + "+00:00"
+        out.setdefault(key, {})[slot] = (used, reset)
+    return out
+
+
+def publish(parsed: dict[str, dict]) -> None:
+    os.makedirs(FEED_DIR, exist_ok=True)
+    keep = wanted()
+    for _, (key, provider, label) in FAMILIES.items():
+        if key not in keep or key not in parsed:
+            continue
+        rows = parsed[key]
+        session, week = rows.get("session"), rows.get("week")
+        payload = {
+            "provider": provider,
+            "label": label,
+            "session_pct": session[0] if session else None,
+            "week_pct": week[0] if week else None,
+            "session_resets_at": session[1] if session else None,
+            "week_resets_at": week[1] if week else None,
+            "updated": time.time(),
+        }
+        path = feed_path(key)
+        tmp = f"{path}.tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+        os.replace(tmp, path)  # atomic: the panel may be mid-read
+
+
+def acquire_lock() -> int | None:
+    try:
+        return os.open(LOCK_PATH, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            return None
+    try:  # reclaim a lock left behind by a killed refresher
+        if time.time() - os.path.getmtime(LOCK_PATH) > LOCK_STALE_S:
+            os.unlink(LOCK_PATH)
+            return os.open(LOCK_PATH, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except OSError:
+        pass
+    return None
+
+
+def refresh() -> None:
+    """Runs in the detached child: call agy, parse, publish."""
+    fd = acquire_lock()
+    if fd is None:
+        return  # another refresh is already in flight
+    try:
+        os.close(fd)
+        agy = agy_path()
+        if not agy:
+            return
+        proc = subprocess.run(
+            [agy, "-p", "/usage", "--log-file", AGY_LOG],
+            capture_output=True,
+            text=True,
+            timeout=AGY_TIMEOUT_S,
+            cwd=RUNTIME,
+        )
+        parsed = parse(proc.stdout or "")
+        if parsed:  # only overwrite good data with good data
+            publish(parsed)
+    except Exception:
+        pass
+    finally:
+        try:
+            os.unlink(LOCK_PATH)
+        except OSError:
+            pass
+
+
+def main() -> None:
+    if "--refresh" in sys.argv:  # the detached child
+        refresh()
+        return
+    if not agy_path():
+        return  # antigravity not installed: publish nothing at all
+    if "--force" in sys.argv:
+        refresh()
+        return
+    if fresh_enough():
+        return
+    # Hand off to a detached child so the panel's 10s budget never covers an
+    # agy spawn. Returns immediately; the feed lands before the next tick.
+    try:
+        subprocess.Popen(
+            [sys.executable, os.path.abspath(__file__), "--refresh"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except Exception:
+        pass
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception:
+        pass  # display-only; never let a collector failure break anything
