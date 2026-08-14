@@ -32,7 +32,11 @@ command -v herdr >/dev/null 2>&1 || exit 0
 command -v jq >/dev/null 2>&1 || exit 0
 
 # ── guard: only act when the focused window hosts herdr ──────────────────────
-if command -v hyprctl >/dev/null 2>&1; then
+# HERDR_AGENT_CYCLE_FORCE=1 skips the guard. Needed to test the cycling logic
+# (any terminal you run the test from steals focus from herdr, so the guard
+# would otherwise refuse every test run and look like a broken script), and
+# available if you ever want the bind to work from anywhere.
+if [ "${HERDR_AGENT_CYCLE_FORCE:-}" != 1 ] && command -v hyprctl >/dev/null 2>&1; then
   active_pid=$(hyprctl -j activewindow 2>/dev/null | jq -r '.pid // empty')
   [ -n "$active_pid" ] || exit 0
 
