@@ -12,7 +12,12 @@
 set -uo pipefail
 
 LABEL="usage"
-RATIO="${HERDR_USAGE_PANEL_RATIO:-0.16}"
+# Fraction of the split the STRIP should get. herdr's `pane split --ratio` sets
+# the size of the ORIGINAL pane, not the new one — verified by screenshot after
+# --ratio 0.16 produced a strip taking ~84% of the height. So this is inverted
+# before being passed through, and this variable means what its name says.
+STRIP="${HERDR_USAGE_PANEL_RATIO:-0.08}"
+RATIO=$(awk -v s="$STRIP" 'BEGIN{r=1-s; if(r<0.05)r=0.05; if(r>0.95)r=0.95; printf "%.3f", r}')
 HERDR="${HERDR_BIN_PATH:-herdr}"
 
 command -v "$HERDR" >/dev/null 2>&1 || { echo "herdr not found" >&2; exit 0; }
