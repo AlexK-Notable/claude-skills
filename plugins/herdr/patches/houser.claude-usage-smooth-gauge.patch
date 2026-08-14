@@ -21,7 +21,46 @@
  WARN_PCT, HOT_PCT = 70, 90
  VARIANTS = ("cu", "cu_warn", "cu_hot", "cu_out")  # each styled by its own sidebar row
  
-@@ -250,8 +264,15 @@
+@@ -192,6 +206,38 @@
+     }
+ 
+ 
++# LOCAL PATCH (komi, 2026-08-13): publish raw numbers to a shared feed dir so a
++# single usage panel can render one bar per PROVIDER, instead of this plugin's
++# per-workspace tokens repeating the same account-wide number on every space row.
++# herdr metadata only has workspace and pane scope — there is no account/global
++# scope — so de-duplicating has to happen outside the token system entirely.
++# This plugin stays the sole Anthropic poller: nothing else should hold the OAuth
++# token or add rate-limit pressure. Future providers write the same shape.
++FEED_DIR = os.path.expanduser("~/.local/state/herdr-usage")
++
++
++def publish_feed(last_good):
++    try:
++        os.makedirs(FEED_DIR, exist_ok=True)
++        for name, usage in last_good.items():
++            payload = {
++                "provider": "anthropic",
++                "label": "anthropic" if name == "claude" else f"anthropic:{name}",
++                "session_pct": usage["session"]["pct"],
++                "week_pct": usage["week"]["pct"],
++                "session_resets_at": usage["session"].get("resets_at"),
++                "week_resets_at": usage["week"].get("resets_at"),
++                "updated": time.time(),
++            }
++            path = os.path.join(FEED_DIR, f"anthropic-{name}.json")
++            tmp = f"{path}.tmp"
++            with open(tmp, "w", encoding="utf-8") as f:
++                json.dump(payload, f)
++            os.replace(tmp, path)  # atomic: the panel may be mid-read
++    except Exception:
++        pass  # the feed is display-only; never break the sidebar path over it
++
++
+ def report_variant(workspace_id, variant, text):
+     """Publish one variant and retract the other three, in a single CLI call."""
+     args = ["workspace", "report-metadata", workspace_id, "--source", SOURCE,
+@@ -250,8 +296,15 @@
          return "cu_out", "⏳ limit reached"
      worst = max(session["pct"] or 0, week["pct"] or 0)
      variant = "cu_hot" if worst >= HOT_PCT else "cu_warn" if worst >= WARN_PCT else "cu"
@@ -39,3 +78,11 @@
      week_pct = "?" if week["pct"] is None else week["pct"]
      return variant, f"{gauge} {session['pct']}/{week_pct}"
  
+@@ -319,6 +372,7 @@
+             # back off hard while rate-limited so we don't extend the penalty
+             # window or compete with the user's own /status calls
+             next_poll = now + (POLL_S * 3 if rate_limited else POLL_S)
++            publish_feed(last_good)  # LOCAL PATCH: see publish_feed()
+         for ws in workspaces:
+             ws_id = ws["workspace_id"]
+             usage = last_good.get(ws_account.get(ws_id))
