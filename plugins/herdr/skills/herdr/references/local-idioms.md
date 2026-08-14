@@ -97,6 +97,42 @@ click stays terminal input.
 the alternate screen, which never enters herdr's host scrollback. Verify such an action by its
 exit status plus a `pane list` diff, not by `pane read`.
 
+## Finding the UI-focused pane — `pane current` is a trap
+
+**`herdr pane current` does NOT return the pane the user is looking at.** It resolves the
+*caller's* inherited `HERDR_PANE_ID`, so a script running inside a pane always gets its own
+pane back no matter what the UI shows, and a script launched from outside herdr (a systemd
+unit, a compositor keybind) has no context at all. Verified live: with `w6:p1` genuinely
+focused, `pane current` still reported the caller's `w4:p1`.
+
+Use the `focused` flag from a **global** `pane list` instead — it takes no `--workspace` and
+covers every workspace:
+
+```bash
+herdr pane list | jq -r '.result.panes[]|select(.focused)|.pane_id'
+```
+
+## herdr cannot bind a mouse wheel
+
+`src/config/keybinds.rs` resolves every binding to a crossterm `KeyCode` and returns `None`
+for anything unrecognised — there is no mouse/wheel/button token. herdr consumes the wheel
+for scrollback, selection, and its scrollbars, but the wheel is not bindable to an action.
+
+Wheel-driven actions therefore belong to the compositor. Hyprland binds `mouse_up`/`mouse_down`
+and can `exec` a script that calls the herdr CLI — `bin/herdr-agent-cycle` does exactly this.
+Two things make it safe rather than chaotic:
+
+- **A compositor wheel bind is global.** Guard the script so it no-ops unless the focused
+  window is the terminal hosting herdr — resolve that by walking each `herdr` process's
+  ancestry until you hit a terminal emulator, never by hardcoding a pid (it changes every
+  restart). Testing such a guard is confusing: any terminal you test from holds focus, so the
+  guard correctly refuses and the script looks broken. Give it a documented env override.
+- **Check the modifier is free.** `$mainMod + mouse_down/up` was already bound to Hyprland
+  workspace cycling on this host, so agent cycling uses `$mainMod SHIFT`.
+
+Confirm binds actually registered with `hyprctl -j binds` (filter on `.description`), and
+run the same filter against a bogus string as a negative control.
+
 ## Plugin vetting — what to check before installing
 
 Plugins are unsandboxed; pre-install review IS the security model. Lessons from vetting 15 repos (2026-08-11, full reports in `~/repos/herdr-research/vetting-*.md`):
