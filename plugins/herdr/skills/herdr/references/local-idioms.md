@@ -133,6 +133,21 @@ Two things make it safe rather than chaotic:
 Confirm binds actually registered with `hyprctl -j binds` (filter on `.description`), and
 run the same filter against a bogus string as a negative control.
 
+**Use an ABSOLUTE path in a Hyprland `exec` bind.** Hyprland's exec environment does not
+include `~/bin` — that is added by `.zshrc`, which only runs for interactive shells. A bare
+command name resolves to nothing and fails **completely silently**: the bind fires, the shell
+finds no such command, and no error surfaces anywhere. `~/.local/bin` *is* present, so a
+script symlinked there works by luck; `~/bin` does not. Verify the real environment rather
+than assuming:
+
+```bash
+hyprctl dispatch exec /path/to/probe    # probe writes $PATH + `command -v` results to a file
+```
+
+**A guarded script that no-ops looks exactly like a broken one**, and a compositor bind
+swallows stderr. Give any guarded script a `*_DEBUG=1` env that logs its exit reason to
+`$XDG_RUNTIME_DIR`, or the next "it doesn't work" report has no evidence attached.
+
 ## Plugin vetting — what to check before installing
 
 Plugins are unsandboxed; pre-install review IS the security model. Lessons from vetting 15 repos (2026-08-11, full reports in `~/repos/herdr-research/vetting-*.md`):
