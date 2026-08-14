@@ -9,7 +9,7 @@ Nothing here is applied automatically. Re-apply by hand after a deliberate reins
 
 | Patch | Plugin | Pinned upstream | What it changes |
 |---|---|---|---|
-| `houser.claude-usage-smooth-gauge.patch` | `houser.claude-usage` | `21896aa7` | Continuous sidebar gauge instead of `■□` segments |
+| `houser.claude-usage-smooth-gauge.patch` | `houser.claude-usage` | `21896aa7` | Continuous gauge instead of `■□` segments **+** publishes a provider feed for the usage strip |
 
 ## Applying
 
@@ -49,3 +49,18 @@ It also adds `GAUGE_SUBCELL`, off by default:
 
 Only the sidebar gauge is affected. The detail popup (`prefix+u`) already used `█` plus a
 `·` track and was never segmented.
+
+### `publish_feed()` — the de-duplication half
+
+herdr metadata has only `workspace` and `pane` scope; there is no account or global scope.
+Plan usage is account-wide, so publishing it as a workspace token repeats the identical
+number on **every** space row. That is a scope mismatch, not something plugin config can fix.
+
+The patch adds `publish_feed()`, which writes the raw numbers to
+`~/.local/state/herdr-usage/anthropic-<account>.json` (atomically, via `os.replace`, because
+the panel may be mid-read). `bin/herdr-usage-panel` renders one bar per provider from that
+directory, and the `$cu*` rows were removed from `[ui.sidebar.spaces]`.
+
+This plugin deliberately stays the **only** Anthropic poller — nothing else should hold the
+OAuth token or add rate-limit pressure. Adding Codex or Gemini means writing another
+collector that emits the same JSON shape; the panel needs no change.
