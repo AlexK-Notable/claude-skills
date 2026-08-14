@@ -159,6 +159,45 @@ survives until *you* reinstall.
 daemon restarts: `herdr plugin action invoke stop --plugin <id>` then `start`. Verify
 against the reported token, not the file.
 
+## Building herdr from source (verified 2026-08-13)
+
+Default branch is **`master`**, not `main`. Build:
+
+```bash
+cd ~/repos/herdr && git pull --ff-only origin master
+ZIG="$HOME/.local/share/zig/zig-x86_64-linux-0.15.2/zig" cargo build --release
+```
+
+- **zig is a hard version gate.** herdr vendors `libghostty-vt`, whose `build.zig` calls
+  `requireZig(0.15.2)` and rejects anything *newer* too — system zig 0.16.0 fails with
+  `zig build for vendored libghostty-vt failed`. `build.rs` honours a **`ZIG`** env var, so
+  pin a local toolchain (`~/.local/share/zig/…`) instead of touching the system package.
+- **`rust-toolchain.toml` is ignored** without rustup — this host uses Arch's system cargo,
+  so the 1.96.1 pin does nothing and it builds with whatever `rustc` is installed.
+- **Capture cargo's own exit code.** `cargo build | tail` reports *tail's* status; a failed
+  build reads as success. Redirect to a log and record `$?` separately.
+- Build lands at `target/release/herdr` and touches nothing installed.
+
+### Running a dev build without risking the live session
+
+```bash
+HERDR_CONFIG_PATH=~/.config/herdr/config.tabbar-test.toml \
+  ~/repos/herdr/target/release/herdr --session NAME
+```
+
+`HERDR_CONFIG_PATH` overrides the config file; `--session NAME` gets its own directory and
+socket under `~/.config/herdr/sessions/NAME/`. Stop it with `herdr session stop NAME` — the
+`default` session is untouched throughout. Keep the test config minimal: a second server
+loading the full config re-runs plugin startup/events, spawning duplicate collector daemons.
+
+**herdr refuses to nest** ("recursive descent denied"). To view a dev build inside an existing
+pane, set `allow_nested = true` under **`[experimental]`** in the *test* config — it is not a
+top-level key, and it is read from the config the new process loads, so the live session keeps
+refusing.
+
+`herdr config check` on an OLD binary is a good negative control for a new feature: it prints
+`unknown config key ui.tab_bar_right; ignoring key` and exits 1.
+
 ## Account-wide values duplicate across the sidebar — by design
 
 **Metadata has exactly two scopes: `workspace` and `pane`.** There is no account or global
