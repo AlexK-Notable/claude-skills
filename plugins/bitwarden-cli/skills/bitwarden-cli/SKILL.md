@@ -1,6 +1,6 @@
 ---
 name: bitwarden-cli
-description: Covers BOTH Bitwarden CLIs — they are DIFFERENT products, disambiguate first. (1) `bw`, the password-vault CLI — master-password unlock to a BW_SESSION, storing/retrieving credentials, secure notes for backups (age keys, API tokens, recovery codes, fingerprints), scripted vault lookups, auth errors (vault is locked, invalid_grant). (2) `bws`, the Secrets Manager CLI — machine-account access token (BWS_ACCESS_TOKEN, no master password), projects + secrets, creating/reading secrets, and runtime injection via `bws run` (e.g. feeding LLM API keys into Home Assistant). Triggers on bitwarden, bw, bws, secrets manager, secure note, password vault, BW_SESSION, BWS_ACCESS_TOKEN, machine account, bws run/project/secret, "store/back up to bitwarden", rotate credential, or alexkechichian1@gmail.com in a vault context. Route bw vs bws before following any recipe.
+description: Covers BOTH Bitwarden CLIs — they are DIFFERENT products, disambiguate first. (1) `bw`, the password-vault CLI — master-password unlock to a BW_SESSION, storing/retrieving credentials, secure notes for backups (age keys, API tokens, recovery codes, fingerprints), scripted vault lookups, auth errors (vault is locked, invalid_grant). (2) `bws`, the Secrets Manager CLI — machine-account access token (BWS_ACCESS_TOKEN, no master password), projects + secrets, creating/reading secrets, and runtime injection via `bws run` (e.g. feeding LLM API keys into Home Assistant). Triggers on bitwarden, bw, bws, secrets manager, secure note, password vault, BW_SESSION, BWS_ACCESS_TOKEN, machine account, bws run/project/secret, "store/back up to bitwarden", rotate credential, or alexkechichian1@gmail.com in a vault context. Also load this BEFORE writing any script that reads a secret from bws or bw — it carries the two first-command footguns: `bws | jq` dies with "Invalid numeric literal" unless you pass the global `--color no`, and a `${VAR:-x}` presence check silently prints the token itself. Route bw vs bws before following any recipe.
 ---
 
 # Bitwarden CLI
@@ -413,6 +413,7 @@ path, rewrite it so it structurally cannot.
   ```
   (History keeps the literal `"$val"`, never the expansion.)
 - `bws secret get` / `bws secret list` print **plaintext secret values** — same rule as `bw get`: don't paste their output into chats or screenshares.
+- **Diagnostics must branch on a secret, never interpolate it** — `${VAR:-x}` prints the value on the set path. See [gotcha 2](#-two-gotchas-that-bite-on-the-first-command-you-write) above; this is how a token actually leaked.
 - `BWS_ACCESS_TOKEN` is a bearer credential: never echo it, never commit it. **Rotate** by issuing a new token in the web UI and revoking the old one, then updating `~/.config/bws/token.env`.
 
 Full operations — token-storage patterns (600 file, systemd `EnvironmentFile`/`LoadCredential`), `bws run` injection, **Home Assistant LLM-key wiring**, rotation, and bws-specific errors — are in **[references/secrets-manager.md](references/secrets-manager.md)**.
