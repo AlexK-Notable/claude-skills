@@ -343,6 +343,66 @@ Unlike `bw`, there is **no logged-out/locked/unlocked lifecycle and no master pa
 
 Default output is JSON; `-o` accepts `json`, `yaml`, `env`, `table`, `tsv`, `none`.
 
+### ⚠ Two gotchas that bite on the first command you write
+
+**1. `bws | jq` fails unless you pass `--color no`.**
+
+`bws` writes ANSI colour escapes into its JSON — **including when stdout is not a
+TTY**, so "it's in a pipe, colour will auto-disable" is false. The naked pattern
+everyone reaches for:
+
+```bash
+bws secret get "$SECRET_ID" | jq -r '.value'     # ✗ BROKEN
+# jq: parse error: Invalid numeric literal at line 1, column 2
+```
+
+The "invalid numeric literal at column 2" is jq choking on the `ESC[` of the
+first colour code, not on anything wrong with the secret. Always:
+
+```bash
+bws --color no secret get "$SECRET_ID" -o json | jq -r '.value'   # ✓
+```
+
+`--color` is a **global** flag — it goes before the subcommand, not after.
+Verified live 2026-08-15 against bws 2.1.0 in a non-TTY Bash tool call.
+
+*Known casualty:* `~/bin/firecrawl-mcp-bws:21` uses the naked pipe and fails
+this way. Any other wrapper built on the same one-liner has the same bug.
+
+**2. Never print a token to prove it's set — `${VAR:-x}` expands to the VALUE.**
+
+This is the single easiest way to leak a credential into a transcript, and it
+looks like a safety check while doing it:
+
+```bash
+echo "BWS_ACCESS_TOKEN set: ${BWS_ACCESS_TOKEN:+yes}${BWS_ACCESS_TOKEN:-NO}"
+```
+
+That was *intended* to print `yes` or `NO`. What it actually prints is
+`yes0.8d5a994b-…` — the whole token. Because:
+
+| Form | When VAR is SET | When VAR is unset/empty |
+|---|---|---|
+| `${VAR:+yes}` | `yes` | *(empty)* |
+| `${VAR:-NO}` | **the value** ← the leak | `NO` |
+
+`:-` is "use this default *if unset*", so on the set path it emits the variable
+itself. Concatenating the two forms puts the token on screen in every case
+where the check "passes". Confirmed live 2026-08-15 — a real `BWS_ACCESS_TOKEN`
+went into a session transcript this way.
+
+Safe presence checks — none of these can ever emit the value:
+
+```bash
+[[ -n "${BWS_ACCESS_TOKEN:-}" ]] && echo "token: set" || echo "token: MISSING"
+echo "token length: ${#BWS_ACCESS_TOKEN}"          # length only
+```
+
+Generalise it: **in a diagnostic, branch on the secret, never interpolate it.**
+The same trap applies to `BW_SESSION`, API keys, and anything from
+`bws secret get`. If a line of debug output *can* contain a secret on some code
+path, rewrite it so it structurally cannot.
+
 ### Hygiene (bws-specific)
 
 - **`bws secret create` takes the value as a positional arg → it lands in shell history.** Easiest safe path is the wrapper **`~/bin/bws-secret-add KEY [PROJECT_ID]`** (reads the value hidden, auto-loads the token, auto-resolves the project, strips plaintext from output — see `references/secrets-manager.md`). The underlying manual pattern, if you need it:
