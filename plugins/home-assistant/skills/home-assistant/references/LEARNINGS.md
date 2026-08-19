@@ -152,3 +152,14 @@ this file is append-only.
 - **Fix:** for must-see diagnostics use log.warning or write a pyscript state entity (state.set) and read it via API
 - **Repro / verify:** `call a @service that does log.info('MARKER ...'); grep MARKER home-assistant.log -> nothing; same via state.set -> visible`
 - **Tags:** pyscript
+
+## 2026-08-19 — lrn-3e4c2df3
+
+**Fact:** Govee 'Tree Floor Lamp' (member of light.bedroom_lights) flares bright then settles on each night-downramp step; exposes stale phantom segment sub-entities
+
+**Context:** - **Status:** partly verified — stale-segment half CONFIRMED by live API probe 2026-08-18; overnight full-brightness climb CONFIRMED by operator observation 2026-08-18; the flare *cause* remains an unconfirmed hypothesis  ⚠
+- **HA version:** 2026.5.4
+- **Cause:** LEADING HYPOTHESIS (unconfirmed): the ramp sends one light.turn_on with rgb_color+brightness_pct+transition:2 every 60s; the Govee applies the color at its prior brightness first, then drops brightness, so each step briefly brightens before dimming. Only surfaced 2026-07-07 — first night the downramp reached the group (prior 4 nights it crashed at step 1). Separately, light.tree_floor_lamp_segment_001/002/003 report red (rgb 255,0,0) at brightness 64 but last_changed 2026-07-17 — verified still frozen on 2026-08-18, 32 days stale, while the parent had updated minutes earlier (an earlier note said '255/white, frozen 2026-07-03'; both specifics were wrong) — stale phantom entities the integration no longer syncs; NOT the live driver (parent + physical LEDs correctly followed the ramp to red@1%).
+- **Fix:** TODO tomorrow, test off-hours: try brightness-before-color as two ordered calls, or drop transition for Govee members, or split the tree lamp out of the group ramp. NOT winddown-window only: the operator confirms the lamp climbs back to FULL brightness at some point during the night, with the colour still correctly red — so the assumption that night hold sends no commands and the lamp stays put after 22:00 does not hold, and whatever restores brightness overnight is a second, unexplained actor worth finding before tuning the ramp.
+- **Repro / verify:** `watch light.tree_floor_lamp physically during a 20:30-22:00 downramp; compare parent last_updated (tracks ramp) vs segment_00x last_changed (frozen 2026-07-17); also sample the parent's brightness overnight to catch the full-brightness climb`
+- **Tags:** govee, lighting
