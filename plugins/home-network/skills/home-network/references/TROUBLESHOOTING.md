@@ -17,6 +17,7 @@ Decision trees for common LAN problems.
 11. "Corrupt OS install vs board failure on an SBC" (SD swap-test)
 12. "Is an SBC's MAC stable, or randomized per boot?"
 13. "Tasmota device shows 'unavailable' in Home Assistant"
+14. "VNC connects and authenticates but the screen is black"
 
 ---
 
@@ -585,3 +586,113 @@ broker IP was fixed. If any other Tasmota/MQTT device shows "unavailable",
 check for the same stale broker IP first.
 
 See DEVICES.md §"EZPlug (Tasmota smart plug)" for the device entry.
+
+
+---
+
+## 14. "VNC connects and authenticates but the screen is black"
+
+Login succeeds, the client draws a window, and the contents are solid
+black. **The password is not the problem — stop retrying credentials.**
+
+### First: is the compositor rendering at all?
+
+The single most useful discriminator. It answers "is the desktop dead, or
+is only the VNC path dead?" without involving VNC at all. On a Wayland
+host, over plain SSH, no VNC and no password:
+
+```bash
+ssh host 'XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 grim /tmp/out.png'
+scp host:/tmp/out.png .
+```
+
+- **Image shows a live desktop** → the compositor is fine; the fault is in
+  the VNC server, the VNC client, or you are connected to a *different*
+  desktop than the one you think (see below).
+- **Image is black too** → the session itself is not drawing. Chase the
+  session, not VNC.
+
+X11 equivalent: `xwininfo -display :N -root` / `import -window root`, but
+see the xauth trap below — on a broken `:N` these fail with
+"Authorization required".
+
+### Are there two VNC servers serving two different desktops?
+
+A host can run several VNC servers on adjacent ports, each attached to a
+**different** session. Connecting to the wrong one gets you a real,
+authenticated, permanently-empty desktop. Enumerate before debugging:
+
+```bash
+ssh host 'ss -tlnp | grep -E ":59[0-9][0-9]"'
+ssh host 'systemctl list-units --all "*vnc*"'
+ssh host 'sudo cat /etc/tigervnc/vncserver.users'   # which display maps to which user
+```
+
+Live case (this LAN's Raspberry Pi, `192.168.1.165`, 2026-08-22): `5900`
+is `wayvnc` on the labwc/Wayland desktop and is **healthy**; `5901` is
+`Xtigervnc` on its own X11 `LXDE-pi` session and is **permanently black**.
+Same host, same credentials, two unrelated desktops. See DEVICES.md
+§"Raspberry Pi (komi-2 — Samba host)".
+
+### Cause A — the `.Xauthority` cookie for that display was clobbered
+
+If an X11 VNC display is black *and* nothing you launch ever appears on
+it, check whether new X clients can still authenticate to it:
+
+```bash
+ssh host 'xwininfo -display :1'
+# "Authorization required, but no authorization protocol specified" = this fault
+ssh host 'xauth list'
+# look for a line for THIS display; if only e.g. komi/unix:0 is listed, :1's cookie is gone
+```
+
+**Mechanism:** `Xtigervnc` is started with `-auth /home/<user>/.Xauthority`.
+If a Wayland compositor's Xwayland starts in the same second, both race to
+write that one file and the loser's cookie is simply overwritten. On the Pi
+both started at `2026-05-24 16:31:05` and Xwayland won. The X server keeps
+running, but **no new client can ever join it** — which is why `lxpanel` is
+absent and nothing launched from a menu or over SSH ever shows up. The
+result is a live X server drawing only its own cursor on a black root
+window (captured there as 2546x1369, mean luma 1.09/65535).
+
+This is not a transient. It persists across reconnects and only clears if
+the display's cookie is restored (`xauth add`) or the server is restarted
+against an auth file it does not share with Xwayland.
+
+### Cause B — no desktop background is configured
+
+A second, independent reason for black: `pcmanfm --desktop --profile
+LXDE-pi` paints nothing when
+`~/.config/pcmanfm/LXDE-pi/desktop-items-0.conf` does not exist. Cheap to
+check, and it stacks with Cause A — the Pi had both faults at once.
+
+```bash
+ssh host 'ls -l ~/.config/pcmanfm/LXDE-pi/desktop-items-0.conf'
+```
+
+### Cause C — a flat frame can be a CLIENT artifact, not a black desktop
+
+A uniform single-colour frame (std-dev 0) is **not** proof the server is
+sending nothing. Pulling from `wayvnc` after sending `SetPixelFormat`
+returned uniform grey while the desktop was demonstrably rendering;
+skipping `SetPixelFormat` and decoding in the server's **native** format
+returned the real image.
+
+Rule: before blaming the server for a flat frame, take a simultaneous
+`grim` capture. If `grim` shows content and VNC shows a flat field, the
+bug is in pixel-format negotiation on the client side.
+
+### Seeing what a VNC client actually renders, when you only have SSH
+
+Run a viewer against a virtual X screen on the remote host and screenshot
+that — this reproduces the client's view without needing a display of your
+own:
+
+```bash
+ssh host 'xvfb-run -a -s "-screen 0 1920x1080x24" \
+  sh -c "vncviewer <args> & sleep 8; scrot /tmp/client.png"'
+```
+
+Viewer flag traps are in [TOOLS.md §vncviewer](TOOLS.md#vncviewer-tigervnc-vs-realvnc);
+the biggest one is that **Raspberry Pi OS ships RealVNC Viewer as
+`/usr/bin/vncviewer`, not TigerVNC**, and the two take incompatible flags.
