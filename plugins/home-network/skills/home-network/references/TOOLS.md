@@ -359,6 +359,74 @@ timeout 2 bash -c "</dev/tcp/HOST/PORT" && echo open || echo closed
 **Gotcha**: not a real device — `/dev/tcp` doesn't exist as a file. It's
 a bash redirection special. Won't work in `sh` if `sh` is dash.
 
+### vncviewer (TigerVNC vs RealVNC)
+
+**Purpose**: connect to a VNC server. **Two incompatible programs share
+this name** — check which one you have *before* trusting any flag:
+
+```bash
+dpkg -S /usr/bin/vncviewer     # Debian family
+pacman -Qo /usr/bin/vncviewer  # Arch family
+vncviewer --help 2>&1 | head -3
+```
+
+Raspberry Pi OS ships **RealVNC Viewer** (`realvnc-vnc-viewer`) as
+`/usr/bin/vncviewer` — *not* TigerVNC. Confirmed on the Pi 2026-08-22.
+
+**RealVNC Viewer quirks**:
+- Password file flag is `-PasswordFile`, **not** `-passwd`.
+- It **rejects** `-SecurityTypes` outright.
+- It blocks on an "Unencrypted connection" dialog unless you pass
+  `-WarnUnencrypted=0 -VerifyId=0` — which is why it appears to hang
+  under `xvfb-run` with no visible error.
+- Useful IPC command: `-screenshot <PID> <file.png>` dumps what a running
+  viewer instance is displaying.
+
+**TigerVNC `vncviewer` quirks**:
+- `ServerName` port parsing is ambiguous by design: `host:N` means a
+  **literal port** when `N >= 100`, and a **display number** (port
+  `5900+N`) when `N < 100`. `host::N` is *always* a literal port. So
+  `host:1` is port 5901 but `host:5901` is also port 5901 — and
+  `host:99` is port 5999, not port 99.
+- There is **no `-config` option**. A `.tigervnc` parameter file is
+  passed as a **positional** argument: `vncviewer /path/to/file.tigervnc`.
+- There is **no `UserName` parameter** — the username is always typed
+  interactively; it cannot be supplied from a file or flag.
+
+**Headless capture** (see what a client actually renders when you only
+have SSH): run it under Xvfb and screenshot the virtual screen —
+```bash
+xvfb-run -a -s "-screen 0 1920x1080x24" \
+  sh -c "vncviewer <args> & sleep 8; scrot /tmp/client.png"
+```
+See [TROUBLESHOOTING.md §14](TROUBLESHOOTING.md#14-vnc-connects-and-authenticates-but-the-screen-is-black).
+
+### grim (Wayland screenshot)
+
+**Purpose**: capture a Wayland compositor's output. The fastest way to
+prove a remote desktop is (or is not) actually rendering — no VNC, no
+password, no GUI on your end.
+
+**Install**: Arch `pacman -S grim`; Debian/Raspberry Pi OS `apt install grim`.
+Needs a compositor supporting `wlr-screencopy` (labwc, sway, Hyprland).
+
+**Usage over SSH**:
+```bash
+ssh host 'XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 grim /tmp/out.png'
+scp host:/tmp/out.png .
+```
+
+**Gotcha**: both env vars are mandatory over SSH — a non-login SSH session
+inherits neither, and without them `grim` exits with a compositor-connect
+error that reads like the compositor is dead when it is fine. Confirm the
+socket name first with `ls /run/user/1000/wayland-*`.
+
+**Why it matters**: a `grim` capture is independent of the VNC stack, so
+it separates "the desktop is black" from "the VNC path is broken" in one
+command. Pair it with `wlr-randr` (same env vars) to see the real output
+geometry — that is how the Pi's 720p `HEADLESS-1` virtual output was
+identified as the source of a 720p remote desktop.
+
 ### whois
 
 **Purpose**: Domain / IP / OUI lookups.

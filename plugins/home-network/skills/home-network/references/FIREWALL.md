@@ -161,6 +161,51 @@ source. Snapshot for reference:)
 | 1701 | tcp | 192.168.1.0/24 | Weylus web UI |
 | 5353 | udp | Anywhere | mDNS (Avahi) |
 
+## Hosts on this LAN with no firewall at all
+
+The deny-by-default posture above is **KOMI's**, not the LAN's. Do not
+assume another host inherits it — check before reasoning about exposure.
+
+| Host | Firewall | Consequence |
+|------|----------|-------------|
+| KOMI `192.168.1.139` | ufw, default-deny incoming | listed rules are the policy (Docker `-p` excepted, see above) |
+| Raspberry Pi `192.168.1.165` | **none — `ufw` is not installed** (`dpkg -l ufw` → `un`) | every listener is LAN-wide by default |
+
+Verified on the Pi 2026-08-22. With no packet filter, its whole listener
+set is reachable from any LAN client: 22, 139, 445, 5900 (wayvnc), 5901
+(Xtigervnc), 8080, 8081, 10200 (Piper TTS), 21115/21116/21117/21118/21119
+(RustDesk `hbbs`/`hbbr`), 61208 (glances). Full detail in DEVICES.md
+§"Raspberry Pi (komi-2 — Samba host)".
+
+Two practical consequences:
+
+1. **Scoping must happen at bind time, not at the firewall.** On a
+   firewall-less host the only way to keep a service off the LAN is to
+   bind it to loopback. The Pi does this correctly for two services —
+   CUPS on 631 and a second glances instance on 61209 (`glances -s -B
+   127.0.0.1`) are loopback-only and genuinely unreachable — while the
+   61208 instance (`--bind 0.0.0.0`) is wide open. Same host, same
+   daemon, opposite exposure, decided entirely by the bind address. This
+   is the same lesson as [Docker published ports bypass
+   UFW](#docker-published-ports-bypass-ufw): bind narrowly rather than
+   expecting a filter to save you.
+2. **Verify from a different host.** A `ss -tlnp` on the box tells you
+   the bind address; only a probe from another LAN client tells you what
+   is actually reachable. A same-host `curl` traverses loopback and
+   proves nothing.
+
+```bash
+# is there even a firewall here?
+ssh host 'command -v ufw || echo "no ufw"; dpkg -l ufw 2>/dev/null | tail -1'
+ssh host 'command -v nft firewall-cmd iptables'
+
+# what does the LAN actually see? (run from KOMI, not from the target)
+for p in 22 445 5900 8080 61208; do
+  timeout 3 bash -c "echo > /dev/tcp/192.168.1.165/$p" 2>/dev/null \
+    && echo "$p OPEN" || echo "$p closed/filtered"
+done
+```
+
 ## Reset workflow (nuclear)
 
 If rules drift badly:
