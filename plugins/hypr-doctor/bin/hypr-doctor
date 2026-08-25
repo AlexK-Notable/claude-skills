@@ -441,10 +441,23 @@ cmd_rebuild() {
 
         local so_mtime
         so_mtime=$(mtime "$so_path")
+        local log="$STATE_DIR/rebuild-${name}.log"
 
         # Skip if .so newer than the last Hyprland install/upgrade
         if [[ "$so_mtime" -ge "$hypr_baseline" && "$so_mtime" -gt 0 ]]; then
             ok "$name: .so up-to-date, skipping rebuild"
+            # This fast path never touches $log — only an actual build
+            # attempt below does (it truncates $log on every real run,
+            # success or failure). If the plugin got fixed by some other
+            # means (manual rebuild, reinstall) after a prior FAILED
+            # attempt recorded here, $log would otherwise sit frozen on
+            # that old failure forever and read as "still broken" long
+            # after it wasn't. Append a marker so the log reflects current
+            # (good) state without destroying the prior attempt's output.
+            if [[ -f "$log" ]]; then
+                printf '\n[hypr-doctor %s] .so up-to-date (built %s) — no rebuild needed; ignore any earlier FAILED output above, it predates this fix\n' \
+                    "$(date -Iseconds)" "$(date -d "@$so_mtime" '+%Y-%m-%d')" >>"$log"
+            fi
             continue
         fi
 
@@ -454,7 +467,6 @@ cmd_rebuild() {
         # Capture build output to a log instead of flooding stdout (a clean
         # rebuild is ~30KB of deprecation warnings). Show a pointer on success;
         # show the tail — where the actual error is — on failure.
-        local log="$STATE_DIR/rebuild-${name}.log"
         info "log:  $log  (tail -f to watch live)"
         if ! ( cd "$repo" && eval "$build_cmd" ) >"$log" 2>&1; then
             fail "$name: build FAILED — last 15 lines:"
