@@ -3,7 +3,7 @@
   "plugins": [
     {
       "name": "hyprtasking",
-      "enabled": true,
+      "enabled": false,
       "loaded_name": "Hyprtasking",
       "repo_dir": "/home/komi/repos/hypr-things/hyprtasking",
       "branch": "komi/workspace-fixes-v55",
@@ -13,7 +13,7 @@
       "so_path": "/home/komi/repos/hypr-things/hyprtasking/build/libhyprtasking.so",
       "loader_directive_file": "/home/komi/.config/hypr/hyprland.conf",
       "loader_directive_pattern": "hyprctl plugin load .*libhyprtasking\\.so",
-      "notes": "Local fork carrying workspace-layout / multi-monitor / lifecycle / drop-target fixes. Sync upstream via `git cherry-pick origin/main`, never rebase (LAYERS feature divergence)."
+      "notes": "RETIRED 2026-08-29 \u2014 replaced by quickshell-overview (standalone Quickshell IPC client; no plugin ABI, unaffected by the 0.57 hyprlang removal). No longer built, loaded, or bound; the loader directive is gone from hyprland.conf. The fork is KEPT at the repo_dir but is the only V1-config copy left \u2014 upstream ported to addConfigValueV2 + addLuaFunction on 2026-06-27 (PR #114) and we are 14 commits behind. If it is ever revived, resync via `git cherry-pick origin/main` (NEVER rebase \u2014 LAYERS divergence) and re-apply our workspace-layout / multi-monitor / lifecycle / drop-target fixes on top of the ported registration."
     },
     {
       "name": "dynamic-cursors",
@@ -27,26 +27,58 @@
       "so_path": "/home/komi/repos/dynamic-cursors/out/dynamic-cursors.so",
       "loader_directive_file": "/home/komi/.config/hypr/hyprland.conf",
       "loader_directive_pattern": "hyprctl plugin load .*dynamic-cursors\\.so",
-      "notes": "Upstream is VirtCode/hypr-dynamic-cursors (origin), NOT raybbian — fix any docs that say otherwise. Tracked as detached-HEAD on a hyprpm.toml pin. After a Hyprland update: `git -C /home/komi/repos/dynamic-cursors fetch origin && git show origin/main:hyprpm.toml` (left col = Hyprland commit, right col = plugin commit to build), `git checkout <plugin-commit>`, then rebuild. Re-enabled 2026-06-15 for Hyprland 0.55.4 → pin da447486c84e0be81f2cdd208af1ef92469f0a88."
+      "notes": "Upstream is VirtCode/hypr-dynamic-cursors (origin), NOT raybbian \u2014 fix any docs that say otherwise. Tracked as detached-HEAD on a hyprpm.toml pin. After a Hyprland update: `git -C /home/komi/repos/dynamic-cursors fetch origin && git show origin/main:hyprpm.toml` (left col = Hyprland commit, right col = plugin commit to build), `git checkout <plugin-commit>`, then rebuild. Re-enabled 2026-06-15 for Hyprland 0.55.4 \u2192 pin da447486c84e0be81f2cdd208af1ef92469f0a88."
     }
   ],
   "watched_venvs": [
     "/home/komi/repos/claude-dirs/ccx"
   ],
-  "$watched_venvs_note": "Project dirs containing a .venv whose interpreter health hypr-doctor checks. Catches the 'python got bumped / repo moved → venv orphaned' class (e.g. ccx broke this way on 2026-05-30 when its repo moved to claude-dirs). Each entry is a project dir; the check runs <dir>/.venv/bin/python --version and, on failure, prints the recreate recipe.",
+  "$watched_venvs_note": "Project dirs containing a .venv whose interpreter health hypr-doctor checks. Catches the 'python got bumped / repo moved \u2192 venv orphaned' class (e.g. ccx broke this way on 2026-05-30 when its repo moved to claude-dirs). Each entry is a project dir; the check runs <dir>/.venv/bin/python --version and, on failure, prints the recreate recipe.",
   "suppressions": {
     "$note": "Acknowledged drift that should stay SILENT in the SessionStart hook (it still appears in full `audit`, marked acknowledged, and does not count toward the issue total). Self-expiring: the ack matches only the exact recorded version pair, so any package bump revives the warning. Set the current pair with `hypr-doctor ack-skew`.",
     "pyqt_skew_ack": "6.11.0 vs 6.11.1"
   },
   "qt_python_bindings": {
     "$note": "Packages that must stay version-locked to qt6-base. When qt6-base bumps and these don't, anything Python+Qt will fail at runtime with 'no Qt platform plugin can be initialized'.",
-    "watch": ["qt6-base", "python-pyqt6", "pyside6", "python-pyside6"]
+    "watch": [
+      "qt6-base",
+      "python-pyqt6",
+      "pyside6",
+      "python-pyside6"
+    ]
   },
   "stack_packages": {
     "$note": "Packages whose upgrade triggers a hypr-doctor recommendation in the SessionStart hook.",
-    "compositor": ["hyprland", "hyprlang", "hyprutils", "hyprgraphics", "hyprcursor", "aquamarine"],
-    "graphics": ["mesa", "vulkan-radeon", "vulkan-intel", "nvidia", "nvidia-utils", "nvidia-dkms"],
-    "wayland": ["wayland", "wayland-protocols", "xdg-desktop-portal", "xdg-desktop-portal-hyprland", "xdg-desktop-portal-gtk", "xdg-desktop-portal-kde"],
-    "qt_python": ["qt6-base", "qt6-wayland", "python", "python-pyqt6", "pyside6"]
+    "compositor": [
+      "hyprland",
+      "hyprlang",
+      "hyprutils",
+      "hyprgraphics",
+      "hyprcursor",
+      "aquamarine"
+    ],
+    "graphics": [
+      "mesa",
+      "vulkan-radeon",
+      "vulkan-intel",
+      "nvidia",
+      "nvidia-utils",
+      "nvidia-dkms"
+    ],
+    "wayland": [
+      "wayland",
+      "wayland-protocols",
+      "xdg-desktop-portal",
+      "xdg-desktop-portal-hyprland",
+      "xdg-desktop-portal-gtk",
+      "xdg-desktop-portal-kde"
+    ],
+    "qt_python": [
+      "qt6-base",
+      "qt6-wayland",
+      "python",
+      "python-pyqt6",
+      "pyside6"
+    ]
   }
 }
