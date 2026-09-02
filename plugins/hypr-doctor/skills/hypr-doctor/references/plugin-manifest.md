@@ -20,7 +20,7 @@ Claude (via Read) consume it directly.
       "build_system": "meson|make|cargo|…",  // informational, free-form
       "build_cmd": "…",              // shell pipeline. Runs via `cd $repo_dir && eval $build_cmd`
       "so_path": "/abs/path.so",     // for mtime check vs Hyprland binary, and hyprctl load
-      "loader_directive_file": "…",  // where the `hyprctl plugin load` line lives (informational)
+      "loader_directive_file": "…",  // where the load line lives — `hl.plugin.load(...)` in hyprland.lua since the 2026-08-30 Lua cutover (informational)
       "loader_directive_pattern": "…",  // regex matching the load line (informational)
       "notes": "…"                   // free-form context for future Claude / future-you
     }
@@ -80,14 +80,19 @@ Then add an object to `plugins[]`:
   "build_system": "meson",
   "build_cmd": "rm -rf build && meson setup build --buildtype=release && ninja -C build",
   "so_path": "/home/komi/repos/myplugin/build/libmyplugin.so",
-  "loader_directive_file": "/home/komi/.config/hypr/hyprland.conf",
-  "loader_directive_pattern": "hyprctl plugin load .*libmyplugin\\.so",
+  "loader_directive_file": "/home/komi/.config/hypr/hyprland.lua",
+  "loader_directive_pattern": "hl\\.plugin\\.load\\(.*libmyplugin\\.so",
   "notes": "Whatever future-you needs to remember about this plugin."
 }
 ```
 
-Then add a corresponding `exec-once = hyprctl plugin load /home/komi/repos/myplugin/build/libmyplugin.so` in the relevant hyprland.conf section
-(or in `~/.config/hypr/config/autostart.conf`).
+Then add `hl.plugin.load("/home/komi/repos/myplugin/build/libmyplugin.so")` to
+`~/.config/hypr/hyprland.lua`, next to the dynamic-cursors line. The config has been Lua
+since the 2026-08-30 cutover; the old form was `exec-once = hyprctl plugin load …` in
+hyprland.conf. Any `plugin:<name>` settings must be guarded —
+`if hl.plugin.<name> then hl.config{plugin={<name>={…}}} end` — because the table only
+exists once the plugin is loaded, and an unguarded block is a hard error under
+`--verify-config` and on every reload without the plugin.
 
 ## Retiring a plugin (temporarily)
 
@@ -105,9 +110,9 @@ reason) so you don't forget about them.
 
 ## Retiring a plugin (permanently)
 
-Delete the JSON object. Also remove the `hyprctl plugin load` line from
-hyprland.conf (or wherever it lives) — the manifest is just a manifest, it
-doesn't actually wire up the load itself.
+Delete the JSON object. Also remove the `hl.plugin.load(...)` line and its guarded
+config block from hyprland.lua — the manifest is just a manifest, it doesn't
+actually wire up the load itself.
 
 ## Editing the watched packages
 
@@ -128,5 +133,5 @@ new Python binding for Qt enters the system, add it here.
 - **`so_path` points to a debug build** — `hypr-doctor rebuild` always
   builds release. If `so_path` points to `build/debug/...` it'll get
   stale every release build. Match the path in `build_cmd`.
-- **Forgetting the `exec-once` line** — the manifest manages the build,
+- **Forgetting the `hl.plugin.load()` line** — the manifest manages the build,
   not the load. After adding an entry, also add the load directive.

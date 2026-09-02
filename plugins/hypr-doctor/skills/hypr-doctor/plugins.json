@@ -11,8 +11,8 @@
       "build_system": "meson",
       "build_cmd": "rm -rf build && meson setup build --buildtype=release && ninja -C build",
       "so_path": "/home/komi/repos/hypr-things/hyprtasking/build/libhyprtasking.so",
-      "loader_directive_file": "/home/komi/.config/hypr/hyprland.conf",
-      "loader_directive_pattern": "hyprctl plugin load .*libhyprtasking\\.so",
+      "loader_directive_file": "/home/komi/.config/hypr/hyprland.lua",
+      "loader_directive_pattern": "hl\\.plugin\\.load\\(.*libhyprtasking\\.so",
       "notes": "RETIRED 2026-08-29 \u2014 replaced by quickshell-overview (standalone Quickshell IPC client; no plugin ABI, unaffected by the 0.57 hyprlang removal). No longer built, loaded, or bound; the loader directive is gone from hyprland.conf. The fork is KEPT at the repo_dir but is the only V1-config copy left \u2014 upstream ported to addConfigValueV2 + addLuaFunction on 2026-06-27 (PR #114) and we are 14 commits behind. If it is ever revived, resync via `git cherry-pick origin/main` (NEVER rebase \u2014 LAYERS divergence) and re-apply our workspace-layout / multi-monitor / lifecycle / drop-target fixes on top of the ported registration."
     },
     {
@@ -25,8 +25,8 @@
       "build_system": "make",
       "build_cmd": "make clean && rm -rf out && make all",
       "so_path": "/home/komi/repos/dynamic-cursors/out/dynamic-cursors.so",
-      "loader_directive_file": "/home/komi/.config/hypr/hyprland.conf",
-      "loader_directive_pattern": "hyprctl plugin load .*dynamic-cursors\\.so",
+      "loader_directive_file": "/home/komi/.config/hypr/hyprland.lua",
+      "loader_directive_pattern": "hl\\.plugin\\.load\\(.*dynamic-cursors\\.so",
       "notes": "Upstream is VirtCode/hypr-dynamic-cursors (origin), NOT raybbian \u2014 fix any docs that say otherwise. Tracked as detached-HEAD on a hyprpm.toml pin. After a Hyprland update: `git -C /home/komi/repos/dynamic-cursors fetch origin && git show origin/main:hyprpm.toml` (left col = Hyprland commit, right col = plugin commit to build), `git checkout <plugin-commit>`, then rebuild. Re-enabled 2026-06-15 for Hyprland 0.55.4 \u2192 pin da447486c84e0be81f2cdd208af1ef92469f0a88."
     }
   ],

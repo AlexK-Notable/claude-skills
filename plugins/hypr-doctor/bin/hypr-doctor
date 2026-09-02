@@ -192,7 +192,7 @@ check_hypr_plugin_abi() {
             if plugin_is_loaded "$(plugin_loaded_name "$i")"; then
                 ok "$name: built $(date -d "@$so_mtime" '+%Y-%m-%d'), loaded"
             else
-                warn "$name: .so newer than Hyprland but not loaded — check the exec-once in hyprland.conf"
+                warn "$name: .so newer than Hyprland but not loaded — check the hl.plugin.load() line in hyprland.lua"
             fi
         else
             ok "$name: built $(date -d "@$so_mtime" '+%Y-%m-%d') (load state unverified)"
