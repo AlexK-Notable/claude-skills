@@ -14,6 +14,8 @@ Keep the worker's Herdr name/pane, native session ID, assignment and durable rep
 
 Interrupt only the owned worker. `herdr agent send-keys NAME ctrl+c` is a scoped input, not proof the native process exited. Read its state and `herdr pane process-info --pane PANE_ID`. Never kill the Herdr server or delete a shared workspace for cancellation.
 
+Once reports or partial results are saved, follow [cleanup](cleanup.md) to close the task-created layout. Keep the caller alive until it has delivered its result, and leave peer resources alone.
+
 Resume by recorded exact session: Claude `--resume ID`, agy `--conversation ID`, Hermes `chat --resume ID`; Codex uses its `resume` subcommand (inspect installed help for interactive versus `exec resume`). If native resume is unavailable, hand off the saved artifacts explicitly. Do not duplicate work whose execution is still uncertain.
 
 For headless commands, Claude stream-json requires `--verbose`; Codex `exec --json -` accepts the prompt on stdin; the tested agy CLI instead required a single `--print=TEXT` argument. Supply arbitrary text via a subprocess argument array, never unsafe shell interpolation. Headless children should not inherit Herdr pane metadata that would make their hooks report state into the parent's pane.

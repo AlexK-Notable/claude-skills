@@ -37,4 +37,6 @@ For OpenRouter, read [paid model selection](references/openrouter.md) and [Herme
 
 Observe the same worker after a timeout; do not submit the task twice. An idle agent or successful process exit means the turn stopped, not that the work passed. Inspect its durable output and independently check the task's acceptance criteria. Use [recovery](references/recovery.md) for interruption, missing output, or exhausted allowance.
 
+After saving results, [clean up the task's Herdr resources](references/cleanup.md): stop owned workers and close their task-created panes, tabs and workspaces unless the user asked to retain them. Record ownership at creation and verify removal; preserve reports, native session IDs, peer resources and the caller's pane.
+
 Keep the route explanation brief: category/difficulty, harness + exact model + effort, relevant allowance, why it fits, and paid allowance if applicable. Record meaningful results for future selections; small local trials and published benchmarks inform judgment without becoming universal eligibility gates.
