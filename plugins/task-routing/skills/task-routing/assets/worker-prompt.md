@@ -1,11 +1,14 @@
 # Worker assignment
 
+Use these fields to check that a short, natural-language assignment is complete; do not require the worker to receive a form. Put lengthy background in linked notes or files.
+
 Purpose: {{why this task matters}}
 Model and effort: {{exact native ID and supported effort}}
 Task group: {{coding / review / research / other}}
 Working directory: {{absolute path}}
 Ownership and scope: {{files or responsibility; explicit exclusions}}
 Inputs: {{source paths, question, relevant context}}
+Handoff: {{task hub and worker report-note IDs, or identified note exports when tools are unavailable}}
 Deliverable: {{concrete output and durable report path}}
 Acceptance: {{what the orchestrator will independently check}}
 Limits: {{bounded task, time/turn expectations; total paid allowance if applicable}}

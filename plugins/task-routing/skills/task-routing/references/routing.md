@@ -7,7 +7,7 @@ These are starting preferences from the user's September 2026 routing discussion
 | Category | Starting model family | Escalate when |
 |---|---|---|
 | Retrieve a fact from known documentation | Flash 3.8; Luna/Haiku for a narrow local lookup | Sources conflict or the answer requires reasoning beyond extraction |
-| Discover and compare internet sources | Flash 3.8; affordable open research model when Flash is constrained | Evidence is difficult to locate, technical claims need experiments, or synthesis is hard |
+| Discover and compare internet sources | Flash 3.8; affordable open research model when Flash is constrained (see [shortlist and evidence limits](openrouter.md)) | Evidence is difficult to locate, technical claims need experiments, or synthesis is hard |
 | Brainstorm alternatives | Fable for substantial exploration; Sol/Sonnet for bounded ideas | Novel constraints interact and shallow alternatives are inadequate |
 | Plan complex work | Fable or Astra, according to headroom and the nature of the reasoning | Cross-component dependencies, unfamiliar design, or consequential uncertainty |
 | Orchestrate and track work | Either Claude Code or Codex; appropriate Fable/Opus or Astra/Sol tier | Dependencies and integration require sustained judgment; basic dispatch alone does not |

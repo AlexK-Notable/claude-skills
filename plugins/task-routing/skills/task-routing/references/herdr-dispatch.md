@@ -33,7 +33,24 @@ herdr agent start WORKER --kind agy --pane PANE_ID -- --model EXACT_ID --dangero
 
 `agent start` has no `--no-focus` flag; focus preservation belongs to workspace/tab/pane creation. Herdr supplies the executable. Arguments after `--` are native arguments: do not repeat `codex`, `claude`, or `agy` there. agy effort can be encoded in its exact model ID (`gemini-3.8-flash-low` was observed locally); do not supply a contradictory effort. Hermes uses `chat` arguments as described in [Hermes](hermes.md).
 
-Pass arbitrary prompt text as one subprocess argument, never shell-interpolate it. For example, after creating and starting `research-1`:
+## Verify before submitting work
+
+After launch, inspect the native session before sending the assignment:
+
+```bash
+herdr agent read WORKER --source recent-unwrapped --lines 80
+herdr pane process-info --pane PANE_ID
+```
+
+Match the model shown by the native UI or a native session inspection command to the requested route. Process arguments record the request; they do not prove the effective selection. Record requested and observed effort separately when the native display does not expose effort. A worker's self-description is not independent verification.
+
+If the pane is blank or still initializing, do not send substantive work. Recheck within the task's startup time allowance; use the harness's native model/status inspection when available. If selection remains unobservable, report that limitation rather than assuming success. If the model differs, correct it through the native selector and verify again, or stop that launch and choose a deliberate route. Do not silently accept the substituted model.
+
+If work already began on the wrong model, pause it and record the intervention. A model switch in the same conversation retains earlier context. Request reassessment when appropriate, but do not describe the resulting report as a fresh session containing only the corrected model's work.
+
+## Submit and observe
+
+Pass arbitrary prompt text as one subprocess argument, never shell-interpolate it. For example, after creating, starting and verifying `research-1`:
 
 ```python
 from pathlib import Path
@@ -44,7 +61,7 @@ subprocess.run([
 ], check=True)
 ```
 
-`agent start` waits for recognized readiness. `agent prompt` submits; `--wait --timeout 30000` can additionally wait for a settled state. A timeout does not prove submission failed. Continue with the same name:
+`agent start` waits for Herdr's recognized readiness; the native session may still need the checks above. `agent prompt` submits; `--wait --timeout 30000` can additionally wait for a settled state. A timeout does not prove submission failed. Continue with the same name:
 
 ```bash
 herdr agent get research-1
@@ -52,7 +69,9 @@ herdr agent wait research-1 --timeout 30000
 herdr agent read research-1 --source recent-unwrapped --lines 80
 ```
 
-`idle` and `done` mean a settled turn; `blocked` requires inspection; `unknown` proves neither progress nor completion. Read the durable report and verify it. Terminal alternate-screen history can be incomplete even with a large `--lines` value.
+`idle` and `done` are Herdr's assessment of a settled turn; they can appear while native tools are still running. Inspect the native output and durable report before accepting completion. `blocked` requires inspection; `unknown` proves neither progress nor completion. Terminal alternate-screen history can be incomplete even with a large `--lines` value.
+
+After submission, look for actual task progress: source reads, tool activity or a report. If the worker remains inactive, inspect the same session and resolve readiness first. A short clarification pointing to the saved assignment can recover an inactive worker; do not blindly resend the full task or create another worker merely because a wait timed out.
 
 For scoped interruption use `herdr agent send-keys WORKER ctrl+c` or the harness's supported stop key, then inspect the actual process/session. The key spelling is `ctrl+c`, not `ctrl-c`. Keep native session IDs for resume; see [recovery](recovery.md).
 

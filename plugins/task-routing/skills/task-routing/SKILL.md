@@ -25,6 +25,10 @@ Native permission bypass is the user's authorized default. Use each harness's ac
 
 Give the worker a concrete deliverable, inputs, ownership, acceptance criteria, and durable report path. Adapt the [prompt template](assets/worker-prompt.md); no generated manifest is required. Ask the worker to preserve evidence and distinguish sourced claims, locally verified observations, and inference.
 
+Before sending substantive work, confirm the native session displays the requested model. Successful launch arguments and Herdr's ready state do not prove that selection took effect. Follow the [launch checks](references/herdr-dispatch.md#verify-before-submitting-work); record effort as unverified when the harness does not expose it.
+
+Use [znote handoffs](references/znote-handoff.md) to carry project decisions, assignments and accepted results between workers. Keep prompts conversational: explain the purpose, point to the relevant notes and files, and state the outcome and boundaries. The template is a checklist, not a required prompt format.
+
 For OpenRouter, read [paid model selection](references/openrouter.md) and [Hermes](references/hermes.md). Keep paid work small, with approximately **USD5 maximum for the whole invocation, including auxiliary calls, retries and resume**. Do not use long-horizon Kimi work as the ordinary fallback. Check what spending controls actually exist; a turn limit or time limit is not a dollar cap.
 
 ## Observe and finish
