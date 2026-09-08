@@ -1,0 +1,16 @@
+{
+  "name": "task-routing",
+  "version": "0.1.0",
+  "description": "Classify agent tasks, choose models by subscription headroom and task value, and dispatch through existing Herdr and Hermes tools.",
+  "author": {
+    "name": "Alex Kechichian"
+  },
+  "license": "Apache-2.0",
+  "keywords": [
+    "orchestration",
+    "model-routing",
+    "herdr",
+    "hermes",
+    "openrouter"
+  ]
+}

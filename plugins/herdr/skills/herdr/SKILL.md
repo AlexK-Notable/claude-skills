@@ -211,6 +211,8 @@ After that failed read, ask the agent to write its complete response as Markdown
 
 ## Local idioms
 
+For model selection and delegated task groups, use the `task-routing` skill. Its user-authorized placement is one workspace per task group, at most four agents per tab with overflow tabs in the same workspace. Its durable report requirement overrides the temporary-report fallback for these tasks.
+
 The `HERDR_ENV=1` gate above applies to **controlling the current session from inside a pane**. Host-level work — editing config, installing plugins, debugging agent detection, building automation around the socket/CLI — is legitimate from any terminal. For those tasks read [references/local-idioms.md](references/local-idioms.md): notification delivery setup, agent-detection maintenance, sidebar metadata from Claude Code hooks, event-subscription patterns, worktree flow, and plugin-authoring notes.
 
 ## Setting this up on a new machine

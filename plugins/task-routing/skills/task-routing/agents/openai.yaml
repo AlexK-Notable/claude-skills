@@ -1,0 +1,6 @@
+interface:
+  display_name: "Task Routing"
+  short_description: "Route agent work by capacity, quality and cost"
+  default_prompt: "Use $task-routing to choose and launch a suitable model for this task."
+policy:
+  allow_implicit_invocation: true

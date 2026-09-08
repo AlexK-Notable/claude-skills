@@ -46,6 +46,10 @@ say "== skills (live symlinks) =="
 for name in $PLUGINS; do
   skill="$REPO/plugins/$name/skills/$name"
   if [ -d "$skill" ]; then link "$skill" "$SKILLS_DIR/$name"; else say "  WARN  no skill dir for $name"; fi
+  if [ "$name" = task-routing ] && [ -d "$skill" ]; then
+    run "mkdir -p '$HOME/.codex/skills'"
+    link "$skill" "$HOME/.codex/skills/$name"
+  fi
 done
 
 say "== slash commands (live symlinks) =="
