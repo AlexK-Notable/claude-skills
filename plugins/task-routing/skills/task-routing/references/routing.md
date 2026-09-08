@@ -2,7 +2,7 @@
 
 Classify by the requested work product. Difficulty means reasoning or uncertainty; length means how much work and context must persist. A long mechanical task need not use the deepest model.
 
-These are starting preferences from the user's September 2026 routing discussion and supplied benchmark report, not a verified universal ranking. Resolve exact IDs and supported effort from the current harness. Capacity can change the choice among suitable models.
+These are starting preferences from the user's September 2026 routing discussion and supplied benchmark report, not a verified universal ranking. Use the established family aliases or model IDs and supported effort below. Capacity can change the choice among suitable models.
 
 | Category | Starting model family | Escalate when |
 |---|---|---|
@@ -21,7 +21,19 @@ Do not assert that code-writing benchmarks prove review skill, or that a composi
 
 ## Resolve the actual model
 
-Use `agy models` to discover Gemini IDs only. Anthropic and OpenAI entries in that catalog are not eligible routes: agy is Gemini-only, regardless of advertised availability or spare quota. Use Claude Code for Anthropic subscription models and Codex for OpenAI subscription models. For Codex, the native `/model` picker or app-server `model/list` supplies available IDs and supported effort; `~/.codex/models_cache.json` is a cached hint, not live entitlement. For Claude, inspect the native model selector and observed session model; the supplied report's Opus/Sonnet generation names can differ from what the installed subscription exposes. For Hermes/OpenRouter, use the current model catalog and endpoint data described in [OpenRouter](openrouter.md).
+Prefer an explicit family alias that the harness maintains as its current model. Establish the mapping once and rely on it during ordinary dispatch; do not inspect the catalog or prove the resolved version on every invocation. Keep task fit: the latest suitable family does not mean the most expensive frontier tier. Use a full release ID when a specific version is requested or no suitable family alias is supported.
+
+| Harness | Normal selector | Established behavior |
+|---|---|---|
+| Claude Code subscription | `sonnet`, `opus`, `fable`, `haiku` | Native family aliases track the provider's recommended current version. Locally, `--model sonnet` launched Sonnet 5. Use the family alias instead of copying an older release ID. |
+| Codex subscription | `gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` | Current IDs from the native catalog. Bare `sol` was rejected by the ChatGPT-backed client; no equivalent evergreen family alias is established here. `gpt-5.6` is a version-family alias for Sol, not a promise to follow future generations. |
+| agy, Gemini only | `gemini-3.8-flash-low`, `gemini-3.8-flash-medium`, `gemini-3.8-flash-high` | Bare `flash` was rejected and fell back to the saved model, both with and without `--effort`. Do not assume Claude-style alias resolution. Effort can be encoded in the model ID. |
+
+These mappings were checked on 2026-09-08. Refresh the relevant row when a new model is introduced, a harness/provider changes, or a selection fails—not before every worker. Claude aliases can be redirected by provider-specific mappings or `ANTHROPIC_DEFAULT_*_MODEL` overrides; re-establish the mapping if those change. An unavailable requested model needs a surfaced conflict, not silent fallback to an older model.
+
+For mapping updates, use `agy models` for Gemini IDs only; its Anthropic/OpenAI entries and quota are ineligible. Codex's native `/model` picker or app-server `model/list` supplies IDs and supported effort; `~/.codex/models_cache.json` is a cached hint. For Claude Code, use its documented aliases and native selector. For Hermes/OpenRouter, use the catalog and endpoint data in [OpenRouter](openrouter.md).
+
+Sources: [Claude Code model aliases](https://code.claude.com/docs/en/model-config#model-aliases), [Codex model selection](https://learn.chatgpt.com/docs/models), [GPT-5.6 Sol alias](https://developers.openai.com/api/docs/models/gpt-5.6-sol), and local launch/response evidence in `/home/komi/notes/task-routing-iterations-2026-09-08/aliases/`. Codex 0.153.4 rejected `sol`; Claude Code 2.1.265 resolved `sonnet`; agy 1.1.27 rejected `flash`. These observations do not establish every possible alias in the other clients.
 
 Do not print authentication files to discover models. Record what the harness actually launched, rather than treating its requested flags or a worker's self-description as proof.
 
@@ -35,6 +47,6 @@ A deliberate exact-model request overrides ordinary value preferences when execu
 
 ## Minimum dispatch record
 
-A short Markdown entry suffices: task/group, category and difficulty, purpose, exact model/harness/effort, relevant usage observation time, reason for selection, worker/native-session handles, output path, and acceptance checks. For paid work add the planned total allowance and observed cumulative spending. Reuse the record across retries/resume.
+A short Markdown entry suffices: task/group, category and difficulty, purpose, explicit alias or model ID/harness/effort, relevant usage observation time, reason for selection, worker/native-session handles, output path, and acceptance checks. Record a resolved model when observed without adding a routine probe. For paid work add the planned total allowance and observed cumulative spending. Reuse the record across retries/resume.
 
 The original source is `~/notes/compass_artifact_wf-c25b09eb-c57a-5a8a-ae44-853ee564cde7_text_markdown.md`. Its benchmark numbers, release claims, and model labels require current primary-source verification before grounding a new empirical claim. The user's later capacity and bounded-paid-work preferences take precedence over that report's generic recommendations.

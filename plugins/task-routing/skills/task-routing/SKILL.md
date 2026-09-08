@@ -15,9 +15,9 @@ Help the orchestrator choose **who should do this task, why, and how to launch t
 2. Read current allowance and spending in one call: `agent-usage`. Use `agent-usage --fresh` when its observations are stale. Interpret the windows and model pools using [usage](references/usage.md).
 3. Among models capable of the task, prefer the subscription service with more usable headroom. Then choose the model that delivers the required quality with the least cost and allowance consumption. If subscriptions are fresh, choose the best appropriate model for the category; spare capacity does not justify Astra or Fable for routine documentation retrieval.
 4. For small paid tasks, prefer an open-weight model with a demonstrated task advantage. **When Flash 3.8 research allowance is constrained, a suitable affordable open research model is the preferred next option before moving that routine research to other subscription models.** If none fits, use a suitable subscription route.
-5. Specify the exact native model ID and effort on every launch. Honor deliberate model requests; if unavailable or incompatible, explain the conflict and propose an alternative. Never silently inherit the orchestrator's model or substitute another one.
+5. Pass an explicit model selector and effort on every launch. Prefer a supported family alias that tracks the latest generation, such as Claude Code's `sonnet`, `opus` or `fable`; use the [known model IDs](references/routing.md#resolve-the-actual-model) where that alias behavior is unavailable. Rely on established mappings during normal dispatch, without repeating catalog or version checks. Honor deliberate model requests and surface unavailable selections; never silently inherit or substitute a model.
 
-The initial model families and their evidence limits are in [task categories](references/routing.md). Discover current IDs and availability from the installed harness; a model named in an old report is not proof that this subscription can launch it.
+The initial model families and their evidence limits are in [task categories](references/routing.md). Establish a mapping when adding a route; revisit it after a relevant harness/provider change, a model update or a selection error. Old release names in reports are not default launch recommendations.
 
 ## Dispatch
 
@@ -27,7 +27,7 @@ Native permission bypass is the user's authorized default. Use each harness's ac
 
 Give the worker a concrete deliverable, inputs, ownership, acceptance criteria, and durable report path. Adapt the [prompt template](assets/worker-prompt.md); no generated manifest is required. Ask the worker to preserve evidence and distinguish sourced claims, locally verified observations, and inference.
 
-Before sending substantive work, confirm the native session displays the requested model. Successful launch arguments and Herdr's ready state do not prove that selection took effect. Follow the [launch checks](references/herdr-dispatch.md#verify-before-submitting-work); record effort as unverified when the harness does not expose it.
+Resolve startup prompts before submitting work. Established model aliases do not need a separate version-verification step on each launch. Inspect native model selection when a warning, rejected selector or other evidence suggests a mismatch; follow [startup and recovery](references/herdr-dispatch.md#verify-before-submitting-work) rather than accepting a fallback silently.
 
 Use [znote handoffs](references/znote-handoff.md) to carry project decisions, assignments and accepted results between workers. Keep prompts conversational: explain the purpose, point to the relevant notes and files, and state the outcome and boundaries. The template is a checklist, not a required prompt format.
 
@@ -39,4 +39,4 @@ Observe the same worker after a timeout; do not submit the task twice. An idle a
 
 After saving results, [clean up the task's Herdr resources](references/cleanup.md): stop owned workers and close their task-created panes, tabs and workspaces unless the user asked to retain them. Record ownership at creation and verify removal; preserve reports, native session IDs, peer resources and the caller's pane.
 
-Keep the route explanation brief: category/difficulty, harness + exact model + effort, relevant allowance, why it fits, and paid allowance if applicable. Record meaningful results for future selections; small local trials and published benchmarks inform judgment without becoming universal eligibility gates.
+Keep the route explanation brief: category/difficulty, harness + explicit alias/model + effort, relevant allowance, why it fits, and paid allowance if applicable. Record meaningful results for future selections; small local trials and published benchmarks inform judgment without becoming universal eligibility gates.

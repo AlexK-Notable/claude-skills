@@ -25,11 +25,11 @@ Workspace creation returns `.result.workspace`, `.result.tab`, `.result.root_pan
 
 agy launches and in-session model changes must stay within Gemini. Never use `--kind agy` to run an Anthropic or OpenAI model. Choose Claude Code or Codex respectively for those subscription routes; extra agy quota does not override this boundary.
 
-Replace the uppercase placeholders with discovered IDs/effort; these are command patterns, not literal runnable assignments:
+Use the established selectors in [model routing](routing.md#resolve-the-actual-model). Claude Code uses family aliases by default; replace the uppercase placeholders with the applicable IDs/effort. These are command patterns, not literal runnable assignments:
 
 ```text
 herdr agent start WORKER --kind codex --pane PANE_ID -- --model EXACT_ID --config 'model_reasoning_effort="high"' --dangerously-bypass-approvals-and-sandbox
-herdr agent start WORKER --kind claude --pane PANE_ID -- --model EXACT_ID --effort high --dangerously-skip-permissions
+herdr agent start WORKER --kind claude --pane PANE_ID -- --model sonnet --effort high --dangerously-skip-permissions
 herdr agent start WORKER --kind agy --pane PANE_ID -- --model EXACT_ID --dangerously-skip-permissions
 ```
 
@@ -37,16 +37,16 @@ herdr agent start WORKER --kind agy --pane PANE_ID -- --model EXACT_ID --dangero
 
 ## Verify before submitting work
 
-After launch, inspect the native session before sending the assignment:
+Check startup readiness and resolve native trust or other blocking prompts before sending work. Herdr can report ready while a native prompt is still open. Ordinary observation is enough; do not add a catalog query, model-probing turn or resolved-version gate for an established selector:
 
 ```bash
 herdr agent read WORKER --source recent-unwrapped --lines 80
 herdr pane process-info --pane PANE_ID
 ```
 
-Match the model shown by the native UI or a native session inspection command to the requested route. Process arguments record the request; they do not prove the effective selection. Record requested and observed effort separately when the native display does not expose effort. A worker's self-description is not independent verification.
+Investigate model selection when startup warns of an unsupported selector or fallback, the visible model conflicts with the route, or a newly introduced mapping has not been established. Compare native UI/session evidence with the intended family and effort. Arguments record a request, and a worker's self-description is not independent proof. Record resolved model/effort when observed, without making extra discovery a routine requirement.
 
-If the pane is blank or still initializing, do not send substantive work. Recheck within the task's startup time allowance; use the harness's native model/status inspection when available. If selection remains unobservable, report that limitation rather than assuming success. If the model differs, correct it through the native selector and verify again, or stop that launch and choose a deliberate route. Do not silently accept the substituted model.
+If the pane is blank or still initializing, recheck readiness within the task's startup allowance. If selection fails or differs, use a supported selector and confirm the correction, or stop that launch and choose a deliberate route. Do not silently accept a fallback. In particular, agy's unrecognized `flash` selector fell back to a saved Anthropic model locally; no substantive prompt should be sent to such a session, because agy is Gemini-only. Use its known Gemini ID instead.
 
 If work already began on the wrong model, pause it and record the intervention. A model switch in the same conversation retains earlier context. Request reassessment when appropriate, but do not describe the resulting report as a fresh session containing only the corrected model's work.
 

@@ -13,6 +13,8 @@ Check `--help` before assuming extra options. The installed standalone version d
 
 Read each service's status, observation time, cached/stale markers, pools and windows. Null is unknown. A cached observation does not become new because it was read again. A reset timestamp crossed since observation makes the old percentage unsuitable for a new routing decision. Avoid repeated fresh requests after authentication errors or rate limiting.
 
+Keep service and pool labels attached to every percentage you use. Prefer `agent-usage --text` for a quick reading, or select complete service objects from JSON; a truncated `head`/`tail` fragment can separate windows from their owner. An agy Claude/GPT percentage is not Codex subscription headroom.
+
 Subscription headroom includes both short and long windows. Match the candidate to its actual pool: Claude's model-specific restrictions matter; Codex's separate pools are not interchangeable; agy may expose only some quota periods. Missing monthly data does not mean unlimited monthly use.
 
 For agy routing, consider Gemini capacity only. The collector may also report an agy Claude/GPT pool; retain that observation as usage data but exclude it from model selection. The user's Gemini-only restriction takes precedence over headroom, including a completely unused non-Gemini pool.
