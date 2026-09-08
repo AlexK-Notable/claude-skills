@@ -21,7 +21,7 @@ Do not assert that code-writing benchmarks prove review skill, or that a composi
 
 ## Resolve the actual model
 
-Use `agy models` for agy IDs. For Codex, the native `/model` picker or app-server `model/list` supplies available IDs and supported effort; `~/.codex/models_cache.json` is a cached hint, not live entitlement. For Claude, inspect the native model selector and observed session model; the supplied report's Opus/Sonnet generation names can differ from what the installed subscription exposes. For Hermes/OpenRouter, use the current model catalog and endpoint data described in [OpenRouter](openrouter.md).
+Use `agy models` to discover Gemini IDs only. Anthropic and OpenAI entries in that catalog are not eligible routes: agy is Gemini-only, regardless of advertised availability or spare quota. Use Claude Code for Anthropic subscription models and Codex for OpenAI subscription models. For Codex, the native `/model` picker or app-server `model/list` supplies available IDs and supported effort; `~/.codex/models_cache.json` is a cached hint, not live entitlement. For Claude, inspect the native model selector and observed session model; the supplied report's Opus/Sonnet generation names can differ from what the installed subscription exposes. For Hermes/OpenRouter, use the current model catalog and endpoint data described in [OpenRouter](openrouter.md).
 
 Do not print authentication files to discover models. Record what the harness actually launched, rather than treating its requested flags or a worker's self-description as proof.
 

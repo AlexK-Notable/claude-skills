@@ -23,6 +23,8 @@ Workspace creation returns `.result.workspace`, `.result.tab`, `.result.root_pan
 
 ## Start with explicit native settings
 
+agy launches and in-session model changes must stay within Gemini. Never use `--kind agy` to run an Anthropic or OpenAI model. Choose Claude Code or Codex respectively for those subscription routes; extra agy quota does not override this boundary.
+
 Replace the uppercase placeholders with discovered IDs/effort; these are command patterns, not literal runnable assignments:
 
 ```text

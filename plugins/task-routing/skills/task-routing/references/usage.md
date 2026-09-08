@@ -15,6 +15,8 @@ Read each service's status, observation time, cached/stale markers, pools and wi
 
 Subscription headroom includes both short and long windows. Match the candidate to its actual pool: Claude's model-specific restrictions matter; Codex's separate pools are not interchangeable; agy may expose only some quota periods. Missing monthly data does not mean unlimited monthly use.
 
+For agy routing, consider Gemini capacity only. The collector may also report an agy Claude/GPT pool; retain that observation as usage data but exclude it from model selection. The user's Gemini-only restriction takes precedence over headroom, including a completely unused non-Gemini pool.
+
 | OpenRouter scope | What it measures |
 |---|---|
 | Key (`/api/v1/key`) | Key usage totals and daily/weekly/monthly spending, key limit and remaining limit |

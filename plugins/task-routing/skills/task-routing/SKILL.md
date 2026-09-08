@@ -9,6 +9,8 @@ Help the orchestrator choose **who should do this task, why, and how to launch t
 
 ## Choose the route
 
+**Harness boundary: agy is Gemini-only. Never launch Anthropic or OpenAI models through agy, even if its catalog lists them or their quota pool has more headroom. Use Claude Code for Anthropic subscription models and Codex for OpenAI subscription models. Apply this boundary before comparing capacity.**
+
 1. Classify the work and difficulty using [task categories](references/routing.md). Separate cheap source gathering from difficult analysis when that makes a useful handoff. Delegate bounded, independently useful work; do not manufacture a fan-out for a simple request.
 2. Read current allowance and spending in one call: `agent-usage`. Use `agent-usage --fresh` when its observations are stale. Interpret the windows and model pools using [usage](references/usage.md).
 3. Among models capable of the task, prefer the subscription service with more usable headroom. Then choose the model that delivers the required quality with the least cost and allowance consumption. If subscriptions are fresh, choose the best appropriate model for the category; spare capacity does not justify Astra or Fable for routine documentation retrieval.
