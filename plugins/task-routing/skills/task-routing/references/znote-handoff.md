@@ -12,6 +12,8 @@ When a deliverable condenses accepted decisions, identify the conditions whose l
 
 When a worker has znote tools, it can read notes directly and update its own spoke. Fetch the current version and use `expected_version` for updates; re-read and reconcile conflicts. When tools are unavailable, supply identified note exports and have the worker write durable Markdown. The orchestrator imports the report into its spoke and records that fallback. Do not make MCP installation or configuration repair a prerequisite for the task.
 
+The note update's `content` field replaces the whole body; it is not an append operation. Read the current body and preserve its decisions, assignments and acceptance record when changing status or adding cleanup results. Afterward, retrieve the note and check that both the new status and the retained material survived; intact links alone do not prove the body was preserved.
+
 At acceptance, inspect the files and independently retrieve any claimed note update before marking it delivered. Verify that the hub links to the reports, then update its leading status, accepted outcome and outstanding work. Preserve full reports separately from the orchestrator's corrections to their claims. Keep terminal transcripts and large evidence in durable files rather than copying them into every note.
 
 Record what the handoff actually exercised: consuming exports does not demonstrate direct note retrieval, and a successful write to one's own spoke does not prove the whole handoff used MCP. Keep reusable findings with their evidence; do not turn every terminal event into a note.
