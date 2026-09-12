@@ -195,3 +195,12 @@ Add this when the recurring patterns become tedious to re-recognize.
 - **When cherry-picking an upstream fix commit onto a long-diverged local plugin fork (e.g. hyprtasking's komi/workspace-fixes-v55) after a Hyprland ABI-breaking release, once git's flagged conflicts appear resolved:** don't trust conflict resolution as complete — grep the whole source tree for every renamed/removed API named in the upstream commit's diff. Git only flags a conflict where it can correlate matching context lines; where the fork's own prior edits diverged the surrounding code too far, git silently keeps the fork's old (now-broken) code with no conflict marker at all, so those call sites only surface later as compile errors (or worse, could build clean and misbehave at runtime). *(lrn-d399003c)*
 - hypr-doctor's plugin-rebuild command does not overwrite its own persisted rebuild log on success, so the log can read as a failure long after the plugin was actually fixed and loaded. *(lrn-21cd0529)*
 <!-- self-learn:end -->
+
+<!-- self-learn:pointers:begin (do not hand-edit inside; managed by self-learn) -->
+## Reference material (self-learn)
+
+Captured lessons that are NOT loaded into this context. Read the file whose
+subject matches what you are about to do, before you start.
+
+- `references/LEARNINGS.md` — captured lessons for this skill
+<!-- self-learn:pointers:end -->
